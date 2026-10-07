@@ -6,15 +6,32 @@ import type { DisplayRelease } from '../utils/collection'
 import { artistDisplayName, creditedArtists, effectiveYears } from '../utils/collection'
 import { useReleaseTracklist } from '../hooks/useReleaseTracklist'
 import { useScrollLock } from '../hooks/useScrollLock'
+import { formatRelativeTime } from '../utils/time'
 import { CloseIcon } from './icons'
 
 interface ReleaseDetailProps {
   display: DisplayRelease
   token: string
   onClose: () => void
+  /** The last few random picks; only passed when the picker opened this view. */
+  recentPicks?: RecentPick[]
+  /** Opens a pick from the history — deliberately separate from logging. */
+  onOpenPick?: (id: number) => void
 }
 
-export function ReleaseDetail({ display, token, onClose }: ReleaseDetailProps) {
+export interface RecentPick {
+  id: number
+  at: number
+  label: string
+}
+
+export function ReleaseDetail({
+  display,
+  token,
+  onClose,
+  recentPicks,
+  onOpenPick,
+}: ReleaseDetailProps) {
   useScrollLock(true)
 
   useEffect(() => {
@@ -175,7 +192,23 @@ export function ReleaseDetail({ display, token, onClose }: ReleaseDetailProps) {
           ) : null}
 
           {tracksError && (
-            <p className="tracklist-note">Couldn't load the tracklist: {tracksError}</p>
+            <p className="tracklist-note">Couldn&apos;t load the tracklist: {tracksError}</p>
+          )}
+
+          {recentPicks && recentPicks.length > 0 && (
+            <div className="detail-section">
+              <span className="detail-section-title">Recent picks</span>
+              <ul className="recent-picks">
+                {recentPicks.map((pick) => (
+                  <li key={`${pick.id}-${pick.at}`}>
+                    <button type="button" onClick={() => onOpenPick?.(pick.id)}>
+                      <span className="recent-pick-label">{pick.label}</span>
+                      <span className="recent-pick-time">{formatRelativeTime(pick.at)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           <div className="detail-meta">

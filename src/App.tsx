@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import type { Settings as SettingsType } from './db/settings'
+import type { DiscogsCollectionRelease } from './types/discogs'
 import { loadSettings, saveSettings, clearSettings } from './db/settings'
 import type { ThemeId } from './theme'
 import { applyTheme } from './theme'
@@ -33,10 +34,21 @@ import { FiltersButton, FilterPanel } from './components/FilterMenu'
 import { ViewsButton, ViewsPanel } from './components/ViewsMenu'
 import { ArtistSection } from './components/ArtistSection'
 import { RecentList } from './components/RecentList'
-import { ReleaseDetail } from './components/ReleaseDetail'
+import { ReleaseDetail, type RecentPick } from './components/ReleaseDetail'
 import { StatsPanel } from './components/StatsPanel'
 import { SettingsIcon, RefreshIcon, ShuffleIcon, ChevronIcon, RecordPlayer, StatsIcon } from './components/icons'
 import { loadViews, saveViews, clearViews } from './db/views'
+import {
+  clampSkip,
+  clearPickerConfig,
+  DEFAULT_SKIP,
+  loadPickerConfig,
+  savePickerConfig,
+} from './db/picker'
+import { clearListenLog, getListenLog, getRecentListenIds, logListen } from './db/listenLog'
+import type { ListenEntry } from './db/listenLog'
+import { pickAvoiding } from './utils/picker'
+import { creditedArtists } from './utils/collection'
 import {
   createSavedView,
   hasCriteria,
@@ -68,6 +80,27 @@ function progressText(progress: SyncProgress): string {
     return `Retrieving original release years… ${progress.loaded.toLocaleString()} / ${progress.total.toLocaleString()}`
   }
   return `Fetching releases… ${progress.loaded.toLocaleString()} / ${progress.total.toLocaleString()}`
+}
+
+/** Shapes the stored log for the picker history in the detail overlay. */
+function toRecentPicks(
+  entries: ListenEntry[],
+  currentId: number,
+  releases: DiscogsCollectionRelease[],
+): RecentPick[] {
+  return entries
+    .filter((entry) => entry.id !== currentId)
+    .slice(0, 5)
+    .map((entry) => {
+      const basic = releases.find((release) => release.id === entry.id)?.basic_information
+      if (!basic) return { id: entry.id, at: entry.at, label: `Release #${entry.id}` }
+      const artist = basic.artists?.length ? creditedArtists(basic.artists) : ''
+      return {
+        id: entry.id,
+        at: entry.at,
+        label: artist ? `${artist} — ${basic.title}` : basic.title,
+      }
+    })
 }
 
 export default function App() {
@@ -102,6 +135,10 @@ export default function App() {
   const [artistSortMode, setArtistSortMode] = useState<ArtistSortMode>('chronological')
   const [viewMode, setViewMode] = useState<ViewMode>('artists')
   const [selected, setSelected] = useState<DisplayRelease | null>(null)
+  // Recent-pick history shown in the detail overlay; non-null only while the
+  // release on screen came from the random picker.
+  const [recentPicks, setRecentPicks] = useState<RecentPick[] | null>(null)
+  const [pickerSkip, setPickerSkip] = useState(() => loadPickerConfig().skip)
   const [showStats, setShowStats] = useState(false)
   const toolbarRef = useRef<HTMLDivElement>(null)
 
@@ -138,6 +175,7 @@ export default function App() {
     setArtistSortMode('chronological')
     setViewMode('artists')
     setSelected(null)
+    setRecentPicks(null)
     setActiveViewId(null)
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [accountKey])
@@ -285,14 +323,49 @@ export default function App() {
     setActiveViewId(null)
   }
 
-  const pickRandom = useCallback(() => {
-    if (filtered.length === 0) return
-    const picked = filtered[Math.floor(Math.random() * filtered.length)]
+  const pickRandom = useCallback(async () => {
+    if (filtered.length === 0 || !settings) return
+    const recentIds = await getRecentListenIds(settings.username, pickerSkip)
+    const picked = pickAvoiding(filtered, recentIds, pickerSkip)
+    if (!picked) return
+    // Every pick is logged — including re-rolls from an open detail view —
+    // so the skip window always reflects what the picker actually served.
+    await logListen(settings.username, picked.id)
+    const entries = await getListenLog(settings.username)
+    setRecentPicks(toRecentPicks(entries, picked.id, releases))
     setSelected(toDisplayRelease(picked, masterYears))
-  }, [filtered, masterYears])
+  }, [filtered, masterYears, releases, settings, pickerSkip])
+
+  /** Opening a card (or pressing rows) is browsing, not a listen: no history. */
+  const openRelease = useCallback((display: DisplayRelease) => {
+    setRecentPicks(null)
+    setSelected(display)
+  }, [])
+
+  /** History hops swap the release without logging another listen. */
+  const openPick = useCallback(
+    (id: number) => {
+      const found = releases.find((release) => release.id === id)
+      if (!found) return
+      setSelected(toDisplayRelease(found, masterYears))
+    },
+    [releases, masterYears],
+  )
+
+  const changePickerSkip = useCallback((value: number) => {
+    const skip = clampSkip(value)
+    setPickerSkip(skip)
+    savePickerConfig({ skip })
+  }, [])
 
   const onClearData = async () => {
     await wipeCache()
+    // The listen log and the skip preference are user data too: "clear
+    // everything" has to take them down, not just the caches.
+    await clearListenLog()
+    clearPickerConfig()
+    setPickerSkip(DEFAULT_SKIP)
+    setRecentPicks(null)
     clearSettings()
     // Saved views live in their own storage key, so "clear everything" has to
     // take them down explicitly to keep reclaiming everything it claims to.
@@ -323,6 +396,8 @@ export default function App() {
               theme={theme}
               onThemeChange={onThemeChange}
               onSave={onSaveSettings}
+              pickerSkip={pickerSkip}
+              onPickerSkipChange={changePickerSkip}
               onClose={settings ? () => setShowSettings(false) : undefined}
             >
               {settings && (
@@ -600,7 +675,7 @@ export default function App() {
               )}
             </div>
           ) : viewMode === 'recent' ? (
-            <RecentList sections={recentSections} onSelectRelease={setSelected} />
+            <RecentList sections={recentSections} onSelectRelease={openRelease} />
           ) : (
             <div className="artist-list">
               {grouped.map((artist) => (
@@ -609,19 +684,24 @@ export default function App() {
                   artist={artist}
                   sortMode={artistSortMode}
                   viewMode={viewMode}
-                  onSelectRelease={setSelected}
+                  onSelectRelease={openRelease}
                 />
               ))}
             </div>
           )}
         </div>
       )}
-    {/* Release detail overlay */}
+      {/* Release detail overlay */}
       {selected && (
         <ReleaseDetail
           display={selected}
           token={settings?.token ?? ''}
-          onClose={() => setSelected(null)}
+          recentPicks={recentPicks ?? undefined}
+          onOpenPick={openPick}
+          onClose={() => {
+            setRecentPicks(null)
+            setSelected(null)
+          }}
         />
       )}
 
