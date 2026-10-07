@@ -17,6 +17,7 @@ import {
   distinctLabels,
   yearBounds,
   countUniqueAlbums,
+  groupByDateAdded,
   toDisplayRelease,
   DEFAULT_FILTERS,
   type DisplayRelease,
@@ -31,6 +32,7 @@ import { SearchBar } from './components/SearchBar'
 import { FiltersButton, FilterPanel } from './components/FilterMenu'
 import { ViewsButton, ViewsPanel } from './components/ViewsMenu'
 import { ArtistSection } from './components/ArtistSection'
+import { RecentList } from './components/RecentList'
 import { ReleaseDetail } from './components/ReleaseDetail'
 import { StatsPanel } from './components/StatsPanel'
 import { SettingsIcon, RefreshIcon, ShuffleIcon, ChevronIcon, RecordPlayer, StatsIcon } from './components/icons'
@@ -156,6 +158,10 @@ export default function App() {
     [folderReleases, filters, debouncedQuery, masterYears],
   )
   const grouped = useMemo(() => groupReleases(filtered, masterYears), [filtered, masterYears])
+  const recentSections = useMemo(
+    () => groupByDateAdded(filtered.map((release) => toDisplayRelease(release, masterYears))),
+    [filtered, masterYears],
+  )
 
   const artistCount = grouped.length
   const totalMatching = filtered.length
@@ -494,27 +500,39 @@ export default function App() {
                 >
                   Albums
                 </button>
-              </div>
-            </div>
-            <div className="global-sort">
-              <span className="global-sort-label">Sort</span>
-              <div className="sort-toggle" role="group" aria-label="Sort releases by">
                 <button
-                  className={artistSortMode === 'chronological' ? 'active' : ''}
-                  onClick={() => setArtistSortMode('chronological')}
-                  title="Oldest to newest within each artist"
+                  type="button"
+                  role="radio"
+                  aria-checked={viewMode === 'recent'}
+                  className={viewMode === 'recent' ? 'active' : ''}
+                  onClick={() => setViewMode('recent')}
+                  title="A timeline of additions, newest month first"
                 >
-                  Year
-                </button>
-                <button
-                  className={artistSortMode === 'byName' ? 'active' : ''}
-                  onClick={() => setArtistSortMode('byName')}
-                  title="By album name within each artist"
-                >
-                  A–Z
+                  Recent
                 </button>
               </div>
             </div>
+            {viewMode !== 'recent' && (
+              <div className="global-sort">
+                <span className="global-sort-label">Sort</span>
+                <div className="sort-toggle" role="group" aria-label="Sort releases by">
+                  <button
+                    className={artistSortMode === 'chronological' ? 'active' : ''}
+                    onClick={() => setArtistSortMode('chronological')}
+                    title="Oldest to newest within each artist"
+                  >
+                    Year
+                  </button>
+                  <button
+                    className={artistSortMode === 'byName' ? 'active' : ''}
+                    onClick={() => setArtistSortMode('byName')}
+                    title="By album name within each artist"
+                  >
+                    A–Z
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {filtersOpen && (
@@ -581,6 +599,8 @@ export default function App() {
                 </div>
               )}
             </div>
+          ) : viewMode === 'recent' ? (
+            <RecentList sections={recentSections} onSelectRelease={setSelected} />
           ) : (
             <div className="artist-list">
               {grouped.map((artist) => (

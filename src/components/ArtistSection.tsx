@@ -17,7 +17,8 @@ import { ChevronIcon } from './icons'
 interface ArtistSectionProps {
   artist: GroupedArtist
   sortMode: ArtistSortMode
-  viewMode: ViewMode
+  /** The Recent view has no shelves, so it never reaches this component. */
+  viewMode: Exclude<ViewMode, 'recent'>
   onSelectRelease: (display: DisplayRelease) => void
 }
 

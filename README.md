@@ -1,6 +1,6 @@
 # Vinyl Vault
 
-Browse your personal **Discogs collection** on any device — grouped by artist or by album, sorted the way you want, searchable, filterable, and available offline. It's an installable web app that runs entirely in your browser: fetch your collection once and it's yours.
+Browse your personal **Discogs collection** on any device — grouped by artist, by album, or as a recently-added timeline, sorted the way you want, searchable, filterable, and available offline. It's an installable web app that runs entirely in your browser: fetch your collection once and it's yours.
 
 ## What it can do
 
@@ -8,6 +8,7 @@ Browse your personal **Discogs collection** on any device — grouped by artist 
 - **Filing sort** — leading articles (`a`, `an`, `the`) are ignored when sorting, so **The Menzingers** files under **M**. Diacritics and punctuation are normalized too (`Motörhead` → `motorhead`).
 - **Sort within an artist** — toggle between **Year** (oldest → newest, default) and **A–Z** per artist; click any artist header to collapse or expand its shelf.
 - **Artists / Albums view** — a toggle in the toolbar flips the grid to one card per album: every pressing of the same Discogs master collapses together, badged `3 pressings`, with each pressing listed on the card (year, country, format, label). The card opens the earliest pressing, a listed row opens that exact one, long lists collapse behind **+N more**, and duplicate copies of one pressing count as `×N copies` instead of repeating. Releases without a master group by release id. Artist shelves and the summary line keep counting in pressings either way, so the totals never change when you flip views.
+- **Recently added view** — a third option turns the grid into a timeline: month-by-month sections (newest first, bucketed in your local time) of everything you've added, with the artist credited on every card since there are no shelves to hang them from. Search and filters still apply, releases without a usable date land in a final **Undated** section instead of vanishing, and the year/A–Z sort steps aside — it costs no extra API calls, because it only reads timestamps the collection already cached.
 - **Summary & unique albums** — running totals of `N artists · M releases · U unique albums`, and every artist header shows its own counts. *Unique albums* counts distinct masters (a release id when a master is missing), so several pressings of the same album count once — the same rule the Albums view groups by.
 - **Search & filter** — debounced search across artist, title, genre, style, label and year; filters for format, genre, style, label and year range, all populated from your actual data.
 - **Saved views (smart lists)** — save any search + filter combination under a name (**7-inch singles**, **90s techno**) and switch back to it in one tap from the toolbar. Each view shows how many releases it matches *right now*, and can be renamed, updated or deleted; touching the search box or filters marks the view as changed, with a one-tap **update** or **revert**. A view captures the search box and filters only — your folder and sort preference stay as you left them.

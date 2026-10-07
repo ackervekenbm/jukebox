@@ -9,9 +9,11 @@ import { VinylIcon } from './icons'
 interface ReleaseCardProps {
   display: DisplayRelease
   onOpen?: (display: DisplayRelease) => void
+  /** Credit line above the title — used where there is no artist shelf. */
+  showArtist?: boolean
 }
 
-export function ReleaseCard({ display, onOpen }: ReleaseCardProps) {
+export function ReleaseCard({ display, onOpen, showArtist }: ReleaseCardProps) {
   const lines = effectiveYears(display)
 
   const handleKey = (event: KeyboardEvent<HTMLElement>) => {
@@ -46,6 +48,7 @@ export function ReleaseCard({ display, onOpen }: ReleaseCardProps) {
         )}
       </div>
       <div className="release-meta">
+        {showArtist && <p className="release-artist">{display.artistName}</p>}
         <h3 className="release-title" title={display.title}>
           {display.title}
         </h3>
