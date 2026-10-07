@@ -135,4 +135,12 @@ npm run build && npm test
 
 ---
 
+## License
+
+Vinyl Vault is free software licensed under the **GNU Affero General Public License v3.0 or later** (`AGPL-3.0-or-later`) — see [`LICENSE`](LICENSE) for the full text. Source-file headers carry the matching `SPDX-License-Identifier: AGPL-3.0-or-later` tag.
+
+In short: you are free to use, study, share and modify this software, and if you run it as a network service (for example hosting the app for others), you must offer the corresponding source code to its users.
+
+---
+
 This README is part of the repo and is kept in sync as the app evolves — when features, commands, or structure change, this file is updated to match.
