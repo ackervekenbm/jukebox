@@ -319,6 +319,36 @@ button:disabled {
   gap: 8px;
 }
 
+.picker-skip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.picker-skip input {
+  width: 74px;
+  font: inherit;
+  text-align: center;
+  padding: 8px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.picker-skip input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.theme-section .settings-help {
+  display: block;
+  margin-top: 8px;
+}
+
 .theme-chip {
   display: flex;
   flex-direction: column;
@@ -1758,6 +1788,48 @@ button:disabled {
   list-style: none;
   font-size: 13px;
   line-height: 1.7;
+}
+
+.recent-picks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recent-picks button {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.recent-picks button:hover {
+  border-color: var(--accent-strong);
+}
+
+.recent-pick-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-pick-time {
+  flex: none;
+  color: var(--text-faint);
+  font-size: 12px;
 }
 
 .detail-role {

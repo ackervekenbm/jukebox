@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2025-2026 ackervekenbm
 
-import { openDB } from 'idb'
 import type {
   CollectionValue,
   DiscogsCollectionFolder,
@@ -9,6 +8,7 @@ import type {
   DiscogsTrack,
 } from '../types/discogs'
 import type { MasterYears } from '../api/discogs'
+import { dbPromise } from './database'
 
 export interface CachedCollection {
   username: string
@@ -23,30 +23,11 @@ export interface CachedCollectionValue {
   fetchedAt: number
 }
 
-const DB_NAME = 'vinyl-vault'
 const STORE = 'collection'
 const MASTER_STORE = 'masterYears'
 const DETAIL_STORE = 'releaseDetails'
 const VALUE_STORE = 'collectionValue'
-const VERSION = 4
 const MASTER_KEY = 'all'
-
-const dbPromise = openDB(DB_NAME, VERSION, {
-  upgrade(db) {
-    if (!db.objectStoreNames.contains(STORE)) {
-      db.createObjectStore(STORE)
-    }
-    if (!db.objectStoreNames.contains(MASTER_STORE)) {
-      db.createObjectStore(MASTER_STORE)
-    }
-    if (!db.objectStoreNames.contains(DETAIL_STORE)) {
-      db.createObjectStore(DETAIL_STORE)
-    }
-    if (!db.objectStoreNames.contains(VALUE_STORE)) {
-      db.createObjectStore(VALUE_STORE)
-    }
-  },
-})
 
 export async function getCachedCollection(username: string): Promise<CachedCollection | undefined> {
   const db = await dbPromise

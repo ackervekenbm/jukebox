@@ -12,6 +12,10 @@ interface SettingsProps {
   theme: ThemeId
   onThemeChange: (theme: ThemeId) => void
   onSave: (settings: SettingsType) => void
+  /** How many recent picks the random picker should avoid. */
+  pickerSkip: number
+  /** Fires on every edit; the caller clamps and persists immediately. */
+  onPickerSkipChange: (skip: number) => void
   onClose?: () => void
   children?: ReactNode
 }
@@ -21,6 +25,8 @@ export function SettingsForm({
   theme,
   onThemeChange,
   onSave,
+  pickerSkip,
+  onPickerSkipChange,
   onClose,
   children,
 }: SettingsProps) {
@@ -114,6 +120,29 @@ export function SettingsForm({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="theme-section">
+            <span className="theme-heading">Random picker</span>
+            <label className="picker-skip" htmlFor="picker-skip">
+              Skip the last
+              <input
+                id="picker-skip"
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={pickerSkip}
+                onChange={(event) =>
+                  onPickerSkipChange(event.target.value === '' ? 0 : Number(event.target.value))
+                }
+              />
+              recently played picks
+            </label>
+            <span className="settings-help">
+              The picker avoids the last N picks while the collection still has something else to
+              offer. Set it to 0 to allow instant repeats.
+            </span>
           </div>
 
           {children}
