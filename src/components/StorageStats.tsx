@@ -206,6 +206,14 @@ export function StorageStats({ username, onClearData }: StorageStatsProps) {
             </div>
 
             <div className="stats-row">
+              <span className="stats-label">Listen log</span>
+              <span className="stats-value">
+                {stats.indexedDb.listenCount.toLocaleString()}{' '}
+                {stats.indexedDb.listenCount === 1 ? 'pick' : 'picks'}
+              </span>
+            </div>
+
+            <div className="stats-row">
               <span className="stats-label">App shell</span>
               <span className="stats-value">
                 {cacheReadable

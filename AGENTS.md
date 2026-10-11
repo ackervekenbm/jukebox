@@ -59,10 +59,14 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   the app must never call `api.discogs.com` cross-origin, because Discogs' 429s
   carry no CORS headers and the browser would mask throttling as an opaque
   CORS error.
-- `src/db/collection.ts` — IndexedDB `vinyl-vault` (idb lib), three stores:
-  `collection` (1 row/username), `masterYears` (1 row), `releaseDetails`
-  (unbounded tracklist cache — the app's main space grower).
-  Bump `VERSION` to invalidate caches after a shape change.
+- `src/db/database.ts` — one shared `openDB` connection for IndexedDB
+  `vinyl-vault` (idb lib), five stores: `collection` (1 row/username),
+  `masterYears` (1 row), `collectionValue` (1 row/username), `releaseDetails`
+  (unbounded tracklist cache — the app's main space grower) and `listenLog`
+  (random-pick history, capped at 200 entries/username). Bump `VERSION` there
+  to invalidate caches after a shape change. `src/db/collection.ts` and
+  `src/db/listenLog.ts` are the typed store APIs; `settings.ts`, `views.ts`
+  and `picker.ts` in the same folder are the localStorage counterparts.
 - `src/theme.ts` + `src/styles.css` — CSS-variable themes
   (`midnight`/`paper`/`club`/`forest`); new UI styles must use existing `--*`
   tokens, never hardcoded colors.

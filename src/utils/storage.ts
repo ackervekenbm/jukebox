@@ -2,6 +2,7 @@
 // Copyright (C) 2025-2026 ackervekenbm
 
 import { getCachedCollection, getMasterYears, countReleaseDetails } from '../db/collection'
+import { countListenEntries } from '../db/listenLog'
 import type { MasterYears } from '../api/discogs'
 
 const encoder = new TextEncoder()
@@ -87,12 +88,14 @@ export interface IndexedDbStat {
   collection: CollectionCacheStat | null
   masterYears: MasterYearsStat
   detailCount: number
+  listenCount: number
 }
 
 export async function scanIndexedDb(username: string): Promise<IndexedDbStat> {
   const collection = await getCachedCollection(username).catch(() => undefined)
   const years: MasterYears = await getMasterYears().catch(() => ({} as MasterYears))
   const detailCount = await countReleaseDetails().catch(() => 0)
+  const listenCount = await countListenEntries(username).catch(() => 0)
 
   const collectionStat: CollectionCacheStat | null = collection
     ? (() => {
@@ -124,6 +127,7 @@ export async function scanIndexedDb(username: string): Promise<IndexedDbStat> {
       bytes: byteSize(JSON.stringify(years)),
     },
     detailCount,
+    listenCount,
   }
 }
 

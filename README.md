@@ -15,7 +15,7 @@ Browse your personal **Discogs collection** on any device — grouped by artist,
 - **Collection folders** — a folder bar above the search: pick a Discogs folder (or **All**) and the search, filters, summary and grids all follow it. The whole collection is fetched once, so switching folders is instant.
 - **Release details** — click any cover for an overlay with everything we have: original/pressing years, format, label + catno, genres/styles, credits, country, rating, added date and direct Discogs links.
 - **Tracklists** — the detail view also lists the full tracklisting, loaded per release on demand and cached in the browser, so it's instant on reopening and works offline.
-- **Random picker** — can't decide what to listen to? A floating shuffle button picks from the current folder (respecting any active search/filters); with a release open, it re-rolls to a new random pick.
+- **Random picker** — can't decide what to listen to? A floating shuffle button picks from the current folder (respecting any active search/filters); with a release open, it re-rolls to a new random pick. Every pick is remembered in a local **listen log** (the last 200 per account) and the picker skips your most recent picks, so it won't hand you the same record twice — how many to skip is yours to choose in settings (0–100, default 10), and the window shrinks gracefully on small collections rather than running out of options. Opened from the picker, the detail view lists the last few picks with relative timestamps, so you can hop back to an earlier one without it counting as a new listen.
 - **4 UI styles** — **Midnight** (dark navy), **Paper** (warm light), **Club** (neon dark) or **Forest** (mossy dark) in settings; your choice is remembered.
 - **Instant & offline** — pages are fetched from Discogs at a pace that stays inside their rate limit, then cached in the browser: later visits show the collection instantly and refresh it quietly in the background. Add the app to your home screen and use it like a native app.
 
@@ -37,9 +37,9 @@ Browse your personal **Discogs collection** on any device — grouped by artist,
 ## Where your data lives
 
 - Your **token stays in your browser** (localStorage). It's sent to Discogs and nowhere else. Anyone with access to your device could extract it — regenerate it anytime at <https://www.discogs.com/settings/developers>.
-- The **collection, tracklists and cached years live in your browser** (IndexedDB). Nothing is stored on a server — the deployment is completely stateless.
+- The **collection, tracklists, cached years and pick history live in your browser** (IndexedDB). Nothing is stored on a server — the deployment is completely stateless.
 - **Saved views** are stored in the browser too (localStorage), as plain filter definitions — no account, no API calls.
-- **"Clear everything"** in settings removes the cached collection, your saved views and stored credentials from your device.
+- **"Clear everything"** in settings removes the cached collection, your saved views, the listen log, the picker preference and stored credentials from your device.
 
 ## Deployment (production)
 
@@ -124,7 +124,7 @@ npm run build && npm test
 ├── scripts/gen-icons.mjs                          # icon generator
 └── src/
     ├── api/discogs.ts                             # Discogs client (proxy base, pacing, retries)
-    ├── db/                                        # settings (localStorage) + IndexedDB collection cache
+    ├── db/                                        # IndexedDB stores (collection, tracklists, listen log) + localStorage settings/views/picker
     ├── hooks/                                     # useCollection (sync lifecycle), useReleaseTracklist, useScrollLock
     ├── utils/                                     # sortName (filing sort keys), collection (group/filter/shape)
     ├── test/setup.ts                              # vitest setup
