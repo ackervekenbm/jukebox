@@ -14,6 +14,7 @@ import {
   distinctStyles,
   effectiveYears,
   filterReleases,
+  groupByDateAdded,
   groupPressings,
   groupReleases,
   sortPressingGroups,
@@ -548,6 +549,58 @@ describe('sortPressingGroups', () => {
     const input = [newer, older]
     sortPressingGroups(input, 'chronological')
     expect(input.map((g) => g.key)).toEqual(['master-12', 'master-11'])
+  })
+})
+
+describe('groupByDateAdded', () => {
+  const display = (over: Partial<DiscogsCollectionRelease> = {}) => toDisplayRelease(release(over))
+  /** An ISO timestamp that falls on this local calendar date (machine-TZ safe). */
+  const addedAt = (year: number, month: number, day = 15) =>
+    new Date(year, month - 1, day, 12).toISOString()
+  const monthLabel = (year: number, month: number) =>
+    new Date(year, month - 1, 15).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+
+  it('buckets by month with the newest month first', () => {
+    const may2 = display({ id: 1, date_added: addedAt(2024, 5, 2) })
+    const may15 = display({ id: 2, date_added: addedAt(2024, 5, 15) })
+    const nov = display({ id: 3, date_added: addedAt(2023, 11, 20) })
+
+    const sections = groupByDateAdded([nov, may2, may15])
+
+    expect(sections.map((s) => s.key)).toEqual(['2024-05', '2023-11'])
+    expect(sections.map((s) => s.label)).toEqual([monthLabel(2024, 5), monthLabel(2023, 11)])
+    // Newest addition first within the month.
+    expect(sections[0].releases.map((r) => r.id)).toEqual([2, 1])
+  })
+
+  it('buckets in local time, not UTC', () => {
+    // Just past midnight on May 1st local time — west of UTC the ISO instant
+    // still reads April, but the collector's calendar says May.
+    const local = display({ id: 1, date_added: new Date(2024, 4, 1, 0, 30).toISOString() })
+
+    expect(groupByDateAdded([local])[0].key).toBe('2024-05')
+  })
+
+  it('lands missing or unparseable dates in a final Undated section', () => {
+    const good = display({ id: 1, date_added: addedAt(2024, 5, 15) })
+    const empty = display({ id: 2, date_added: '' })
+    const garbage = display({ id: 3, date_added: 'not-a-date' })
+
+    const sections = groupByDateAdded([empty, good, garbage])
+
+    expect(sections.map((s) => s.key)).toEqual(['2024-05', 'undated'])
+    expect(sections[1].label).toBe('Undated')
+    expect(sections[1].releases.map((r) => r.id)).toEqual([2, 3])
+  })
+
+  it('returns no sections for an empty list and keeps the input order', () => {
+    expect(groupByDateAdded([])).toEqual([])
+    const input = [
+      display({ id: 1, date_added: addedAt(2024, 5, 2) }),
+      display({ id: 2, date_added: addedAt(2024, 5, 15) }),
+    ]
+    groupByDateAdded(input)
+    expect(input.map((r) => r.id)).toEqual([1, 2])
   })
 })
 

@@ -254,7 +254,7 @@ export function groupReleases(
  * per-artist sort: it is not part of a saved view (a view captures the
  * selection only) and it resets with the account, like the open folder.
  */
-export type ViewMode = 'artists' | 'albums'
+export type ViewMode = 'artists' | 'albums' | 'recent'
 
 /** One distinct pressing of a group, plus how many copies of it are held. */
 export interface PressingRow {
@@ -358,6 +358,57 @@ export function sortPressingGroups(
     )
   }
   return list
+}
+
+/** One calendar month of additions (or the final catch-all "Undated" bucket). */
+export interface DateSection {
+  /** `YYYY-MM` for a real month, `undated` for the catch-all. */
+  key: string
+  /** Localized month heading, e.g. "April 2023". */
+  label: string
+  /** Newest addition first; whatever order they arrived in when undated. */
+  releases: DisplayRelease[]
+}
+
+/**
+ * Buckets releases by when they were added to the collection, newest month
+ * first. The timestamp is read in the viewer's local time (Discogs returns ISO
+ * UTC, but a collector thinks in their own calendar), and anything without a
+ * parseable date lands in a final "Undated" section rather than being dropped.
+ */
+export function groupByDateAdded(releases: DisplayRelease[]): DateSection[] {
+  const months = new Map<string, DateSection>()
+  const undated: DisplayRelease[] = []
+
+  for (const release of releases) {
+    const date = new Date(release.dateAdded)
+    if (!release.dateAdded || Number.isNaN(date.getTime())) {
+      undated.push(release)
+      continue
+    }
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    let section = months.get(key)
+    if (!section) {
+      section = {
+        key,
+        label: date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
+        releases: [],
+      }
+      months.set(key, section)
+    }
+    section.releases.push(release)
+  }
+
+  // YYYY-MM sorts newest-first lexicographically; within a month, latest
+  // timestamp first (ISO-8601 strings compare correctly as text).
+  const sections = [...months.values()].sort((a, b) => b.key.localeCompare(a.key))
+  for (const section of sections) {
+    section.releases.sort((a, b) => b.dateAdded.localeCompare(a.dateAdded))
+  }
+  if (undated.length > 0) {
+    sections.push({ key: 'undated', label: 'Undated', releases: undated })
+  }
+  return sections
 }
 
 export function distinctFormats(releases: DiscogsCollectionRelease[]): string[] {

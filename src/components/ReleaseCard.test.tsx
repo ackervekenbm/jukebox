@@ -34,4 +34,14 @@ describe('ReleaseCard', () => {
     fireEvent.keyDown(card, { key: ' ' })
     expect(onOpen).toHaveBeenCalledTimes(2)
   })
+
+  it('shows the artist credit only when asked to', () => {
+    const { rerender } = render(<ReleaseCard display={display} />)
+    expect(screen.queryByText('Test Artist')).toBeNull()
+
+    rerender(<ReleaseCard display={display} showArtist />)
+    expect(screen.getByText('Test Artist')).toBeInTheDocument()
+    // The accessible name carries the credit either way.
+    expect(screen.getByRole('button')).toHaveAccessibleName('Test Artist — Closer')
+  })
 })
