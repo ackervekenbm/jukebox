@@ -22,6 +22,7 @@ import {
   type DisplayRelease,
   type Filters,
   type ArtistSortMode,
+  type ViewMode,
 } from './utils/collection'
 import { SettingsForm } from './components/Settings'
 import { StorageStats } from './components/StorageStats'
@@ -97,6 +98,7 @@ export default function App() {
   const [activeViewId, setActiveViewId] = useState<string | null>(null)
   const [folderId, setFolderId] = useState(0)
   const [artistSortMode, setArtistSortMode] = useState<ArtistSortMode>('chronological')
+  const [viewMode, setViewMode] = useState<ViewMode>('artists')
   const [selected, setSelected] = useState<DisplayRelease | null>(null)
   const [showStats, setShowStats] = useState(false)
   const toolbarRef = useRef<HTMLDivElement>(null)
@@ -132,6 +134,7 @@ export default function App() {
     setFilters(DEFAULT_FILTERS)
     setFolderId(0)
     setArtistSortMode('chronological')
+    setViewMode('artists')
     setSelected(null)
     setActiveViewId(null)
     /* eslint-enable react-hooks/set-state-in-effect */
@@ -468,6 +471,31 @@ export default function App() {
                 setFiltersOpen(false)
               }}
             />
+            <div className="global-view">
+              <span className="global-sort-label">View</span>
+              <div className="sort-toggle" role="radiogroup" aria-label="Collection view">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={viewMode === 'artists'}
+                  className={viewMode === 'artists' ? 'active' : ''}
+                  onClick={() => setViewMode('artists')}
+                  title="One card per release, on each artist's shelf"
+                >
+                  Artists
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={viewMode === 'albums'}
+                  className={viewMode === 'albums' ? 'active' : ''}
+                  onClick={() => setViewMode('albums')}
+                  title="One card per album: every pressing of a master grouped together"
+                >
+                  Albums
+                </button>
+              </div>
+            </div>
             <div className="global-sort">
               <span className="global-sort-label">Sort</span>
               <div className="sort-toggle" role="group" aria-label="Sort releases by">
@@ -560,6 +588,7 @@ export default function App() {
                   key={artist.id}
                   artist={artist}
                   sortMode={artistSortMode}
+                  viewMode={viewMode}
                   onSelectRelease={setSelected}
                 />
               ))}

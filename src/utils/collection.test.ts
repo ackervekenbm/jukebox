@@ -14,13 +14,16 @@ import {
   distinctStyles,
   effectiveYears,
   filterReleases,
+  groupPressings,
   groupReleases,
+  sortPressingGroups,
   toDisplayRelease,
   yearBounds,
   DEFAULT_FILTERS,
   type FilterOptions,
 } from './collection'
 import { artist, release } from '../test/factories'
+import type { DiscogsCollectionRelease } from '../types/discogs'
 
 const basic = release().basic_information
 
@@ -336,6 +339,215 @@ describe('groupReleases', () => {
     ])
     expect(groups).toHaveLength(1)
     expect(groups[0].name).toBe('Various')
+  })
+})
+
+describe('groupPressings', () => {
+  const display = (
+    over: Partial<DiscogsCollectionRelease> = {},
+    masterYears: Record<number, number> = {},
+  ) => toDisplayRelease(release(over), masterYears)
+
+  it('collapses every pressing of one master into a single group', () => {
+    const us = display({
+      id: 1,
+      instance_id: 1,
+      basic_information: { ...basic, master_id: 11, title: 'Album', year: 1981, country: 'US' },
+    })
+    const uk = display({
+      id: 2,
+      instance_id: 2,
+      basic_information: { ...basic, master_id: 11, title: 'Album', year: 1983, country: 'UK' },
+    })
+
+    const groups = groupPressings([us, uk])
+
+    expect(groups).toHaveLength(1)
+    expect(groups[0].key).toBe('master-11')
+    expect(groups[0].pressings.map((p) => p.id)).toEqual([1, 2])
+    expect(groups[0].rows).toHaveLength(2)
+  })
+
+  it('orders pressings oldest first and makes the earliest the primary', () => {
+    const pressings = [
+      display({
+        id: 1,
+        instance_id: 1,
+        basic_information: { ...basic, master_id: 11, year: 1981 },
+      }),
+      display({
+        id: 2,
+        instance_id: 2,
+        basic_information: { ...basic, master_id: 11, year: 1979 },
+      }),
+      display({
+        id: 3,
+        instance_id: 3,
+        basic_information: { ...basic, master_id: 11, year: 1983 },
+      }),
+    ]
+
+    const [group] = groupPressings(pressings)
+
+    expect(group.pressings.map((p) => p.id)).toEqual([2, 1, 3])
+    expect(group.primary.id).toBe(2)
+  })
+
+  it('sends undated pressings to the end, never to primary', () => {
+    const undated = display({
+      id: 1,
+      instance_id: 1,
+      basic_information: { ...basic, master_id: 11, year: 0 },
+    })
+    const dated = display({
+      id: 2,
+      instance_id: 2,
+      basic_information: { ...basic, master_id: 11, year: 1981 },
+    })
+
+    const [group] = groupPressings([undated, dated])
+
+    expect(group.pressings.map((p) => p.id)).toEqual([2, 1])
+    expect(group.primary.id).toBe(2)
+    expect(group.year).toBe(1981)
+  })
+
+  it.each<[string, number | null | undefined]>([
+    ['0', 0],
+    ['null', null],
+    ['undefined', undefined],
+  ])('keeps masterless (master_id %s) releases in their own release-keyed groups', (_, masterId) => {
+    const one = display({
+      id: 1,
+      instance_id: 1,
+      basic_information: {
+        ...basic,
+        // Deliberately out of contract for the undefined case: the wire payload
+        // can miss the field, and grouping must not care whether 0, null or a
+        // missing id marks "no master".
+        master_id: masterId as number | null,
+        year: 1970,
+      },
+    })
+    const two = display({
+      id: 2,
+      instance_id: 2,
+      basic_information: {
+        ...basic,
+        master_id: masterId as number | null,
+        year: 1971,
+      },
+    })
+
+    const groups = groupPressings([one, two])
+
+    expect(groups.map((g) => g.key)).toEqual(['release-1', 'release-2'])
+    expect(groups.every((g) => g.rows.length === 1)).toBe(true)
+  })
+
+  it('gathers two copies of the same masterless release into one group', () => {
+    const copyA = display({
+      id: 7,
+      instance_id: 1,
+      basic_information: { ...basic, master_id: 0, year: 1970 },
+    })
+    const copyB = display({
+      id: 7,
+      instance_id: 2,
+      basic_information: { ...basic, master_id: 0, year: 1970 },
+    })
+
+    const [group] = groupPressings([copyA, copyB])
+
+    expect(group.key).toBe('release-7')
+    expect(group.pressings).toHaveLength(2)
+    expect(group.rows).toHaveLength(1)
+    expect(group.rows[0].copies).toBe(2)
+  })
+
+  it('counts duplicate instances of one pressing as copies on a shared row', () => {
+    const copyA = display({ id: 5, instance_id: 1, basic_information: { ...basic, master_id: 11 } })
+    const copyB = display({ id: 5, instance_id: 2, basic_information: { ...basic, master_id: 11 } })
+    const other = display({ id: 6, instance_id: 3, basic_information: { ...basic, master_id: 11 } })
+
+    const [group] = groupPressings([copyA, copyB, other])
+
+    expect(group.rows.map((row) => row.release.id)).toEqual([5, 6])
+    expect(group.rows.map((row) => row.copies)).toEqual([2, 1])
+    expect(group.pressings).toHaveLength(3)
+  })
+
+  it('uses the master year as the group year when it is known', () => {
+    const pressings = [
+      display(
+        { id: 1, instance_id: 1, basic_information: { ...basic, master_id: 11, year: 1981 } },
+        { 11: 1974 },
+      ),
+      display(
+        { id: 2, instance_id: 2, basic_information: { ...basic, master_id: 11, year: 1983 } },
+        { 11: 1974 },
+      ),
+    ]
+
+    expect(groupPressings(pressings)[0].year).toBe(1974)
+  })
+
+  it('returns no groups for an empty list and never mutates the input order', () => {
+    expect(groupPressings([])).toEqual([])
+    const one = display({ id: 1, instance_id: 1, basic_information: { ...basic, master_id: 11, year: 1981 } })
+    const two = display({ id: 2, instance_id: 2, basic_information: { ...basic, master_id: 11, year: 1979 } })
+    const input = [one, two]
+    groupPressings(input)
+    expect(input.map((d) => d.id)).toEqual([1, 2])
+  })
+})
+
+describe('sortPressingGroups', () => {
+  const display = (over: Partial<DiscogsCollectionRelease> = {}) =>
+    toDisplayRelease(release(over))
+
+  const older = groupPressings([
+    display({
+      id: 1,
+      instance_id: 1,
+      basic_information: { ...basic, master_id: 11, title: 'Zebra', year: 1970 },
+    }),
+  ])[0]
+  const newer = groupPressings([
+    display({
+      id: 2,
+      instance_id: 2,
+      basic_information: { ...basic, master_id: 12, title: 'Apple', year: 1990 },
+    }),
+  ])[0]
+  const undated = groupPressings([
+    display({
+      id: 3,
+      instance_id: 3,
+      basic_information: { ...basic, master_id: 13, title: 'Mango', year: 0 },
+    }),
+  ])[0]
+
+  it('sorts chronological by group year with undated groups last', () => {
+    expect(sortPressingGroups([undated, newer, older], 'chronological').map((g) => g.key)).toEqual([
+      'master-11',
+      'master-12',
+      'master-13',
+    ])
+  })
+
+  it('sorts A–Z by title with the group year as tie-break', () => {
+    expect(sortPressingGroups([older, newer, undated], 'byName').map((g) => g.key)).toEqual([
+      'master-12',
+      'master-13',
+      'master-11',
+    ])
+  })
+
+  it('leaves the input array untouched', () => {
+    const input = [newer, older]
+    sortPressingGroups(input, 'chronological')
+    expect(input.map((g) => g.key)).toEqual(['master-12', 'master-11'])
   })
 })
 

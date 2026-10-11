@@ -17,6 +17,7 @@ export interface DisplayRelease {
   genres: string[]
   styles: string[]
   labels: string[]
+  country: string
   formatNames: string[]
   formatText: string
   coverImage: string
@@ -156,6 +157,7 @@ export function toDisplayRelease(
     genres: basic.genres ?? [],
     styles: basic.styles ?? [],
     labels: (basic.labels ?? []).map((label) => label.name),
+    country: basic.country ?? '',
     formatNames: formatNamesOf(release),
     formatText: formatTextOf(release),
     coverImage: coverImageOf(release),
@@ -245,6 +247,117 @@ export function groupReleases(
     compareSortKeys(a.sortKey, b.sortKey),
   )
   return artists
+}
+
+/**
+ * How the listing is organized. Deliberately a browsing preference like the
+ * per-artist sort: it is not part of a saved view (a view captures the
+ * selection only) and it resets with the account, like the open folder.
+ */
+export type ViewMode = 'artists' | 'albums'
+
+/** One distinct pressing of a group, plus how many copies of it are held. */
+export interface PressingRow {
+  release: DisplayRelease
+  copies: number
+}
+
+/** Every pressing of one master (or the copies of one masterless release). */
+export interface PressingGroup {
+  /** `master-<id>` for a real master, `release-<id>` when Discogs has none. */
+  key: string
+  /** The card's cover/title: the earliest dated pressing, deterministically. */
+  primary: DisplayRelease
+  /** Earliest known year across the group (master year when known), 0 if none. */
+  year: number
+  /** Every instance, oldest pressing first (undated last). */
+  pressings: DisplayRelease[]
+  /** One entry per distinct release id, so two copies don't list twice. */
+  rows: PressingRow[]
+}
+
+/**
+ * Groups an artist's releases into one card per album.
+ *
+ * The key mirrors countUniqueAlbums exactly: a real Discogs master (any id
+ * above 0) collapses all of its pressings, while masterless releases (0 or a
+ * missing id — there is no master to collapse into) each stand alone, keyed by
+ * release id so multiple copies of one release still gather together.
+ */
+export function groupPressings(releases: DisplayRelease[]): PressingGroup[] {
+  const byKey = new Map<string, DisplayRelease[]>()
+
+  for (const display of releases) {
+    const masterId = display.release?.basic_information?.master_id
+    const key =
+      typeof masterId === 'number' && masterId > 0
+        ? `master-${masterId}`
+        : `release-${display.id}`
+    const bucket = byKey.get(key)
+    if (bucket) bucket.push(display)
+    else byKey.set(key, [display])
+  }
+
+  const groups: PressingGroup[] = []
+  for (const [key, pressings] of byKey) {
+    pressings.sort(comparePressings)
+
+    const rows: PressingRow[] = []
+    for (const pressing of pressings) {
+      const last = rows[rows.length - 1]
+      if (last && last.release.id === pressing.id) last.copies++
+      else rows.push({ release: pressing, copies: 1 })
+    }
+
+    // originalYear is the master year and therefore identical for every
+    // pressing of a master; for masterless groups it falls back to the
+    // pressing year. Unknown years (0) never win over a known one.
+    let year = 0
+    for (const pressing of pressings) {
+      const candidate = pressing.originalYear || pressing.year
+      if (candidate > 0 && (year === 0 || candidate < year)) year = candidate
+    }
+
+    groups.push({ key, primary: pressings[0], year, pressings, rows })
+  }
+  return groups
+}
+
+/** Pressings of one album: oldest first, undated last, ties broken stably. */
+function comparePressings(a: DisplayRelease, b: DisplayRelease): number {
+  const aYear = a.year > 0 ? a.year : Number.MAX_SAFE_INTEGER
+  const bYear = b.year > 0 ? b.year : Number.MAX_SAFE_INTEGER
+  return (
+    aYear - bYear ||
+    compareSortKeys(a.titleKey, b.titleKey) ||
+    a.id - b.id ||
+    a.instanceId - b.instanceId
+  )
+}
+
+/** Orders album cards within an artist the same way releases are ordered. */
+export function sortPressingGroups(
+  groups: PressingGroup[],
+  mode: ArtistSortMode,
+): PressingGroup[] {
+  const list = [...groups]
+  const yearOf = (group: PressingGroup) => (group.year > 0 ? group.year : Number.MAX_SAFE_INTEGER)
+  if (mode === 'chronological') {
+    list.sort(
+      (a, b) =>
+        yearOf(a) - yearOf(b) ||
+        compareSortKeys(a.primary.titleKey, b.primary.titleKey) ||
+        a.primary.id - b.primary.id,
+    )
+  } else {
+    list.sort(
+      (a, b) =>
+        compareSortKeys(a.primary.titleKey, b.primary.titleKey) ||
+        yearOf(a) - yearOf(b) ||
+        a.primary.id - b.primary.id,
+    )
+  }
+  return list
 }
 
 export function distinctFormats(releases: DiscogsCollectionRelease[]): string[] {

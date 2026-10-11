@@ -2,19 +2,31 @@
 // Copyright (C) 2025-2026 ackervekenbm
 
 import { useMemo, useState } from 'react'
-import type { DisplayRelease, GroupedArtist, ArtistSortMode } from '../utils/collection'
-import { countUniqueAlbums } from '../utils/collection'
+import type {
+  DisplayRelease,
+  GroupedArtist,
+  ArtistSortMode,
+  ViewMode,
+} from '../utils/collection'
+import { countUniqueAlbums, groupPressings, sortPressingGroups } from '../utils/collection'
 import { compareSortKeys } from '../utils/sortName'
 import { ReleaseCard } from './ReleaseCard'
+import { AlbumCard } from './AlbumCard'
 import { ChevronIcon } from './icons'
 
 interface ArtistSectionProps {
   artist: GroupedArtist
   sortMode: ArtistSortMode
+  viewMode: ViewMode
   onSelectRelease: (display: DisplayRelease) => void
 }
 
-export function ArtistSection({ artist, sortMode, onSelectRelease }: ArtistSectionProps) {
+export function ArtistSection({
+  artist,
+  sortMode,
+  viewMode,
+  onSelectRelease,
+}: ArtistSectionProps) {
   const [collapsed, setCollapsed] = useState(false)
 
   const sorted = useMemo(() => {
@@ -32,6 +44,14 @@ export function ArtistSection({ artist, sortMode, onSelectRelease }: ArtistSecti
     }
     return list
   }, [artist.releases, sortMode])
+
+  const albumGroups = useMemo(
+    () =>
+      viewMode === 'albums'
+        ? sortPressingGroups(groupPressings(sorted), sortMode)
+        : [],
+    [sorted, sortMode, viewMode],
+  )
 
   const thumbnail = sorted[0]?.coverImage
 
@@ -67,9 +87,9 @@ export function ArtistSection({ artist, sortMode, onSelectRelease }: ArtistSecti
         <div className="artist-heading">
           <h2 className="artist-name">{artist.name}</h2>
           <span className="artist-count">
-            {sorted.length} {sorted.length === 1 ? 'release' : 'releases'}
-            {' · '}
-            {uniqueAlbums} unique {uniqueAlbums === 1 ? 'album' : 'albums'}
+            {viewMode === 'albums'
+              ? `${albumGroups.length} ${albumGroups.length === 1 ? 'album' : 'albums'} · ${sorted.length} ${sorted.length === 1 ? 'release' : 'releases'}`
+              : `${sorted.length} ${sorted.length === 1 ? 'release' : 'releases'} · ${uniqueAlbums} unique ${uniqueAlbums === 1 ? 'album' : 'albums'}`}
           </span>
         </div>
 
@@ -80,13 +100,17 @@ export function ArtistSection({ artist, sortMode, onSelectRelease }: ArtistSecti
 
       {!collapsed && (
         <div className="artist-releases" id={`artist-${artist.id}`} role="region">
-{sorted.map((display) => (
-              <ReleaseCard
-                key={display.key}
-                display={display}
-                onOpen={onSelectRelease}
-              />
-            ))}
+          {viewMode === 'albums'
+            ? albumGroups.map((group) => (
+                <AlbumCard key={group.key} group={group} onOpen={onSelectRelease} />
+              ))
+            : sorted.map((display) => (
+                <ReleaseCard
+                  key={display.key}
+                  display={display}
+                  onOpen={onSelectRelease}
+                />
+              ))}
         </div>
       )}
     </section>
