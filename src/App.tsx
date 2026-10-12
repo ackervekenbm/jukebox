@@ -23,6 +23,7 @@ import {
   DEFAULT_FILTERS,
   type DisplayRelease,
   type Filters,
+  type PressingGroup,
   type ArtistSortMode,
   type ViewMode,
 } from './utils/collection'
@@ -47,6 +48,13 @@ import {
 } from './db/picker'
 import { clearListenLog, getListenLog, getRecentListenIds, logListen } from './db/listenLog'
 import type { ListenEntry } from './db/listenLog'
+import {
+  DEFAULT_PREFERENCES,
+  clearPreferences,
+  loadPreferences,
+  savePreferences,
+  type Preferences,
+} from './db/preferences'
 import { pickAvoiding } from './utils/picker'
 import { creditedArtists } from './utils/collection'
 import {
@@ -139,6 +147,10 @@ export default function App() {
   // release on screen came from the random picker.
   const [recentPicks, setRecentPicks] = useState<RecentPick[] | null>(null)
   const [pickerSkip, setPickerSkip] = useState(() => loadPickerConfig().skip)
+  const [preferences, setPreferences] = useState<Preferences>(loadPreferences)
+  // The master whose stack is open in the detail view, and which pressing of
+  // it is showing; null for a release opened straight from the grid.
+  const [stack, setStack] = useState<{ pressings: DisplayRelease[]; index: number } | null>(null)
   const [showStats, setShowStats] = useState(false)
   const toolbarRef = useRef<HTMLDivElement>(null)
 
@@ -176,6 +188,7 @@ export default function App() {
     setViewMode('artists')
     setSelected(null)
     setRecentPicks(null)
+    setStack(null)
     setActiveViewId(null)
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [accountKey])
@@ -334,19 +347,40 @@ export default function App() {
     const entries = await getListenLog(settings.username)
     setRecentPicks(toRecentPicks(entries, picked.id, releases))
     setSelected(toDisplayRelease(picked, masterYears))
+    setStack(null)
   }, [filtered, masterYears, releases, settings, pickerSkip])
 
-  /** Opening a card (or pressing rows) is browsing, not a listen: no history. */
+  /** Opening a card is browsing, not a listen: no history, no stack. */
   const openRelease = useCallback((display: DisplayRelease) => {
     setRecentPicks(null)
+    setStack(null)
     setSelected(display)
   }, [])
+
+  /** Opening a stack starts at the primary pressing; the arrows step onward. */
+  const openStack = useCallback((group: PressingGroup) => {
+    const pressings = group.rows.map((row) => row.release)
+    if (pressings.length === 0) return
+    setRecentPicks(null)
+    setStack({ pressings, index: 0 })
+    setSelected(pressings[0])
+  }, [])
+
+  /** Steps through the open stack, wrapping around at either end. */
+  const stepStack = useCallback((delta: number) => {
+    if (!stack || stack.pressings.length === 0) return
+    const total = stack.pressings.length
+    const index = (stack.index + delta + total) % total
+    setStack({ ...stack, index })
+    setSelected(stack.pressings[index])
+  }, [stack])
 
   /** History hops swap the release without logging another listen. */
   const openPick = useCallback(
     (id: number) => {
       const found = releases.find((release) => release.id === id)
       if (!found) return
+      setStack(null)
       setSelected(toDisplayRelease(found, masterYears))
     },
     [releases, masterYears],
@@ -358,14 +392,22 @@ export default function App() {
     savePickerConfig({ skip })
   }, [])
 
+  const changeGroupPressings = useCallback((grouped: boolean) => {
+    setPreferences((prev) => ({ ...prev, groupPressings: grouped }))
+    savePreferences({ groupPressings: grouped })
+  }, [])
+
   const onClearData = async () => {
     await wipeCache()
     // The listen log and the skip preference are user data too: "clear
     // everything" has to take them down, not just the caches.
     await clearListenLog()
     clearPickerConfig()
+    clearPreferences()
     setPickerSkip(DEFAULT_SKIP)
+    setPreferences(DEFAULT_PREFERENCES)
     setRecentPicks(null)
+    setStack(null)
     clearSettings()
     // Saved views live in their own storage key, so "clear everything" has to
     // take them down explicitly to keep reclaiming everything it claims to.
@@ -396,6 +438,8 @@ export default function App() {
               theme={theme}
               onThemeChange={onThemeChange}
               onSave={onSaveSettings}
+              groupPressings={preferences.groupPressings}
+              onGroupPressingsChange={changeGroupPressings}
               pickerSkip={pickerSkip}
               onPickerSkipChange={changePickerSkip}
               onClose={settings ? () => setShowSettings(false) : undefined}
@@ -568,16 +612,6 @@ export default function App() {
                 <button
                   type="button"
                   role="radio"
-                  aria-checked={viewMode === 'albums'}
-                  className={viewMode === 'albums' ? 'active' : ''}
-                  onClick={() => setViewMode('albums')}
-                  title="One card per album: every pressing of a master grouped together"
-                >
-                  Albums
-                </button>
-                <button
-                  type="button"
-                  role="radio"
                   aria-checked={viewMode === 'recent'}
                   className={viewMode === 'recent' ? 'active' : ''}
                   onClick={() => setViewMode('recent')}
@@ -683,8 +717,9 @@ export default function App() {
                   key={artist.id}
                   artist={artist}
                   sortMode={artistSortMode}
-                  viewMode={viewMode}
+                  grouped={preferences.groupPressings}
                   onSelectRelease={openRelease}
+                  onOpenStack={openStack}
                 />
               ))}
             </div>
@@ -698,8 +733,14 @@ export default function App() {
           token={settings?.token ?? ''}
           recentPicks={recentPicks ?? undefined}
           onOpenPick={openPick}
+          onPrev={stack ? () => stepStack(-1) : undefined}
+          onNext={stack ? () => stepStack(1) : undefined}
+          position={
+            stack ? { index: stack.index + 1, total: stack.pressings.length } : undefined
+          }
           onClose={() => {
             setRecentPicks(null)
+            setStack(null)
             setSelected(null)
           }}
         />

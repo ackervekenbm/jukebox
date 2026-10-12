@@ -6,27 +6,29 @@ import type {
   DisplayRelease,
   GroupedArtist,
   ArtistSortMode,
-  ViewMode,
+  PressingGroup,
 } from '../utils/collection'
 import { countUniqueAlbums, groupPressings, sortPressingGroups } from '../utils/collection'
 import { compareSortKeys } from '../utils/sortName'
 import { ReleaseCard } from './ReleaseCard'
-import { AlbumCard } from './AlbumCard'
+import { StackCard } from './StackCard'
 import { ChevronIcon } from './icons'
 
 interface ArtistSectionProps {
   artist: GroupedArtist
   sortMode: ArtistSortMode
-  /** The Recent view has no shelves, so it never reaches this component. */
-  viewMode: Exclude<ViewMode, 'recent'>
+  /** Collapse each master's pressings into one stacked card. */
+  grouped: boolean
   onSelectRelease: (display: DisplayRelease) => void
+  onOpenStack: (group: PressingGroup) => void
 }
 
 export function ArtistSection({
   artist,
   sortMode,
-  viewMode,
+  grouped,
   onSelectRelease,
+  onOpenStack,
 }: ArtistSectionProps) {
   const [collapsed, setCollapsed] = useState(false)
 
@@ -47,11 +49,8 @@ export function ArtistSection({
   }, [artist.releases, sortMode])
 
   const albumGroups = useMemo(
-    () =>
-      viewMode === 'albums'
-        ? sortPressingGroups(groupPressings(sorted), sortMode)
-        : [],
-    [sorted, sortMode, viewMode],
+    () => (grouped ? sortPressingGroups(groupPressings(sorted), sortMode) : []),
+    [sorted, sortMode, grouped],
   )
 
   const thumbnail = sorted[0]?.coverImage
@@ -88,9 +87,8 @@ export function ArtistSection({
         <div className="artist-heading">
           <h2 className="artist-name">{artist.name}</h2>
           <span className="artist-count">
-            {viewMode === 'albums'
-              ? `${albumGroups.length} ${albumGroups.length === 1 ? 'album' : 'albums'} · ${sorted.length} ${sorted.length === 1 ? 'release' : 'releases'}`
-              : `${sorted.length} ${sorted.length === 1 ? 'release' : 'releases'} · ${uniqueAlbums} unique ${uniqueAlbums === 1 ? 'album' : 'albums'}`}
+            {sorted.length} {sorted.length === 1 ? 'release' : 'releases'} ·{' '}
+            {uniqueAlbums} unique {uniqueAlbums === 1 ? 'album' : 'albums'}
           </span>
         </div>
 
@@ -101,10 +99,18 @@ export function ArtistSection({
 
       {!collapsed && (
         <div className="artist-releases" id={`artist-${artist.id}`} role="region">
-          {viewMode === 'albums'
-            ? albumGroups.map((group) => (
-                <AlbumCard key={group.key} group={group} onOpen={onSelectRelease} />
-              ))
+          {grouped
+            ? albumGroups.map((group) =>
+                group.pressings.length > 1 ? (
+                  <StackCard key={group.key} group={group} onOpen={onOpenStack} />
+                ) : (
+                  <ReleaseCard
+                    key={group.key}
+                    display={group.primary}
+                    onOpen={onSelectRelease}
+                  />
+                ),
+              )
             : sorted.map((display) => (
                 <ReleaseCard
                   key={display.key}

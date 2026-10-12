@@ -254,7 +254,7 @@ export function groupReleases(
  * per-artist sort: it is not part of a saved view (a view captures the
  * selection only) and it resets with the account, like the open folder.
  */
-export type ViewMode = 'artists' | 'albums' | 'recent'
+export type ViewMode = 'artists' | 'recent'
 
 /** One distinct pressing of a group, plus how many copies of it are held. */
 export interface PressingRow {
@@ -277,6 +277,19 @@ export interface PressingGroup {
 }
 
 /**
+ * Badge text for a stack: the number of distinct pressings, or the number of
+ * copies when the group is one release held multiple times. Empty for a lone
+ * pressing, which then renders as a plain card.
+ */
+export function stackCountLabel(group: PressingGroup): string {
+  const pressings = group.rows.length
+  const copies = group.pressings.length
+  if (pressings > 1) return `${pressings} pressings`
+  if (copies > 1) return `${copies} copies`
+  return ''
+}
+
+/**
  * Groups an artist's releases into one card per album.
  *
  * The key mirrors countUniqueAlbums exactly: a real Discogs master (any id
@@ -284,8 +297,7 @@ export interface PressingGroup {
  * missing id — there is no master to collapse into) each stand alone, keyed by
  * release id so multiple copies of one release still gather together.
  */
-export function groupPressings(releases: DisplayRelease[]): PressingGroup[] {
-  const byKey = new Map<string, DisplayRelease[]>()
+export function groupPressings(releases: DisplayRelease[]): PressingGroup[] {  const byKey = new Map<string, DisplayRelease[]>()
 
   for (const display of releases) {
     const masterId = display.release?.basic_information?.master_id
