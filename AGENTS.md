@@ -88,6 +88,12 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
 
 - Dependabot majors stay **enabled** (we watch how often majors recur) — do not
   add `ignore` rules without the maintainer asking.
+- One deliberate exception (issue #88): the `typescript` **major** is ignored in
+  `.github/dependabot.yml` because TypeScript 7 (the native-compiler line) is
+  outside typescript-eslint's `peer typescript <6.1.0` and would make the weekly
+  group uninstallable. Patch/minor updates on the current line still land. Lift
+  the ignore (and plan a deliberate TS6/7 migration) once typescript-eslint
+  supports it.
 
 ## Deployment (internal)
 
