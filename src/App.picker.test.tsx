@@ -104,7 +104,12 @@ describe('random picker listen log', () => {
 
     // Re-roll from the open detail view: also a logged pick, and the skip
     // window (default 10 over a 3-release collection) forces a different one.
+    // The re-roll is async — it reads then writes the listen log before it
+    // swaps the release — so wait for the dialog to move off the first pick.
     await user.click(fab())
+    await waitFor(() =>
+      expect(screen.getByRole('dialog')).not.toHaveAccessibleName(first),
+    )
     const second = screen.getByRole('dialog').getAttribute('aria-label') ?? ''
     expect(second).not.toBe(first)
 
