@@ -44,7 +44,7 @@ export function SettingsIcon({ size = 16 }: IconProps) {
 }
 
 interface ChevronIconProps extends IconProps {
-  direction: 'up' | 'down'
+  direction: 'up' | 'down' | 'left' | 'right'
 }
 
 export function StatsIcon({ size = 16 }: IconProps) {
@@ -216,7 +216,10 @@ export function ChevronIcon({ size = 14, direction }: ChevronIconProps) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      {direction === 'down' ? <path d="m6 9 6 6 6-6" /> : <path d="m18 15-6-6-6 6" />}
+      {direction === 'down' && <path d="m6 9 6 6 6-6" />}
+      {direction === 'up' && <path d="m18 15-6-6-6 6" />}
+      {direction === 'left' && <path d="m15 18-6-6 6-6" />}
+      {direction === 'right' && <path d="m9 18 6-6-6-6" />}
     </svg>
   )
 }

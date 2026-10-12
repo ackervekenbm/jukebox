@@ -6,13 +6,21 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SettingsForm } from './Settings'
 
-const renderSettings = (onSave = vi.fn(), onThemeChange = vi.fn(), onPickerSkipChange = vi.fn()) =>
+const renderSettings = (
+  onSave = vi.fn(),
+  onThemeChange = vi.fn(),
+  onPickerSkipChange = vi.fn(),
+  onGroupPressingsChange = vi.fn(),
+  groupPressings = false,
+) =>
   render(
     <SettingsForm
       initial={{ username: 'bob', token: 'tok-1', theme: 'midnight' }}
       theme="midnight"
       onThemeChange={onThemeChange}
       onSave={onSave}
+      groupPressings={groupPressings}
+      onGroupPressingsChange={onGroupPressingsChange}
       pickerSkip={10}
       onPickerSkipChange={onPickerSkipChange}
     >
@@ -46,6 +54,22 @@ describe('SettingsForm', () => {
     renderSettings(vi.fn(), onThemeChange)
     await userEvent.click(screen.getByRole('radio', { name: /Club/ }))
     expect(onThemeChange).toHaveBeenCalledWith('club')
+  })
+
+  it('toggles the pressings grouping preference', async () => {
+    const onGroupPressingsChange = vi.fn()
+    renderSettings(vi.fn(), vi.fn(), vi.fn(), onGroupPressingsChange)
+
+    const toggle = screen.getByLabelText(/Group pressings by master/)
+    expect(toggle).not.toBeChecked()
+
+    await userEvent.click(toggle)
+    expect(onGroupPressingsChange).toHaveBeenCalledWith(true)
+  })
+
+  it('reflects an already-enabled grouping preference', () => {
+    renderSettings(vi.fn(), vi.fn(), vi.fn(), vi.fn(), true)
+    expect(screen.getByLabelText(/Group pressings by master/)).toBeChecked()
   })
 
   it('shows the random picker skip window and forwards edits', () => {

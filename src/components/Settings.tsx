@@ -12,6 +12,9 @@ interface SettingsProps {
   theme: ThemeId
   onThemeChange: (theme: ThemeId) => void
   onSave: (settings: SettingsType) => void
+  /** Collapse each master's pressings into one stacked card. */
+  groupPressings: boolean
+  onGroupPressingsChange: (grouped: boolean) => void
   /** How many recent picks the random picker should avoid. */
   pickerSkip: number
   /** Fires on every edit; the caller clamps and persists immediately. */
@@ -25,6 +28,8 @@ export function SettingsForm({
   theme,
   onThemeChange,
   onSave,
+  groupPressings,
+  onGroupPressingsChange,
   pickerSkip,
   onPickerSkipChange,
   onClose,
@@ -120,6 +125,23 @@ export function SettingsForm({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="theme-section">
+            <span className="theme-heading">Collection</span>
+            <label className="setting-toggle" htmlFor="group-pressings">
+              <input
+                id="group-pressings"
+                type="checkbox"
+                checked={groupPressings}
+                onChange={(event) => onGroupPressingsChange(event.target.checked)}
+              />
+              Group pressings by master
+            </label>
+            <span className="settings-help">
+              Shows one stacked card per album instead of a card per pressing. Open a stack and use
+              the arrows to step through its pressings.
+            </span>
           </div>
 
           <div className="theme-section">

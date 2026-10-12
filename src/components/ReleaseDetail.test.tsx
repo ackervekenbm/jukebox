@@ -82,3 +82,69 @@ describe('ReleaseDetail pick history', () => {
     expect(buttons[0]).toHaveTextContent('Herbie Hancock — Headhunters')
   })
 })
+
+describe('ReleaseDetail stack navigation', () => {
+  it('shows no stack navigation without a stack', () => {
+    render(<ReleaseDetail display={display} token="tok" onClose={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'Next pressing' })).toBeNull()
+    expect(screen.queryByText(/Pressing \d+ of \d+/)).toBeNull()
+  })
+
+  it('shows no stack navigation for a single-entry stack', () => {
+    render(
+      <ReleaseDetail
+        display={display}
+        token="tok"
+        onClose={vi.fn()}
+        onPrev={vi.fn()}
+        onNext={vi.fn()}
+        position={{ index: 1, total: 1 }}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: 'Next pressing' })).toBeNull()
+  })
+
+  it('shows the position and forwards the arrows', async () => {
+    const user = userEvent.setup()
+    const onPrev = vi.fn()
+    const onNext = vi.fn()
+    render(
+      <ReleaseDetail
+        display={display}
+        token="tok"
+        onClose={vi.fn()}
+        onPrev={onPrev}
+        onNext={onNext}
+        position={{ index: 2, total: 3 }}
+      />,
+    )
+
+    expect(screen.getByText('Pressing 2 of 3')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Previous pressing' }))
+    expect(onPrev).toHaveBeenCalledTimes(1)
+    await user.click(screen.getByRole('button', { name: 'Next pressing' }))
+    expect(onNext).toHaveBeenCalledTimes(1)
+  })
+
+  it('steps with the arrow keys', async () => {
+    const user = userEvent.setup()
+    const onPrev = vi.fn()
+    const onNext = vi.fn()
+    render(
+      <ReleaseDetail
+        display={display}
+        token="tok"
+        onClose={vi.fn()}
+        onPrev={onPrev}
+        onNext={onNext}
+        position={{ index: 1, total: 2 }}
+      />,
+    )
+
+    await user.keyboard('{ArrowRight}')
+    expect(onNext).toHaveBeenCalledTimes(1)
+    await user.keyboard('{ArrowLeft}')
+    expect(onPrev).toHaveBeenCalledTimes(1)
+  })
+})

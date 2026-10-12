@@ -106,7 +106,7 @@ function seedSettings() {
 
 const summary = () => screen.getByText(/artists? ·/)
 
-const viewRadio = (name: 'Artists' | 'Albums' | 'Recent') => screen.getByRole('radio', { name })
+const viewRadio = (name: 'Artists' | 'Recent') => screen.getByRole('radio', { name })
 
 const monthHeadings = () =>
   screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)

@@ -7,7 +7,7 @@ import { artistDisplayName, creditedArtists, effectiveYears } from '../utils/col
 import { useReleaseTracklist } from '../hooks/useReleaseTracklist'
 import { useScrollLock } from '../hooks/useScrollLock'
 import { formatRelativeTime } from '../utils/time'
-import { CloseIcon } from './icons'
+import { CloseIcon, ChevronIcon } from './icons'
 
 interface ReleaseDetailProps {
   display: DisplayRelease
@@ -17,6 +17,11 @@ interface ReleaseDetailProps {
   recentPicks?: RecentPick[]
   /** Opens a pick from the history — deliberately separate from logging. */
   onOpenPick?: (id: number) => void
+  /** Steps through the pressings of the open stack, when one is showing. */
+  onPrev?: () => void
+  onNext?: () => void
+  /** 1-based position within the open stack, for the "Pressing x of y" label. */
+  position?: { index: number; total: number }
 }
 
 export interface RecentPick {
@@ -31,16 +36,29 @@ export function ReleaseDetail({
   onClose,
   recentPicks,
   onOpenPick,
+  onPrev,
+  onNext,
+  position,
 }: ReleaseDetailProps) {
   useScrollLock(true)
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') {
+        onClose()
+      } else if (event.key === 'ArrowLeft' && onPrev) {
+        event.preventDefault()
+        onPrev()
+      } else if (event.key === 'ArrowRight' && onNext) {
+        event.preventDefault()
+        onNext()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, onPrev, onNext])
+
+  const showStackNav = Boolean(position && position.total > 1 && onPrev && onNext)
 
   const basic = display.release?.basic_information
   const years = effectiveYears(display)
@@ -79,6 +97,30 @@ export function ReleaseDetail({
         </button>
 
         <div className="card-scroll">
+          {showStackNav && position && (
+            <div className="detail-stack-nav" role="group" aria-label="Pressings of this master">
+              <button
+                type="button"
+                className="stack-step"
+                onClick={onPrev}
+                aria-label="Previous pressing"
+              >
+                <ChevronIcon direction="left" size={16} />
+              </button>
+              <span className="stack-position">
+                Pressing {position.index} of {position.total}
+              </span>
+              <button
+                type="button"
+                className="stack-step"
+                onClick={onNext}
+                aria-label="Next pressing"
+              >
+                <ChevronIcon direction="right" size={16} />
+              </button>
+            </div>
+          )}
+
           {display.coverImage && (
             <div className="detail-cover">
               <img src={display.coverImage} alt={`${display.artistName} — ${display.title}`} />
