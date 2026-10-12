@@ -57,15 +57,15 @@ describe('StackCard', () => {
     ).toBeInTheDocument()
   })
 
-  it('badges the stack with its pressing count and depth', () => {
+  it('badges the stack with its pressing count', () => {
     render(<StackCard group={groupOf(us, uk)} onOpen={vi.fn()} />)
 
     const card = screen.getByRole('button', { name: 'Rush — Moving Pictures, 2 pressings' })
-    expect(card).toHaveClass('stack-2')
+    expect(card).toBeInTheDocument()
     expect(screen.getByText('2 pressings')).toBeInTheDocument()
   })
 
-  it('adds a second peek tab for three or more pressings', () => {
+  it('badges a stack of three or more pressings', () => {
     const third = release({
       id: 3,
       instance_id: 3,
@@ -75,7 +75,7 @@ describe('StackCard', () => {
 
     expect(
       screen.getByRole('button', { name: 'Rush — Moving Pictures, 3 pressings' }),
-    ).toHaveClass('stack-3')
+    ).toBeInTheDocument()
     expect(screen.getByText('3 pressings')).toBeInTheDocument()
   })
 

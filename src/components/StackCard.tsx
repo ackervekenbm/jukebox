@@ -13,17 +13,15 @@ interface StackCardProps {
 }
 
 /**
- * One album as a stack of records: the primary (earliest) pressing faces
- * front, with one or two offset tabs peeking out behind it (see `.stack-card`
- * in styles.css). The card keeps a plain card's footprint, so grouping
- * pressings never stretches the grid row, and the count badge says how deep
- * the pile is. The arrows in the detail view move through the pressings.
+ * One album held as several pressings, shown as a single plain card whose
+ * count chip says how deep the stack is. Keeping a plain card's footprint and
+ * clipping means grouping never stretches or roughens the grid, and the chip
+ * is the only hint that the detail view will let you step through pressings.
  */
 export function StackCard({ group, onOpen }: StackCardProps) {
   const primary = group.primary
   const lines = effectiveYears(primary)
   const badge = stackCountLabel(group)
-  const depth = Math.min(group.pressings.length, 3)
 
   const handleKey = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -34,7 +32,7 @@ export function StackCard({ group, onOpen }: StackCardProps) {
 
   return (
     <article
-      className={`release-card stack-card stack-${depth}`}
+      className="release-card stack-card"
       role="button"
       tabIndex={0}
       aria-label={`${primary.artistName} — ${primary.title}${badge ? `, ${badge}` : ''}`}
@@ -55,6 +53,12 @@ export function StackCard({ group, onOpen }: StackCardProps) {
           </div>
         )}
       </div>
+      {badge && (
+        <span className="stack-badge">
+          <VinylIcon size={12} />
+          {badge}
+        </span>
+      )}
       <div className="release-meta">
         <h3 className="release-title" title={primary.title}>
           {primary.title}
@@ -71,7 +75,6 @@ export function StackCard({ group, onOpen }: StackCardProps) {
         )}
         {primary.formatText && <p className="release-format">{primary.formatText}</p>}
       </div>
-      {badge && <span className="stack-badge">{badge}</span>}
     </article>
   )
 }
