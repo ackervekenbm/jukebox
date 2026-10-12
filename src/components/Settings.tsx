@@ -62,7 +62,7 @@ export function SettingsForm({
           <div className="settings-logo">
             <VinylIcon size={50} />
           </div>
-          <h1>Vinyl Vault</h1>
+          <h1>Jukebox</h1>
           <p className="settings-sub">Your Discogs collection, beautifully browsable.</p>
 
           <form onSubmit={handleSubmit} className="settings-form">

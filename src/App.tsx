@@ -503,7 +503,7 @@ export default function App() {
         <div className="app">
           <header className="app-header">
             <div className="header-top">
-              <h1 className="app-title">Vinyl Vault</h1>
+              <h1 className="app-title">Jukebox</h1>
               <div className="header-actions">
                 <button
                   type="button"

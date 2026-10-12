@@ -1,8 +1,8 @@
 services:
-  vinyl-vault:
+  jukebox:
     build: .
-    image: vinyl-vault:latest
-    container_name: vinyl-vault
+    image: jukebox:latest
+    container_name: jukebox
     ports:
       - "8080:80"
     restart: unless-stopped

@@ -1,4 +1,4 @@
-# Vinyl Vault
+# Jukebox
 
 Browse your personal **Discogs collection** on any device — grouped by artist (optionally stacking every pressing of a master into one card) or as a recently-added timeline, sorted the way you want, searchable, filterable, and available offline. It's an installable web app that runs entirely in your browser: fetch your collection once and it's yours.
 
@@ -43,14 +43,14 @@ Browse your personal **Discogs collection** on any device — grouped by artist 
 
 ## Deployment (production)
 
-The app is a static frontend; the published container bundles it with nginx. Every push to `main` builds a multi-arch image for **amd64 and arm64** and publishes one tag: `ghcr.io/ackervekenbm/vinyl-vault:latest`.
+The app is a static frontend; the published container bundles it with nginx. Every push to `main` builds a multi-arch image for **amd64 and arm64** and publishes one tag: `ghcr.io/ackervekenbm/jukebox:latest`.
 
 **Pull and run** on any machine with Docker (arm64 runs natively on a Raspberry Pi):
 
 ```yaml
 services:
-  vinyl-vault:
-    image: ghcr.io/ackervekenbm/vinyl-vault:latest
+  jukebox:
+    image: ghcr.io/ackervekenbm/jukebox:latest
     ports:
       - "8080:80"
     restart: unless-stopped
@@ -137,7 +137,7 @@ npm run build && npm test
 
 ## License
 
-Vinyl Vault is free software licensed under the **GNU Affero General Public License v3.0 or later** (`AGPL-3.0-or-later`) — see [`LICENSE`](LICENSE) for the full text. Source-file headers carry the matching `SPDX-License-Identifier: AGPL-3.0-or-later` tag.
+Jukebox is free software licensed under the **GNU Affero General Public License v3.0 or later** (`AGPL-3.0-or-later`) — see [`LICENSE`](LICENSE) for the full text. Source-file headers carry the matching `SPDX-License-Identifier: AGPL-3.0-or-later` tag.
 
 In short: you are free to use, study, share and modify this software, and if you run it as a network service (for example hosting the app for others), you must offer the corresponding source code to its users.
 
