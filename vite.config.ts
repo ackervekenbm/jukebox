@@ -27,7 +27,7 @@ export default defineConfig({
     // values; the Docker build receives them as ARGs from the workflow.
     __BUILD_SHA__: JSON.stringify(process.env.COMMIT_SHA ?? 'dev'),
     __BUILD_TIME__: JSON.stringify(process.env.BUILD_TIME ?? ''),
-    __REPO__: JSON.stringify(process.env.GITHUB_REPOSITORY ?? 'ackervekenbm/vinyl-vault'),
+    __REPO__: JSON.stringify(process.env.GITHUB_REPOSITORY ?? 'ackervekenbm/jukebox'),
   },
   plugins: [
     react(),
@@ -35,8 +35,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-512-maskable.png'],
       manifest: {
-        name: 'Vinyl Vault',
-        short_name: 'Vinyl Vault',
+        name: 'Jukebox',
+        short_name: 'Jukebox',
         description: 'Browse your Discogs collection.',
         lang: 'en',
         display: 'standalone',

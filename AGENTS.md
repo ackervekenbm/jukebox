@@ -1,4 +1,4 @@
-# Vinyl Vault
+# Jukebox
 
 A React 19 + TypeScript + Vite progressive web app that renders a Discogs
 collection from the user's personal access token. All data lives in the
@@ -103,7 +103,8 @@ stateless (nginx serving the static build + the `/discogs` proxy) — every user
 data lives in the browser, so any redeploy is lossless and no volumes are needed.
 
 - Every `main` push with app paths re-builds the multi-arch image and pushes
-  `ghcr.io/ackervekenbm/vinyl-vault:latest` (see `.github/workflows/docker-build.yml`).
+  `ghcr.io/ackervekenbm/jukebox:latest` (see `.github/workflows/docker-build.yml`).
+  The tag derives from `${{ github.repository }}`, so it follows repo renames.
 - **GHCR login (one-time per host).** GHCR requires a login even for public
   images. Log in over SSH:
   ```bash
@@ -117,12 +118,12 @@ data lives in the browser, so any redeploy is lossless and no volumes are needed
   everything your account can, so never paste it anywhere public.
 - **Route A — prebuilt image (all via the OMV web UI, no building on the Pi).**
   With omv-extras installed and Docker + the Compose plugin enabled
-  (Services → Compose): create a compose file `vinyl-vault.yml`:
+  (Services → Compose): create a compose file `jukebox.yml`:
   ```yaml
   services:
-    vinyl-vault:
-      image: ghcr.io/ackervekenbm/vinyl-vault:latest
-      container_name: vinyl-vault
+    jukebox:
+      image: ghcr.io/ackervekenbm/jukebox:latest
+      container_name: jukebox
       ports:
         - "8080:80"
       restart: unless-stopped
@@ -136,7 +137,7 @@ data lives in the browser, so any redeploy is lossless and no volumes are needed
 - **Route B — build on the Pi** (e.g. local variants):
   ```bash
   cd ~
-  git clone https://github.com/ackervekenbm/vinyl-vault.git && cd vinyl-vault
+  git clone https://github.com/ackervekenbm/jukebox.git && cd jukebox
   sudo docker compose up -d --build
   ```
   Update later with `git pull && sudo docker compose up -d --build`.

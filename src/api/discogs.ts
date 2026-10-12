@@ -18,7 +18,7 @@ import type {
 // opaque CORS error and year enrichment can never finish. Through the proxy a
 // 429 is a normal, Retry-After-retryable response.
 const API_BASE = '/discogs'
-const USER_AGENT = 'VinylVault/0.1 (+local personal collection viewer)'
+const USER_AGENT = 'Jukebox/0.1 (+local personal collection viewer)'
 // Cap how long a single request may take. Stalled connections (flaky proxy,
 // network pause, API hang) otherwise leave the sync spinning forever.
 const FETCH_TIMEOUT_MS = 20_000

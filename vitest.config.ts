@@ -8,7 +8,7 @@ export default defineConfig({
   define: {
     __BUILD_SHA__: JSON.stringify('dev'),
     __BUILD_TIME__: JSON.stringify(''),
-    __REPO__: JSON.stringify('ackervekenbm/vinyl-vault'),
+    __REPO__: JSON.stringify('ackervekenbm/jukebox'),
   },
   test: {
     environment: 'jsdom',
