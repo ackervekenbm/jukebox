@@ -59,6 +59,14 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   the app must never call `api.discogs.com` cross-origin, because Discogs' 429s
   carry no CORS headers and the browser would mask throttling as an opaque
   CORS error.
+- Discogs contract coverage — `scripts/refresh-discogs-fixtures.mjs` captures
+  real payloads into `src/test/fixtures/discogs/` (`npm run fixtures`, needs
+  `DISCOGS_TOKEN`). `src/api/discogs-contract.test.ts` replays them through the
+  real parsers with `fetch` mocked (hermetic; skips when fixtures are absent),
+  so `npm test` itself never touches the network. The nightly
+  `discogs-contract` workflow refreshes fixtures with the `DISCOGS_TOKEN`
+  secret: red = Discogs changed a shape we parse, green + diff = auto-PR of
+  the drifted fixtures.
 - `src/db/database.ts` — one shared `openDB` connection for IndexedDB
   `vinyl-vault` (idb lib), five stores: `collection` (1 row/username),
   `masterYears` (1 row), `collectionValue` (1 row/username), `releaseDetails`
