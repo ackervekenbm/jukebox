@@ -204,8 +204,8 @@ export function StatsPanel({
                 <CloseIcon />
               </button>
             )}
+            <h2 className="stats-title">Collection stats</h2>
             <div className="card-scroll">
-              <h2 className="stats-title">Collection stats</h2>
               <CollectionValue state={valueState} />
               <p className="stats-empty">No releases to summarise yet.</p>
             </div>
@@ -229,9 +229,8 @@ export function StatsPanel({
               <CloseIcon />
             </button>
           )}
+          <h2 className="stats-title">Collection stats</h2>
           <div className="card-scroll">
-
-        <h2 className="stats-title">Collection stats</h2>
 
         <div className="stats-totals">
           <div className="stat-tile">
