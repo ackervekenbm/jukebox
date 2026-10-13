@@ -32,14 +32,14 @@ jobs:
         run: npm ci
 
       - name: Refresh Discogs fixtures
-        if: ${{ secrets.DISCOGS_TOKEN != '' }}
         env:
           DISCOGS_TOKEN: ${{ secrets.DISCOGS_TOKEN }}
-        run: node scripts/refresh-discogs-fixtures.mjs
-
-      - name: Warn when the token is not configured
-        if: ${{ secrets.DISCOGS_TOKEN == '' }}
-        run: echo "::warning::DISCOGS_TOKEN secret is missing; skipping fixture refresh (running against committed fixtures). Add the secret to get live signals."
+        run: |
+          if [ -z "$DISCOGS_TOKEN" ]; then
+            echo "::warning::DISCOGS_TOKEN secret is missing; skipping fixture refresh (running against committed fixtures). Add the secret to get live signals."
+            exit 0
+          fi
+          node scripts/refresh-discogs-fixtures.mjs
 
       - name: Run tests against the refreshed fixtures
         run: npm test
