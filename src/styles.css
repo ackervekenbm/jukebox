@@ -2118,15 +2118,12 @@ button:disabled {
 /* Column charts */
 
 .stats-title {
-  /* Stays on screen while the listing scrolls: the bar spans the full
-     scroll width (bleeding over the scroll container's side padding) and
-     mirrors the card background so rows disappear behind it. */
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  margin: 0 calc(-1 * (var(--card-pad) - var(--close-inset))) 18px;
-  padding: 14px calc(var(--card-pad) - var(--close-inset)) 13px;
-  background: var(--panel);
+  /* Sits above the scroll container rather than sticky inside it, so the
+     card's scrollbar starts below the title instead of hiding beneath it.
+     The side padding lines the title up with the inset scroll content. */
+  flex: none;
+  margin: 0 0 18px;
+  padding: 0 calc(var(--card-pad) - var(--close-inset)) 13px;
   border-bottom: 1px solid var(--border);
 }
 
