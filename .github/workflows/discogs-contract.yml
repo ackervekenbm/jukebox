@@ -1,0 +1,65 @@
+name: Discogs contract
+
+# Regenerates the Discogs contract fixtures from the live API and reruns the
+# hermetic contract tests (src/api/discogs-contract.test.ts) against the fresh
+# payloads. A test failure here means Discogs changed a shape the app parses;
+# a diff with green tests is opened as a dependency-update-style PR instead.
+on:
+  schedule:
+    # 03:00 UTC, daily
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    name: Refresh fixtures + run contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Refresh Discogs fixtures
+        if: ${{ secrets.DISCOGS_TOKEN != '' }}
+        env:
+          DISCOGS_TOKEN: ${{ secrets.DISCOGS_TOKEN }}
+        run: node scripts/refresh-discogs-fixtures.mjs
+
+      - name: Warn when the token is not configured
+        if: ${{ secrets.DISCOGS_TOKEN == '' }}
+        run: echo "::warning::DISCOGS_TOKEN secret is missing; skipping fixture refresh (running against committed fixtures). Add the secret to get live signals."
+
+      - name: Run tests against the refreshed fixtures
+        run: npm test
+
+      - name: Open PR when the fixtures drifted
+        # If npm test failed, the previous step already failed this job.
+        run: |
+          git add src/test/fixtures/discogs
+          if git diff --cached --quiet; then
+            echo "Fixtures unchanged; nothing to do."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b chore/refresh-discogs-contract-fixtures
+          git commit -m "chore: refresh Discogs contract fixtures"
+          git push -f origin chore/refresh-discogs-contract-fixtures
+          gh pr create \
+            --title "chore: refresh Discogs contract fixtures" \
+            --body "Automated nightly regeneration of the Discogs contract fixtures. The contract tests still pass against the refreshed payloads." \
+            --head chore/refresh-discogs-contract-fixtures \
+            --base main \
+            || echo "A PR for this branch may already exist."

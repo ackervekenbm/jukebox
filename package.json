@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "icons": "node scripts/gen-icons.mjs"
+    "icons": "node scripts/gen-icons.mjs",
+    "fixtures": "node scripts/refresh-discogs-fixtures.mjs"
   },
   "dependencies": {
     "idb": "^8.0.4",
