@@ -43,6 +43,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      - name: Resolve build metadata
+        # Commit timestamp, straight from the checkout. head_commit is only
+        # present on push events, so manual (workflow_dispatch) builds would
+        # otherwise ship an empty BUILD_TIME and the Settings footer would
+        # drop its date. %cI is strict ISO-8601 with the committer's offset.
+        run: echo "BUILD_TIME=$(git log -1 --format=%cI)" >> "$GITHUB_ENV"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -61,7 +68,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           build-args: |
             COMMIT_SHA=${{ github.sha }}
-            BUILD_TIME=${{ github.event.head_commit.timestamp }}
+            BUILD_TIME=${{ env.BUILD_TIME }}
             GITHUB_REPOSITORY=${{ github.repository }}
           # Plain single-arch images (no SBOM/provenance attestations) so the
           # manifest job can amend them into a multi-arch index.

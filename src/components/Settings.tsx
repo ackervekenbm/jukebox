@@ -184,10 +184,12 @@ export function SettingsForm({
                 {__BUILD_TIME__ && (
                   <>
                     {' · '}
-                    {new Date(__BUILD_TIME__).toLocaleDateString([], {
+                    {new Date(__BUILD_TIME__).toLocaleString([], {
                       day: 'numeric',
                       month: 'short',
                       year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
                     })}
                   </>
                 )}
