@@ -46,6 +46,10 @@ jobs:
 
       - name: Open PR when the fixtures drifted
         # If npm test failed, the previous step already failed this job.
+        env:
+          # gh only reads the token from the environment, and it never picks it
+          # up automatically on a runner.
+          GH_TOKEN: ${{ github.token }}
         run: |
           git add src/test/fixtures/discogs
           if git diff --cached --quiet; then
@@ -57,9 +61,12 @@ jobs:
           git checkout -b chore/refresh-discogs-contract-fixtures
           git commit -m "chore: refresh Discogs contract fixtures"
           git push -f origin chore/refresh-discogs-contract-fixtures
-          gh pr create \
-            --title "chore: refresh Discogs contract fixtures" \
-            --body "Automated nightly regeneration of the Discogs contract fixtures. The contract tests still pass against the refreshed payloads." \
-            --head chore/refresh-discogs-contract-fixtures \
-            --base main \
-            || echo "A PR for this branch may already exist."
+          if gh pr view chore/refresh-discogs-contract-fixtures --json number >/dev/null 2>&1; then
+            echo "PR for this branch already exists; branch updated in place."
+          else
+            gh pr create \
+              --title "chore: refresh Discogs contract fixtures" \
+              --body "Automated nightly regeneration of the Discogs contract fixtures. The contract tests still pass against the refreshed payloads." \
+              --head chore/refresh-discogs-contract-fixtures \
+              --base main
+          fi
