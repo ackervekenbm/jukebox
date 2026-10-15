@@ -1,9 +1,12 @@
 name: Discogs contract
 
-# Regenerates the Discogs contract fixtures from the live API and reruns the
-# hermetic contract tests (src/api/discogs-contract.test.ts) against the fresh
-# payloads. A test failure here means Discogs changed a shape the app parses;
-# a diff with green tests is opened as a dependency-update-style PR instead.
+# Refreshes the Discogs contract fixtures from the live API on the runner and
+# reruns the hermetic contract tests (src/api/discogs-contract.test.ts) against
+# the fresh payloads. A failure means Discogs changed a shape the app parses.
+# Nothing is committed: the fixtures carry live data (marketplace values,
+# collection counts) that churns daily, so a committed copy would only ever be
+# a permanently-dirty PR. The committed fixtures stay the frozen offline
+# baseline for PR CI; this job is purely the live red/green check.
 on:
   schedule:
     # 03:00 UTC, daily
@@ -11,8 +14,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   refresh:
@@ -44,29 +46,7 @@ jobs:
       - name: Run tests against the refreshed fixtures
         run: npm test
 
-      - name: Open PR when the fixtures drifted
-        # If npm test failed, the previous step already failed this job.
-        env:
-          # gh only reads the token from the environment, and it never picks it
-          # up automatically on a runner.
-          GH_TOKEN: ${{ github.token }}
+      - name: Guidance when the contract broke
+        if: failure()
         run: |
-          git add src/test/fixtures/discogs
-          if git diff --cached --quiet; then
-            echo "Fixtures unchanged; nothing to do."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b chore/refresh-discogs-contract-fixtures
-          git commit -m "chore: refresh Discogs contract fixtures"
-          git push -f origin chore/refresh-discogs-contract-fixtures
-          if gh pr view chore/refresh-discogs-contract-fixtures --json number >/dev/null 2>&1; then
-            echo "PR for this branch already exists; branch updated in place."
-          else
-            gh pr create \
-              --title "chore: refresh Discogs contract fixtures" \
-              --body "Automated nightly regeneration of the Discogs contract fixtures. The contract tests still pass against the refreshed payloads." \
-              --head chore/refresh-discogs-contract-fixtures \
-              --base main
-          fi
+          echo "::error::Discogs may have changed a shape we parse. Run 'DISCOGS_TOKEN=... npm run fixtures' locally, update the parsers, then commit the refreshed fixtures."
