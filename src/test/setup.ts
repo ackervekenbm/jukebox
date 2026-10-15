@@ -11,8 +11,9 @@ import 'fake-indexeddb/auto'
 
 // jsdom has no layout engine, so `scrollIntoView` — how the app brings swapped
 // content back into view — is missing. Stub it: no test asserts on scrolling,
-// but a click handler that calls it must not throw.
-if (typeof Element.prototype.scrollIntoView !== 'function') {
+// but a click handler that calls it must not throw. Server tests run in the
+// node environment where there is no Element at all.
+if (typeof Element !== 'undefined' && typeof Element.prototype.scrollIntoView !== 'function') {
   Element.prototype.scrollIntoView = () => {}
 }
 

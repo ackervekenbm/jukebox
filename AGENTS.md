@@ -1,15 +1,17 @@
 # Jukebox
 
 A React 19 + TypeScript + Vite progressive web app that renders a Discogs
-collection from the user's personal access token. All data lives in the
-browser (IndexedDB, localStorage, service-worker caches); there is no backend.
+collection from the user's personal access token. Collection data lives in the
+browser (IndexedDB, localStorage, service-worker caches); a small Express
+server inside the container serves the static app, the same-origin `/discogs`
+proxy, and the `/api` sync store (SQLite) that backs cross-device features.
 
 ## Build, lint, verify
 
 ```bash
 npm install       # install deps (uses package-lock.json, commit it)
-npm run build     # = tsc --noEmit && eslint . && vite build
-npm test          # unit tests (vitest, jsdom) — @testing-library/react
+npm run build     # = tsc --noEmit && eslint . && vite build && tsup (server)
+npm test          # unit tests (vitest) — jsdom for client, node for server
 ```
 
 **Verification for every change is `npm run build && npm test`.** CI runs the
@@ -55,10 +57,20 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   enrichment runs in the background and streams in batches.
 - `src/api/discogs.ts` — raw Discogs calls, ~60 req/min budget. Master-year
   fetch uses staggered batches of 6 + 6.6s pauses; 429s retry via `Retry-After`.
-  All calls go through the same-origin `/discogs` proxy (vite dev + nginx) —
-  the app must never call `api.discogs.com` cross-origin, because Discogs' 429s
-  carry no CORS headers and the browser would mask throttling as an opaque
-  CORS error.
+  All calls go through the same-origin `/discogs` proxy (vite dev forwards to
+  the API server; the container runs it in Express) — the app must never call
+  `api.discogs.com` cross-origin, because Discogs' 429s carry no CORS headers
+  and the browser would mask throttling as an opaque CORS error.
+- `src/server/` — Express API (TypeScript, skin-hq conventions: `tsx watch` in
+  dev, `tsup` bundle in prod). `app.ts` = routes + static client + SPA fallback;
+  `discogsProxy.ts` forwards `/discogs/*` (GET/HEAD only, rate-limit headers
+  passed through); `auth.ts` verifies `Authorization: Discogs token=…` via
+  Discogs `/oauth/identity` (10-min in-memory memo, tokens never stored);
+  `db.ts` = better-sqlite3 (WAL) with the `cabinet_docs` sync table. Tests for
+  routes live in `tests/` (node environment, supertest + temp `DATA_DIR`).
+- `src/shared/cabinetDoc.ts` — zod schema + types for the sync document,
+  imported by both server (validation) and client (types only, so zod never
+  enters the browser bundle).
 - Discogs contract coverage — `scripts/refresh-discogs-fixtures.mjs` captures
   real payloads into `src/test/fixtures/discogs/` (`npm run fixtures`, needs
   `DISCOGS_TOKEN`). `src/api/discogs-contract.test.ts` replays them through the
@@ -86,7 +98,7 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
 
 ## Platform caveats (important)
 
-- Served over **plain HTTP on LAN** (nginx in the container). IndexedDB and
+- Served over **plain HTTP on LAN** (the container). IndexedDB and
   localStorage work over HTTP, but these are **secure-context-only** and must
   be feature-detected with graceful degradation: `navigator.storage.*`,
   `navigator.storage.persist()`, and the `caches` Cache API.
@@ -109,13 +121,18 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
 ## Deployment (internal)
 
 The production host is a Raspberry Pi running **OpenMediaVault**. OMV's web UI
-owns ports 80/443, so the app is exposed on host port **8080**. The container is
-stateless (nginx serving the static build + the `/discogs` proxy) — every user's
-data lives in the browser, so any redeploy is lossless and no volumes are needed.
+owns ports 80/443, so the app is exposed on host port **8080**. One container,
+one node process: it serves the static build, the API and the `/discogs` proxy.
+The container has a named volume for its SQLite DB (`/app/data`) — today that
+holds only the (empty) cabinet-sync table, but the deployment is no longer
+stateless, so treat the volume as persistent user data.
 
 - Every `main` push with app paths re-builds the multi-arch image and pushes
   `ghcr.io/ackervekenbm/jukebox:latest` (see `.github/workflows/docker-build.yml`).
-  The tag derives from `${{ github.repository }}`, so it follows repo renames.
+  PRs touching the same paths run a **smoke job** first: build the image, boot
+  it, poll `/api/health` and assert the PWA cache headers — the image only
+  publishes when smoke passes. The tag derives from
+  `${{ github.repository }}`, so it follows repo renames.
 - **GHCR login (one-time per host).** GHCR requires a login even for public
   images. Log in over SSH:
   ```bash
@@ -136,14 +153,20 @@ data lives in the browser, so any redeploy is lossless and no volumes are needed
       image: ghcr.io/ackervekenbm/jukebox:latest
       container_name: jukebox
       ports:
-        - "8080:80"
+        - "8080:3000"
+      volumes:
+        - jukebox-data:/app/data
       restart: unless-stopped
+
+  volumes:
+    jukebox-data:
   ```
   Save → select it → **Up** (creates/starts the container; open
   `http://<pi-ip>:8080`). To update after a merge: select → **Pull** → **Up**
-  (an unchanged image is a no-op). If **Pull** fails with an auth error, redo
-  the SSH login first. The app is plain HTTP: a normal phone refresh picks up
-  the new build (nginx never caches `index.html`); force-refresh once if a tab
+  (an unchanged image is a no-op; the volume keeps the sync DB). If **Pull**
+  fails with an auth error, redo the SSH login first. The app is plain HTTP:
+  a normal phone refresh picks up the new build (the server sends
+  `Cache-Control: no-cache` for `index.html`); force-refresh once if a tab
   looks stale.
 - **Route B — build on the Pi** (e.g. local variants):
   ```bash

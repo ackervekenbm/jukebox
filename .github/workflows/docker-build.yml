@@ -5,7 +5,20 @@ on:
     branches: [main]
     paths:
       - 'Dockerfile'
-      - 'nginx.conf'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'tsconfig.json'
+      - 'eslint.config.js'
+      - '.dockerignore'
+      - 'index.html'
+      - 'src/**'
+      - 'public/**'
+      - '.github/workflows/docker-build.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
       - 'package.json'
       - 'package-lock.json'
       - 'vite.config.ts'
@@ -22,9 +35,61 @@ env:
   IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
+  smoke:
+    name: smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: jukebox:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Boot container
+        run: docker run -d --name smoke -p 8080:3000 jukebox:smoke
+
+      - name: Wait for /api/health
+        run: |
+          set -e
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/api/health | grep -q '"ok":true'; then
+              echo "healthy after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::server did not become healthy in 60s"
+          exit 1
+
+      - name: Assert PWA cache headers
+        run: |
+          set -e
+          curl -fsSI http://127.0.0.1:8080/index.html | grep -qi '^cache-control: no-cache'
+          curl -fsSI http://127.0.0.1:8080/sw.js | grep -qi '^cache-control: no-cache'
+          asset=$(curl -fsS http://127.0.0.1:8080/index.html | grep -o '/assets/[^"]*\.js' | head -1)
+          echo "checking $asset"
+          test -n "$asset"
+          curl -fsSI "http://127.0.0.1:8080$asset" | grep -qi '^cache-control: public, max-age=31536000, immutable'
+          echo "cache headers ok"
+
+      - name: Dump container logs
+        if: failure()
+        run: docker logs smoke
+
   build:
     # Build each architecture natively (no QEMU emulation): amd64 on the
     # x86 runner, arm64 on GitHub's native arm64 runner.
+    needs: smoke
+    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
