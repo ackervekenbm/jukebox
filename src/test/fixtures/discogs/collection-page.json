@@ -1,0 +1,400 @@
+{
+  "pagination": {
+    "page": 1,
+    "pages": 1,
+    "per_page": 6,
+    "items": 6
+  },
+  "releases": [
+    {
+      "id": 543463,
+      "instance_id": 266326302,
+      "date_added": "2017-12-12T20:10:58-08:00",
+      "rating": 0,
+      "basic_information": {
+        "id": 543463,
+        "master_id": 2213,
+        "master_url": "https://api.discogs.com/masters/2213",
+        "resource_url": "https://api.discogs.com/releases/543463",
+        "thumb": "https://i.discogs.com/tjs9WghJrU4_jFHAO2YMC3q0LBVr6JUHqZe6CFbRWxU/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTU0MzQ2/My0xNDk0MDgzMjc5/LTE1MTcuanBlZw.jpeg",
+        "cover_image": "https://i.discogs.com/5h0FXaFraOIVUsIpJnZDLhsUB9jVFcyFyDrHI7KWsHc/rs:fit/g:sm/q:90/h:600/w:597/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTU0MzQ2/My0xNDk0MDgzMjc5/LTE1MTcuanBlZw.jpeg",
+        "title": "Sign Of The Hammer",
+        "year": 1984,
+        "formats": [
+          {
+            "name": "Vinyl",
+            "qty": "1",
+            "text": "Sonopress Pressing",
+            "descriptions": [
+              "LP",
+              "Album"
+            ]
+          }
+        ],
+        "labels": [
+          {
+            "name": "10 Records",
+            "catno": "206 639",
+            "entity_type": "1",
+            "entity_type_name": "Label",
+            "id": 902,
+            "resource_url": "https://api.discogs.com/labels/902"
+          },
+          {
+            "name": "10 Records",
+            "catno": "206 639-620",
+            "entity_type": "1",
+            "entity_type_name": "Label",
+            "id": 902,
+            "resource_url": "https://api.discogs.com/labels/902"
+          }
+        ],
+        "artists": [
+          {
+            "name": "Manowar",
+            "anv": "",
+            "join": "",
+            "role": "",
+            "tracks": "",
+            "id": 253699,
+            "resource_url": "https://api.discogs.com/artists/253699"
+          }
+        ],
+        "genres": [
+          "Rock"
+        ],
+        "styles": [
+          "Heavy Metal"
+        ]
+      },
+      "folder_id": 1
+    },
+    {
+      "id": 1533994,
+      "instance_id": 267498313,
+      "date_added": "2017-12-19T17:51:35-08:00",
+      "rating": 0,
+      "basic_information": {
+        "id": 1533994,
+        "master_id": 82999,
+        "master_url": "https://api.discogs.com/masters/82999",
+        "resource_url": "https://api.discogs.com/releases/1533994",
+        "thumb": "https://i.discogs.com/m7FMmN3Ssgheup-OcFviGoRy13n59wCgzBW62ZixEJQ/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE1MzM5/OTQtMTc2NzEwODIz/NS0yMTE2LmpwZWc.jpeg",
+        "cover_image": "https://i.discogs.com/iWEEy0yNO-hb3IH0leeY5Mq31m3_jkAIurbCU-JfrS0/rs:fit/g:sm/q:90/h:588/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE1MzM5/OTQtMTc2NzEwODIz/NS0yMTE2LmpwZWc.jpeg",
+        "title": "Run For Cover",
+        "year": 1985,
+        "formats": [
+          {
+            "name": "Vinyl",
+            "qty": "1",
+            "text": "Bass Clef",
+            "descriptions": [
+              "LP",
+              "Album",
+              "Stereo"
+            ]
+          }
+        ],
+        "labels": [
+          {
+            "name": "10 Records",
+            "catno": "207 283",
+            "entity_type": "1",
+            "entity_type_name": "Label",
+            "id": 902,
+            "resource_url": "https://api.discogs.com/labels/902"
+          },
+          {
+            "name": "10 Records",
+            "catno": "207 283-620",
+            "entity_type": "1",
+            "entity_type_name": "Label",
+            "id": 902,
+            "resource_url": "https://api.discogs.com/labels/902"
+          }
+        ],
+        "artists": [
+          {
+            "name": "Gary Moore",
+            "anv": "",
+            "join": "",
+            "role": "",
+            "tracks": "",
+            "id": 208220,
+            "resource_url": "https://api.discogs.com/artists/208220"
+          }
+        ],
+        "genres": [
+          "Rock"
+        ],
+        "styles": [
+          "Pop Rock"
+        ]
+      },
+      "folder_id": 1
+    },
+    {
+      "id": 611003,
+      "instance_id": 266334983,
+      "date_added": "2017-12-12T20:55:25-08:00",
+      "rating": 0,
+      "basic_information": {
+        "id": 611003,
+        "master_id": 106828,
+        "master_url": "https://api.discogs.com/masters/106828",
+        "resource_url": "https://api.discogs.com/releases/611003",
+        "thumb": "https://i.discogs.com/-TRw2RRbyZUFzTmIkeIcih3B87-2ChD7QDmRO6FOXDA/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTYxMTAw/My0xMTQ2Mzg2NDQ5/LmpwZWc.jpeg",
+        "cover_image": "https://i.discogs.com/XQE0FRyV92DmJ7ipDbWjBiuhs7gw_9fCxc-9vDzlZQ0/rs:fit/g:sm/q:90/h:590/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTYxMTAw/My0xMTQ2Mzg2NDQ5/LmpwZWc.jpeg",
+        "title": "We Want Moore!",
+        "year": 1984,
+        "formats": [
+          {
+            "name": "Vinyl",
+            "qty": "1",
+            "descriptions": [
+              "LP",
+              "Album",
+              "Stereo"
+            ]
+          },
+          {
+            "name": "Vinyl",
+            "qty": "1",
+            "descriptions": [
+              "12\"",
+              "Stereo"
+            ]
+          }
+        ],
+        "labels": [
+          {
+            "name": "10 Records",
+            "catno": "302 469-370",
+            "entity_type": "1",
+            "entity_type_name": "Label",
+            "id": 902,
+            "resource_url": "https://api.discogs.com/labels/902"
+          },
+          {
+            "name": "10 Records",
+            "catno": "302 469",
+            "entity_type": "1",
+            "entity_type_name": "Label",
+            "id": 902,
+            "resource_url": "https://api.discogs.com/labels/902"
+          }
+        ],
+        "artists": [
+          {
+            "name": "Gary Moore",
+            "anv": "",
+            "join": "",
+            "role": "",
+            "tracks": "",
+            "id": 208220,
+            "resource_url": "https://api.discogs.com/artists/208220"
+          }
+        ],
+        "genres": [
+          "Rock"
+        ],
+        "styles": [
+          "Hard Rock"
+        ]
+      },
+      "folder_id": 1
+    },
+    {
+      "id": 2147634,
+      "instance_id": 328182608,
+      "date_added": "2018-10-22T19:25:28-07:00",
+      "rating": 0,
+      "basic_information": {
+        "id": 2147634,
+        "master_id": 209718,
+        "master_url": "https://api.discogs.com/masters/209718",
+        "resource_url": "https://api.discogs.com/releases/2147634",
+        "thumb": "https://i.discogs.com/AXWbCa-cYuTzd22JShqi9aeQxzcuZqnj5juErZB9Itc/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTIxNDc2/MzQtMTI2NjYxMTE2/OS5naWY.jpeg",
+        "cover_image": "https://i.discogs.com/Up_d-wQqoKN42E6sqMoec1GqKuzm4OaPb7pjWu1dDJo/rs:fit/g:sm/q:90/h:300/w:300/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTIxNDc2/MzQtMTI2NjYxMTE2/OS5naWY.jpeg",
+        "title": "Mobilize",
+        "year": 2004,
+        "formats": [
+          {
+            "name": "Vinyl",
+            "qty": "1",
+            "descriptions": [
+              "LP",
+              "Album"
+            ]
+          }
+        ],
+        "labels": [
+          {
+            "name": "A-F Records",
+            "catno": "AF0035",
+            "entity_type": "1",
+            "entity_type_name": "Label",
+            "id": 14814,
+            "resource_url": "https://api.discogs.com/labels/14814"
+          }
+        ],
+        "artists": [
+          {
+            "name": "Anti-Flag",
+            "anv": "",
+            "join": "",
+            "role": "",
+            "tracks": "",
+            "id": 253273,
+            "resource_url": "https://api.discogs.com/artists/253273"
+          }
+        ],
+        "genres": [
+          "Rock"
+        ],
+        "styles": [
+          "Hardcore",
+          "Punk"
+        ]
+      },
+      "folder_id": 1336133,
+      "notes": [
+        {
+          "field_id": 4,
+          "value": "€ 24,90"
+        }
+      ]
+    },
+    {
+      "id": 14011141,
+      "instance_id": 635928754,
+      "date_added": "2021-03-10T01:47:22-08:00",
+      "rating": 0,
+      "basic_information": {
+        "id": 14011141,
+        "master_id": 1591992,
+        "master_url": "https://api.discogs.com/masters/1591992",
+        "resource_url": "https://api.discogs.com/releases/14011141",
+        "thumb": "https://i.discogs.com/ZWZ_PctZ-naWLPT1XksNWg2O0fISoDv-q4EBWc4DBCw/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0MDEx/MTQxLTE1NjY2MjQz/MTEtNzA3NC5qcGVn.jpeg",
+        "cover_image": "https://i.discogs.com/ZEIUv2qO2yGYAtLgOL6BrDS1XzuAtHNH3AjO4ZfK7l0/rs:fit/g:sm/q:90/h:600/w:586/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0MDEx/MTQxLTE1NjY2MjQz/MTEtNzA3NC5qcGVn.jpeg",
+        "title": "Live Volume Two ",
+        "year": 2019,
+        "formats": [
+          {
+            "name": "Vinyl",
+            "qty": "1",
+            "text": "Clear With Red Swirl",
+            "descriptions": [
+              "LP",
+              "Album"
+            ]
+          }
+        ],
+        "labels": [
+          {
+            "name": "A-F Records",
+            "catno": "AF108",
+            "entity_type": "1",
+            "entity_type_name": "Label",
+            "id": 14814,
+            "resource_url": "https://api.discogs.com/labels/14814"
+          }
+        ],
+        "artists": [
+          {
+            "name": "Anti-Flag",
+            "anv": "",
+            "join": "",
+            "role": "",
+            "tracks": "",
+            "id": 253273,
+            "resource_url": "https://api.discogs.com/artists/253273"
+          }
+        ],
+        "genres": [
+          "Rock"
+        ],
+        "styles": [
+          "Punk"
+        ]
+      },
+      "folder_id": 1336133,
+      "notes": [
+        {
+          "field_id": 4,
+          "value": "€ 25,99"
+        }
+      ]
+    },
+    {
+      "id": 15312309,
+      "instance_id": 1066776080,
+      "date_added": "2022-06-29T01:54:02-07:00",
+      "rating": 0,
+      "basic_information": {
+        "id": 15312309,
+        "master_id": 1722229,
+        "master_url": "https://api.discogs.com/masters/1722229",
+        "resource_url": "https://api.discogs.com/releases/15312309",
+        "thumb": "https://i.discogs.com/tDVE3q2YR2P9kjyNk4Z81op4iXM6HQkzrNVsnWGJCDQ/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE1MzEy/MzA5LTE1ODk1NzA4/NzEtNjY2MS5qcGVn.jpeg",
+        "cover_image": "https://i.discogs.com/ct523ybH1-NixJIRgZVfqZCOfBd2cAhnaSuYW5qHJec/rs:fit/g:sm/q:90/h:600/w:594/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE1MzEy/MzA5LTE1ODk1NzA4/NzEtNjY2MS5qcGVn.jpeg",
+        "title": "This Land Is Your Landfill",
+        "year": 2020,
+        "formats": [
+          {
+            "name": "Vinyl",
+            "qty": "1",
+            "text": "Sea Blue",
+            "descriptions": [
+              "LP",
+              "Album",
+              "Limited Edition"
+            ]
+          }
+        ],
+        "labels": [
+          {
+            "name": "A-F Records",
+            "catno": "AF111",
+            "entity_type": "1",
+            "entity_type_name": "Label",
+            "id": 14814,
+            "resource_url": "https://api.discogs.com/labels/14814"
+          },
+          {
+            "name": "Hassle Records",
+            "catno": "AF111",
+            "entity_type": "1",
+            "entity_type_name": "Label",
+            "id": 49307,
+            "resource_url": "https://api.discogs.com/labels/49307"
+          }
+        ],
+        "artists": [
+          {
+            "name": "The Homeless Gospel Choir",
+            "anv": "",
+            "join": "",
+            "role": "",
+            "tracks": "",
+            "id": 3557680,
+            "resource_url": "https://api.discogs.com/artists/3557680"
+          }
+        ],
+        "genres": [
+          "Rock"
+        ],
+        "styles": [
+          "Punk"
+        ]
+      },
+      "folder_id": 1336133,
+      "notes": [
+        {
+          "field_id": 4,
+          "value": "€ 21,90"
+        }
+      ]
+    }
+  ]
+}
