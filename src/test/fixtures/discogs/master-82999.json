@@ -1,0 +1,1051 @@
+{
+  "id": 82999,
+  "main_release": 1131695,
+  "most_recent_release": 34718523,
+  "resource_url": "https://api.discogs.com/masters/82999",
+  "uri": "https://www.discogs.com/master/82999-Gary-Moore-Run-For-Cover",
+  "versions_url": "https://api.discogs.com/masters/82999/versions",
+  "main_release_url": "https://api.discogs.com/releases/1131695",
+  "most_recent_release_url": "https://api.discogs.com/releases/34718523",
+  "num_for_sale": 679,
+  "lowest_price": 0.44,
+  "images": [
+    {
+      "type": "primary",
+      "uri": "https://i.discogs.com/GIjirDtDpCT84FSmWpnGcIsj31UOdqSGqFnIemExPkY/rs:fit/g:sm/q:90/h:580/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTY2NjI3MzQz/NC02OTQyLmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/GIjirDtDpCT84FSmWpnGcIsj31UOdqSGqFnIemExPkY/rs:fit/g:sm/q:90/h:580/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTY2NjI3MzQz/NC02OTQyLmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/V7P9X_yGENDs6imGt7GoWNvyOZdchROvikkjEOsIroU/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTY2NjI3MzQz/NC02OTQyLmpwZWc.jpeg",
+      "width": 600,
+      "height": 580
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/VbdS9iP5dHSlwBik_MObtqa2XrJ77xhyUbqnZDvNdd0/rs:fit/g:sm/q:90/h:472/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTY2NjI3MzQz/NS03NTYwLmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/VbdS9iP5dHSlwBik_MObtqa2XrJ77xhyUbqnZDvNdd0/rs:fit/g:sm/q:90/h:472/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTY2NjI3MzQz/NS03NTYwLmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/ZAxUe0swm3bHbvAXQZ8fuYwrh0fD8h4tuR4F6XM20pg/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTY2NjI3MzQz/NS03NTYwLmpwZWc.jpeg",
+      "width": 600,
+      "height": 472
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/5IND_4_clUPgTk7CX4tB8yekp5CQvm40XoxS3TiHJy4/rs:fit/g:sm/q:90/h:600/w:594/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTU0MjUzNTc4/NS0zNDQ4LmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/5IND_4_clUPgTk7CX4tB8yekp5CQvm40XoxS3TiHJy4/rs:fit/g:sm/q:90/h:600/w:594/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTU0MjUzNTc4/NS0zNDQ4LmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/bdBl0jspxHmiLRBrFT4xn36Fbrs3mwHvPhBYUoOTevM/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTU0MjUzNTc4/NS0zNDQ4LmpwZWc.jpeg",
+      "width": 594,
+      "height": 600
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/-BWH4CWNpaxX89hohsNdlaVQPIgeN6sfKKqTNeBxmxo/rs:fit/g:sm/q:90/h:600/w:596/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTU0MjUzNTc4/Ni00MTUwLmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/-BWH4CWNpaxX89hohsNdlaVQPIgeN6sfKKqTNeBxmxo/rs:fit/g:sm/q:90/h:600/w:596/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTU0MjUzNTc4/Ni00MTUwLmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/qkJ-kFfywtqjdqZBvXQleDnXY3iFXqJbx3zUBl6-3PA/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTU0MjUzNTc4/Ni00MTUwLmpwZWc.jpeg",
+      "width": 596,
+      "height": 600
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/1pJP-PccYu2dWHXQnLzVmPxYC0EMFT0FQbAL0-oJxmA/rs:fit/g:sm/q:90/h:591/w:591/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQ0/Ni01NzE0LmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/1pJP-PccYu2dWHXQnLzVmPxYC0EMFT0FQbAL0-oJxmA/rs:fit/g:sm/q:90/h:591/w:591/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQ0/Ni01NzE0LmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/UpfD4ZNTk-iZMXYV91Ep5gAYld6hahLJAB3GcG4dhRQ/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQ0/Ni01NzE0LmpwZWc.jpeg",
+      "width": 591,
+      "height": 591
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/R8ASn13O1Ho_pEhLZIs0AV-7WV7Wx2MotMloq_SMeEk/rs:fit/g:sm/q:90/h:591/w:591/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQz/Ni04NzM4LmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/R8ASn13O1Ho_pEhLZIs0AV-7WV7Wx2MotMloq_SMeEk/rs:fit/g:sm/q:90/h:591/w:591/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQz/Ni04NzM4LmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/4cJAbYilKjlTK_POzgpCKoy-PoQ7j9LbHufuewfw8e4/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQz/Ni04NzM4LmpwZWc.jpeg",
+      "width": 591,
+      "height": 591
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/RRDPWyVkAQDQ2yTWOaZ6J9WG4lO2gIS58vi9hFgdHW8/rs:fit/g:sm/q:90/h:591/w:591/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQ0/OC04MTc0LmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/RRDPWyVkAQDQ2yTWOaZ6J9WG4lO2gIS58vi9hFgdHW8/rs:fit/g:sm/q:90/h:591/w:591/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQ0/OC04MTc0LmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/QAfmCmzEtbeaBvQ0Ui96vvyLzWfTIHXCPAxbhsQLMq4/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQ0/OC04MTc0LmpwZWc.jpeg",
+      "width": 591,
+      "height": 591
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/SwshdF-2YSy9hyqjLTvps_-_lNHUcogQzgZTWIl90Bc/rs:fit/g:sm/q:90/h:591/w:591/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQz/Ny0xODA0LmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/SwshdF-2YSy9hyqjLTvps_-_lNHUcogQzgZTWIl90Bc/rs:fit/g:sm/q:90/h:591/w:591/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQz/Ny0xODA0LmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/-ONGhOtni1q0BJJFwRa0PTX4jLVbIBtHfJJS2md6n2Y/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQz/Ny0xODA0LmpwZWc.jpeg",
+      "width": 591,
+      "height": 591
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/s82NLt2qDECiMh4kQ5VQ8r62m0ClEAB1mEjkXribkGw/rs:fit/g:sm/q:90/h:591/w:591/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQy/NC02OTMzLmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/s82NLt2qDECiMh4kQ5VQ8r62m0ClEAB1mEjkXribkGw/rs:fit/g:sm/q:90/h:591/w:591/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQy/NC02OTMzLmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/-Acw_kQlc7VctdIcxHZgVyDqTn6gPmhXifee51N9DJ8/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQy/NC02OTMzLmpwZWc.jpeg",
+      "width": 591,
+      "height": 591
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/jjygWb7xqbHU1LSuIxdMjkcF6LdytIElFDdnZvPoxIM/rs:fit/g:sm/q:90/h:591/w:591/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQ0/MC03MjM5LmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/jjygWb7xqbHU1LSuIxdMjkcF6LdytIElFDdnZvPoxIM/rs:fit/g:sm/q:90/h:591/w:591/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQ0/MC03MjM5LmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/WfxYaUoa6HDRxQTejzVdBl5aRvmo9dDXYcnhCV0T1A0/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTQwNTA3NDQ0/MC03MjM5LmpwZWc.jpeg",
+      "width": 591,
+      "height": 591
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/Pu2U8jE0tOHMJryl8HoP67SFugyY0kkGkL3kvXvzQpo/rs:fit/g:sm/q:90/h:582/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTY2NjI3MzQz/Ni01MjU5LmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/Pu2U8jE0tOHMJryl8HoP67SFugyY0kkGkL3kvXvzQpo/rs:fit/g:sm/q:90/h:582/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTY2NjI3MzQz/Ni01MjU5LmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/NGpQ-nI9nkQxlGQrBCL9IXSnYzec-ZwQwg5V60ovo7Q/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTY2NjI3MzQz/Ni01MjU5LmpwZWc.jpeg",
+      "width": 600,
+      "height": 582
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/vCXjSMg5e69FTQsXaRTna9kS6ZRJrU4DcoZM6NHenU8/rs:fit/g:sm/q:90/h:528/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTY2NjI3MzQz/OC01OTkyLmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/vCXjSMg5e69FTQsXaRTna9kS6ZRJrU4DcoZM6NHenU8/rs:fit/g:sm/q:90/h:528/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTY2NjI3MzQz/OC01OTkyLmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/Uha6bqAfwHe4HRgeNFl-9Rj822Io-lbgzVB7x6o1fPE/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExMzE2/OTUtMTY2NjI3MzQz/OC01OTkyLmpwZWc.jpeg",
+      "width": 600,
+      "height": 528
+    }
+  ],
+  "genres": [
+    "Rock"
+  ],
+  "styles": [
+    "Pop Rock",
+    "Hard Rock"
+  ],
+  "year": 1985,
+  "tracklist": [
+    {
+      "position": "1",
+      "type_": "track",
+      "title": "Run For Cover",
+      "extraartists": [
+        {
+          "name": "Neil Carter",
+          "anv": "",
+          "join": "",
+          "role": "Backing Vocals",
+          "tracks": "",
+          "id": 270157,
+          "resource_url": "https://api.discogs.com/artists/270157"
+        },
+        {
+          "name": "Glenn Hughes",
+          "anv": "",
+          "join": "",
+          "role": "Bass",
+          "tracks": "",
+          "id": 267270,
+          "resource_url": "https://api.discogs.com/artists/267270"
+        },
+        {
+          "name": "Gary Ferguson",
+          "anv": "",
+          "join": "",
+          "role": "Drums",
+          "tracks": "",
+          "id": 377876,
+          "resource_url": "https://api.discogs.com/artists/377876"
+        },
+        {
+          "name": "Andy Richards",
+          "anv": "",
+          "join": "",
+          "role": "Keyboards",
+          "tracks": "",
+          "id": 69318,
+          "resource_url": "https://api.discogs.com/artists/69318"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Lead Vocals, Guitar [Guitars]",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        },
+        {
+          "name": "Mike Stone",
+          "anv": "",
+          "join": "",
+          "role": "Mixed By",
+          "tracks": "",
+          "id": 94526,
+          "resource_url": "https://api.discogs.com/artists/94526"
+        },
+        {
+          "name": "Stuart Breed",
+          "anv": "",
+          "join": "",
+          "role": "Mixed By [Assisted By]",
+          "tracks": "",
+          "id": 303478,
+          "resource_url": "https://api.discogs.com/artists/303478"
+        },
+        {
+          "name": "Andy Johns",
+          "anv": "",
+          "join": "",
+          "role": "Producer",
+          "tracks": "",
+          "id": 249830,
+          "resource_url": "https://api.discogs.com/artists/249830"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Written-By",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        }
+      ],
+      "duration": "4:14"
+    },
+    {
+      "position": "2",
+      "type_": "track",
+      "title": "Reach For The Sky",
+      "extraartists": [
+        {
+          "name": "Charlie Morgan",
+          "anv": "",
+          "join": "",
+          "role": "Electronic Drums [Simmons Drums]",
+          "tracks": "",
+          "id": 249350,
+          "resource_url": "https://api.discogs.com/artists/249350"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Guitar [Guitars], Backing Vocals",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        },
+        {
+          "name": "Andy Richards",
+          "anv": "",
+          "join": "",
+          "role": "Keyboards",
+          "tracks": "",
+          "id": 69318,
+          "resource_url": "https://api.discogs.com/artists/69318"
+        },
+        {
+          "name": "Glenn Hughes",
+          "anv": "",
+          "join": "",
+          "role": "Lead Vocals, Bass",
+          "tracks": "",
+          "id": 267270,
+          "resource_url": "https://api.discogs.com/artists/267270"
+        },
+        {
+          "name": "Mike Stone",
+          "anv": "",
+          "join": "",
+          "role": "Mixed By",
+          "tracks": "",
+          "id": 94526,
+          "resource_url": "https://api.discogs.com/artists/94526"
+        },
+        {
+          "name": "Stuart Breed",
+          "anv": "",
+          "join": "",
+          "role": "Mixed By [Assisted By]",
+          "tracks": "",
+          "id": 303478,
+          "resource_url": "https://api.discogs.com/artists/303478"
+        },
+        {
+          "name": "Andy Johns",
+          "anv": "",
+          "join": "",
+          "role": "Producer",
+          "tracks": "",
+          "id": 249830,
+          "resource_url": "https://api.discogs.com/artists/249830"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Written-By",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        }
+      ],
+      "duration": "4:46"
+    },
+    {
+      "position": "3",
+      "type_": "track",
+      "title": "Military Man",
+      "extraartists": [
+        {
+          "name": "Charlie Morgan",
+          "anv": "",
+          "join": "",
+          "role": "Drums, Electronic Drums [Simmons Drums]",
+          "tracks": "",
+          "id": 249350,
+          "resource_url": "https://api.discogs.com/artists/249350"
+        },
+        {
+          "name": "Stephen Benben",
+          "anv": "Stephan BenBen",
+          "join": "",
+          "role": "Engineer",
+          "tracks": "",
+          "id": 375299,
+          "resource_url": "https://api.discogs.com/artists/375299"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Guitar [Guitars], Backing Vocals",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        },
+        {
+          "name": "Andy Richards",
+          "anv": "",
+          "join": "",
+          "role": "Keyboards",
+          "tracks": "",
+          "id": 69318,
+          "resource_url": "https://api.discogs.com/artists/69318"
+        },
+        {
+          "name": "Don Airey",
+          "anv": "",
+          "join": "",
+          "role": "Keyboards",
+          "tracks": "",
+          "id": 321792,
+          "resource_url": "https://api.discogs.com/artists/321792"
+        },
+        {
+          "name": "Phil Lynott",
+          "anv": "Philip Lynott",
+          "join": "",
+          "role": "Lead Vocals, Bass",
+          "tracks": "",
+          "id": 281068,
+          "resource_url": "https://api.discogs.com/artists/281068"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Producer",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        },
+        {
+          "name": "Phil Lynott",
+          "anv": "Philip Lynott",
+          "join": "",
+          "role": "Written-By",
+          "tracks": "",
+          "id": 281068,
+          "resource_url": "https://api.discogs.com/artists/281068"
+        }
+      ],
+      "duration": "5:40"
+    },
+    {
+      "position": "4",
+      "type_": "track",
+      "title": "Empty Rooms",
+      "extraartists": [
+        {
+          "name": "Neil Carter",
+          "anv": "",
+          "join": "",
+          "role": "Backing Vocals",
+          "tracks": "",
+          "id": 270157,
+          "resource_url": "https://api.discogs.com/artists/270157"
+        },
+        {
+          "name": "James \"Jimbo\" Barton",
+          "anv": "James (Jimbo) Barton",
+          "join": "",
+          "role": "Electronic Drums [Sampled Drums]",
+          "tracks": "",
+          "id": 259805,
+          "resource_url": "https://api.discogs.com/artists/259805"
+        },
+        {
+          "name": "James \"Jimbo\" Barton",
+          "anv": "James (Jimbo) Barton",
+          "join": "",
+          "role": "Engineer [Remix Engineer], Producer [Production Assistant]",
+          "tracks": "",
+          "id": 259805,
+          "resource_url": "https://api.discogs.com/artists/259805"
+        },
+        {
+          "name": "Andy Richards",
+          "anv": "",
+          "join": "",
+          "role": "Keyboards",
+          "tracks": "",
+          "id": 69318,
+          "resource_url": "https://api.discogs.com/artists/69318"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Lead Vocals, Guitar [Guitars]",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        },
+        {
+          "name": "Peter Collins",
+          "anv": "",
+          "join": "",
+          "role": "Producer",
+          "tracks": "",
+          "id": 68850,
+          "resource_url": "https://api.discogs.com/artists/68850"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Written-By",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        },
+        {
+          "name": "Neil Carter",
+          "anv": "",
+          "join": "",
+          "role": "Written-By",
+          "tracks": "",
+          "id": 270157,
+          "resource_url": "https://api.discogs.com/artists/270157"
+        }
+      ],
+      "duration": "4:17"
+    },
+    {
+      "position": "5",
+      "type_": "track",
+      "title": "Out Of My System",
+      "extraartists": [
+        {
+          "name": "Paul Thompson (2)",
+          "anv": "",
+          "join": "",
+          "role": "Drums",
+          "tracks": "",
+          "id": 261914,
+          "resource_url": "https://api.discogs.com/artists/261914"
+        },
+        {
+          "name": "Stephen Benben",
+          "anv": "Stephan BenBen",
+          "join": "",
+          "role": "Engineer",
+          "tracks": "",
+          "id": 375299,
+          "resource_url": "https://api.discogs.com/artists/375299"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Guitar [Guitars], Backing Vocals",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        },
+        {
+          "name": "Andy Richards",
+          "anv": "",
+          "join": "",
+          "role": "Keyboards",
+          "tracks": "",
+          "id": 69318,
+          "resource_url": "https://api.discogs.com/artists/69318"
+        },
+        {
+          "name": "Neil Carter",
+          "anv": "",
+          "join": "",
+          "role": "Keyboards",
+          "tracks": "",
+          "id": 270157,
+          "resource_url": "https://api.discogs.com/artists/270157"
+        },
+        {
+          "name": "Glenn Hughes",
+          "anv": "",
+          "join": "",
+          "role": "Lead Vocals, Bass",
+          "tracks": "",
+          "id": 267270,
+          "resource_url": "https://api.discogs.com/artists/267270"
+        },
+        {
+          "name": "Beau Hill",
+          "anv": "",
+          "join": "",
+          "role": "Producer",
+          "tracks": "",
+          "id": 260743,
+          "resource_url": "https://api.discogs.com/artists/260743"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Written-By",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        }
+      ],
+      "duration": "4:02"
+    },
+    {
+      "position": "6",
+      "type_": "track",
+      "title": "Out In The Fields",
+      "extraartists": [
+        {
+          "name": "Charlie Morgan",
+          "anv": "",
+          "join": "",
+          "role": "Drums",
+          "tracks": "",
+          "id": 249350,
+          "resource_url": "https://api.discogs.com/artists/249350"
+        },
+        {
+          "name": "James \"Jimbo\" Barton",
+          "anv": "James (Jimbo) Barton",
+          "join": "",
+          "role": "Engineer",
+          "tracks": "",
+          "id": 259805,
+          "resource_url": "https://api.discogs.com/artists/259805"
+        },
+        {
+          "name": "Andy Richards",
+          "anv": "",
+          "join": "",
+          "role": "Keyboards",
+          "tracks": "",
+          "id": 69318,
+          "resource_url": "https://api.discogs.com/artists/69318"
+        },
+        {
+          "name": "Don Airey",
+          "anv": "",
+          "join": "",
+          "role": "Keyboards",
+          "tracks": "",
+          "id": 321792,
+          "resource_url": "https://api.discogs.com/artists/321792"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Lead Vocals, Guitar [Guitars]",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        },
+        {
+          "name": "Peter Collins",
+          "anv": "",
+          "join": "",
+          "role": "Producer",
+          "tracks": "",
+          "id": 68850,
+          "resource_url": "https://api.discogs.com/artists/68850"
+        },
+        {
+          "name": "Phil Lynott",
+          "anv": "Philip Lynott",
+          "join": "",
+          "role": "Vocals, Bass",
+          "tracks": "",
+          "id": 281068,
+          "resource_url": "https://api.discogs.com/artists/281068"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Written-By",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        }
+      ],
+      "duration": "4:18"
+    },
+    {
+      "position": "7",
+      "type_": "track",
+      "title": "Nothing To Lose",
+      "extraartists": [
+        {
+          "name": "Phil Lynott",
+          "anv": "Philip Lynott",
+          "join": "",
+          "role": "Backing Vocals",
+          "tracks": "",
+          "id": 281068,
+          "resource_url": "https://api.discogs.com/artists/281068"
+        },
+        {
+          "name": "Paul Thompson (2)",
+          "anv": "",
+          "join": "",
+          "role": "Drums",
+          "tracks": "",
+          "id": 261914,
+          "resource_url": "https://api.discogs.com/artists/261914"
+        },
+        {
+          "name": "Stephen Benben",
+          "anv": "Stephan BenBen",
+          "join": "",
+          "role": "Engineer",
+          "tracks": "",
+          "id": 375299,
+          "resource_url": "https://api.discogs.com/artists/375299"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Guitar [Guitars], Backing Vocals",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        },
+        {
+          "name": "Neil Carter",
+          "anv": "",
+          "join": "",
+          "role": "Keyboards, Backing Vocals",
+          "tracks": "",
+          "id": 270157,
+          "resource_url": "https://api.discogs.com/artists/270157"
+        },
+        {
+          "name": "Glenn Hughes",
+          "anv": "",
+          "join": "",
+          "role": "Lead Vocals, Bass",
+          "tracks": "",
+          "id": 267270,
+          "resource_url": "https://api.discogs.com/artists/267270"
+        },
+        {
+          "name": "Mike Stone",
+          "anv": "",
+          "join": "",
+          "role": "Mixed By",
+          "tracks": "",
+          "id": 94526,
+          "resource_url": "https://api.discogs.com/artists/94526"
+        },
+        {
+          "name": "Stuart Breed",
+          "anv": "",
+          "join": "",
+          "role": "Mixed By [Assisted By]",
+          "tracks": "",
+          "id": 303478,
+          "resource_url": "https://api.discogs.com/artists/303478"
+        },
+        {
+          "name": "Beau Hill",
+          "anv": "",
+          "join": "",
+          "role": "Producer",
+          "tracks": "",
+          "id": 260743,
+          "resource_url": "https://api.discogs.com/artists/260743"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Written-By",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        }
+      ],
+      "duration": "4:42"
+    },
+    {
+      "position": "8",
+      "type_": "track",
+      "title": "Once In A Lifetime",
+      "extraartists": [
+        {
+          "name": "Bob Daisley",
+          "anv": "",
+          "join": "",
+          "role": "Bass",
+          "tracks": "",
+          "id": 270158,
+          "resource_url": "https://api.discogs.com/artists/270158"
+        },
+        {
+          "name": "Gary Ferguson",
+          "anv": "",
+          "join": "",
+          "role": "Drums",
+          "tracks": "",
+          "id": 377876,
+          "resource_url": "https://api.discogs.com/artists/377876"
+        },
+        {
+          "name": "Andy Richards",
+          "anv": "",
+          "join": "",
+          "role": "Keyboards",
+          "tracks": "",
+          "id": 69318,
+          "resource_url": "https://api.discogs.com/artists/69318"
+        },
+        {
+          "name": "Neil Carter",
+          "anv": "",
+          "join": "",
+          "role": "Keyboards, Backing Vocals",
+          "tracks": "",
+          "id": 270157,
+          "resource_url": "https://api.discogs.com/artists/270157"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Lead Vocals, Guitar [Guitars]",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        },
+        {
+          "name": "Mike Stone",
+          "anv": "",
+          "join": "",
+          "role": "Producer",
+          "tracks": "",
+          "id": 94526,
+          "resource_url": "https://api.discogs.com/artists/94526"
+        },
+        {
+          "name": "Stuart Breed",
+          "anv": "",
+          "join": "",
+          "role": "Producer [Assisted At Air London By]",
+          "tracks": "",
+          "id": 303478,
+          "resource_url": "https://api.discogs.com/artists/303478"
+        },
+        {
+          "name": "Mark Saunders",
+          "anv": "",
+          "join": "",
+          "role": "Producer [Assisted At West Side By]",
+          "tracks": "",
+          "id": 2729,
+          "resource_url": "https://api.discogs.com/artists/2729"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Written-By",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        }
+      ],
+      "duration": "4:19"
+    },
+    {
+      "position": "9",
+      "type_": "track",
+      "title": "All Messed Up",
+      "extraartists": [
+        {
+          "name": "Gary Ferguson",
+          "anv": "",
+          "join": "",
+          "role": "Drums",
+          "tracks": "",
+          "id": 377876,
+          "resource_url": "https://api.discogs.com/artists/377876"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Guitar [Guitars], Backing Vocals",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        },
+        {
+          "name": "Glenn Hughes",
+          "anv": "",
+          "join": "",
+          "role": "Lead Vocals, Bass",
+          "tracks": "",
+          "id": 267270,
+          "resource_url": "https://api.discogs.com/artists/267270"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Written-By",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        },
+        {
+          "name": "Neil Carter",
+          "anv": "",
+          "join": "",
+          "role": "Written-By",
+          "tracks": "",
+          "id": 270157,
+          "resource_url": "https://api.discogs.com/artists/270157"
+        }
+      ],
+      "duration": "4:52"
+    },
+    {
+      "position": "10",
+      "type_": "track",
+      "title": "Listen To Your Heartbeat",
+      "extraartists": [
+        {
+          "name": "Gary Ferguson",
+          "anv": "",
+          "join": "",
+          "role": "Drums",
+          "tracks": "",
+          "id": 377876,
+          "resource_url": "https://api.discogs.com/artists/377876"
+        },
+        {
+          "name": "Andy Richards",
+          "anv": "",
+          "join": "",
+          "role": "Keyboards",
+          "tracks": "",
+          "id": 69318,
+          "resource_url": "https://api.discogs.com/artists/69318"
+        },
+        {
+          "name": "Neil Carter",
+          "anv": "",
+          "join": "",
+          "role": "Keyboards, Backing Vocals",
+          "tracks": "",
+          "id": 270157,
+          "resource_url": "https://api.discogs.com/artists/270157"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Lead Vocals, Guitar [Guitars]",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        },
+        {
+          "name": "Mike Stone",
+          "anv": "",
+          "join": "",
+          "role": "Producer",
+          "tracks": "",
+          "id": 94526,
+          "resource_url": "https://api.discogs.com/artists/94526"
+        },
+        {
+          "name": "Stuart Breed",
+          "anv": "",
+          "join": "",
+          "role": "Producer [Assisted At Air London By]",
+          "tracks": "",
+          "id": 303478,
+          "resource_url": "https://api.discogs.com/artists/303478"
+        },
+        {
+          "name": "Mark Saunders",
+          "anv": "",
+          "join": "",
+          "role": "Producer [Assisted At West Side By]",
+          "tracks": "",
+          "id": 2729,
+          "resource_url": "https://api.discogs.com/artists/2729"
+        },
+        {
+          "name": "Gary Moore",
+          "anv": "",
+          "join": "",
+          "role": "Written-By",
+          "tracks": "",
+          "id": 208220,
+          "resource_url": "https://api.discogs.com/artists/208220"
+        }
+      ],
+      "duration": "4:32"
+    }
+  ],
+  "artists": [
+    {
+      "name": "Gary Moore",
+      "anv": "",
+      "join": "",
+      "role": "",
+      "tracks": "",
+      "id": 208220,
+      "resource_url": "https://api.discogs.com/artists/208220",
+      "thumbnail_url": "https://i.discogs.com/w77vx8sECWZA99mFnt_vnGbOUVQqQpYBQ3XNYmvByOw/rs:fit/g:sm/q:90/h:600/w:491/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9BLTIwODIy/MC0xMzgzMjUzODcz/LTYxNjUuanBlZw.jpeg"
+    }
+  ],
+  "title": "Run For Cover",
+  "notes": "Most if not all LP releases doesn't feature \"Out Of My System\".",
+  "data_quality": "Correct",
+  "videos": [
+    {
+      "uri": "https://www.youtube.com/watch?v=sejrR_jMEWU",
+      "title": "Run For Cover",
+      "description": "Provided to YouTube by Universal Music Group\n\nRun For Cover · Gary Moore\n\nRun For Cover\n\n℗ 1985 Virgin Records Limited\n\nReleased on: 1985-01-01\n\nAssociated  Performer, Vocalist, Guitar: Gary Moore\nAssociated  Performer, Background  Vocalist: Neil Carte",
+      "duration": 254,
+      "embed": true
+    },
+    {
+      "uri": "https://www.youtube.com/watch?v=xsKpazeA5L8",
+      "title": "Gary Moore & Phil Lynott- Out in the Fields",
+      "description": "Clipe da musica Out in the Fields do Gary Moore",
+      "duration": 245,
+      "embed": true
+    },
+    {
+      "uri": "https://www.youtube.com/watch?v=lPojsn7ALsk",
+      "title": "Out Of My System",
+      "description": "Provided to YouTube by Universal Music Group\n\nOut Of My System · Gary Moore\n\nRun For Cover\n\n℗ 1985 Virgin Records Limited\n\nReleased on: 1985-01-01\n\nAssociated  Performer, Background  Vocalist, Guitar: Gary Moore\nProducer: Beau Hill\nAssociated  Performe",
+      "duration": 242,
+      "embed": true
+    },
+    {
+      "uri": "https://www.youtube.com/watch?v=GOg9HQpKxVI",
+      "title": "Reach For The Sky",
+      "description": "Provided to YouTube by Universal Music Group\n\nReach For The Sky · Gary Moore\n\nRun For Cover\n\n℗ 1985 Virgin Records Limited\n\nReleased on: 1985-01-01\n\nAssociated  Performer, Background  Vocalist, Guitar: Gary Moore\nProducer: Andy Johns\nAssociated  Perfor",
+      "duration": 286,
+      "embed": true
+    },
+    {
+      "uri": "https://www.youtube.com/watch?v=XCDBtdU-QS4",
+      "title": "Military Man",
+      "description": "Provided to YouTube by Universal Music Group\n\nMilitary Man · Gary Moore\n\nRun For Cover\n\n℗ 1985 Virgin Records Limited\n\nReleased on: 1985-01-01\n\nAssociated  Performer, Background  Vocalist, Guitar, Producer: Gary Moore\nAssociated  Performer, Drums: Char",
+      "duration": 341,
+      "embed": true
+    },
+    {
+      "uri": "https://www.youtube.com/watch?v=xprXRKmxW1k",
+      "title": "Empty Rooms",
+      "description": "Provided to YouTube by Universal Music Group\n\nEmpty Rooms · Gary Moore\n\nRun For Cover\n\n℗ 1984 Virgin Records Limited\n\nReleased on: 1985-01-01\n\nAssociated  Performer, Vocalist, Guitar: Gary Moore\nAssociated  Performer, Background  Vocalist: Neil Carter\n",
+      "duration": 258,
+      "embed": true
+    },
+    {
+      "uri": "https://www.youtube.com/watch?v=e5LatxGBYZw",
+      "title": "Nothing To Lose",
+      "description": "Provided to YouTube by Universal Music Group\n\nNothing To Lose · Gary Moore\n\nRun For Cover\n\n℗ 1985 Virgin Records Limited\n\nReleased on: 1985-01-01\n\nAssociated  Performer, Background  Vocalist, Guitar: Gary Moore\nAssociated  Performer, Background  Vocali",
+      "duration": 282,
+      "embed": true
+    },
+    {
+      "uri": "https://www.youtube.com/watch?v=lnXz5j4sSw8",
+      "title": "Once In A Lifetime",
+      "description": "Provided to YouTube by Universal Music Group\n\nOnce In A Lifetime · Gary Moore\n\nRun For Cover\n\n℗ 1985 Virgin Records Limited\n\nReleased on: 1985-01-01\n\nAssociated  Performer, Vocalist, Guitar: Gary Moore\nProducer: Mike Stone For Mike Stone Enterprises\nAs",
+      "duration": 259,
+      "embed": true
+    },
+    {
+      "uri": "https://www.youtube.com/watch?v=1IToCC2knTY",
+      "title": "All Messed Up",
+      "description": "Provided to YouTube by Universal Music Group\n\nAll Messed Up · Gary Moore\n\nRun For Cover\n\n℗ 1985 Virgin Records Limited\n\nReleased on: 1985-01-01\n\nAssociated  Performer, Background  Vocalist, Guitar: Gary Moore\nProducer: Andy Johns\nAssociated  Performer,",
+      "duration": 293,
+      "embed": true
+    },
+    {
+      "uri": "https://www.youtube.com/watch?v=ce-yOEcgNEA",
+      "title": "Listen To Your Heartbeat",
+      "description": "Provided to YouTube by Universal Music Group\n\nListen To Your Heartbeat · Gary Moore\n\nRun For Cover\n\n℗ 1985 Virgin Records Limited\n\nReleased on: 1985-01-01\n\nAssociated  Performer, Vocalist, Guitar: Gary Moore\nProducer: Mike Stone For Mike Stone Enterpri",
+      "duration": 272,
+      "embed": true
+    },
+    {
+      "uri": "https://www.youtube.com/watch?v=1uGQjnc9Jsk",
+      "title": "Gary Moore - Empty Rooms [HD]",
+      "description": "Order Gary Moore In Memoriam T-Shirt Here: http://bit.ly/2wDIgEH\n\nGary Moore - Empty Rooms (Official Music Video)\n\nGary Moore Society on Facebook: https://www.facebook.com/garymooresociety\n\nHD Widescreen",
+      "duration": 257,
+      "embed": true
+    },
+    {
+      "uri": "https://www.youtube.com/watch?v=s2HxhslF1Fk",
+      "title": "Gary Moore   Run For Cover...yerdenizplak.com İstanbul Kadıköy",
+      "description": "Album: Gary Moore – Run For Cover\n\nLabel:    10 Records – 5707112, Virgin – 5707112\n\nFormat: Vinyl, LP, Album, Reissue\n\nCountry:Europe\n\nReleased:Jan 17, 2017\n\nGenre: Rock\n\nStyle:    Hard Rock, Blues Rock\n\nhttps://www.yerdenizplak.com/magaza/gary-moore-run",
+      "duration": 235,
+      "embed": true
+    },
+    {
+      "uri": "https://www.youtube.com/watch?v=Bz967kuxW2w",
+      "title": "Run For Cover (Remastered 2002)",
+      "description": "Provided to YouTube by Universal Music Group\n\nRun For Cover (Remastered 2002) · Gary Moore\n\n5 Album Set\n\n℗ 2002 Virgin Records Limited\n\nReleased on: 2012-01-01\n\nAssociated  Performer, Vocalist, Guitar: Gary Moore\nAssociated  Performer, Background  Vocalis",
+      "duration": 254,
+      "embed": true
+    },
+    {
+      "uri": "https://www.youtube.com/watch?v=VrFMbsaxSM4",
+      "title": "Gary Moore   Run For Cover   Reach For Sky vbr",
+      "description": " ",
+      "duration": 287,
+      "embed": true
+    },
+    {
+      "uri": "https://www.youtube.com/watch?v=IlzG1jMiEAM",
+      "title": "GARY MOORE - B1 「Out In The Fields」 from RUN FOR COVER",
+      "description": "1985",
+      "duration": 258,
+      "embed": true
+    }
+  ]
+}

@@ -1,0 +1,204 @@
+{
+  "id": 2213,
+  "main_release": 2487496,
+  "most_recent_release": 38448498,
+  "resource_url": "https://api.discogs.com/masters/2213",
+  "uri": "https://www.discogs.com/master/2213-Manowar-Sign-Of-The-Hammer",
+  "versions_url": "https://api.discogs.com/masters/2213/versions",
+  "main_release_url": "https://api.discogs.com/releases/2487496",
+  "most_recent_release_url": "https://api.discogs.com/releases/38448498",
+  "num_for_sale": 413,
+  "lowest_price": 2.99,
+  "images": [
+    {
+      "type": "primary",
+      "uri": "https://i.discogs.com/pnye_ZauWGCDxZZFM4ZUw_YLfi_yrOFoGCL25etf0pk/rs:fit/g:sm/q:90/h:600/w:597/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTMz/NC02OTc0LmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/pnye_ZauWGCDxZZFM4ZUw_YLfi_yrOFoGCL25etf0pk/rs:fit/g:sm/q:90/h:600/w:597/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTMz/NC02OTc0LmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/nrq4jAdGVo5unTBDDgrhXJ9mcr2WAZdpMw-QJ--OJT8/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTMz/NC02OTc0LmpwZWc.jpeg",
+      "width": 597,
+      "height": 600
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/9_TtLGR2DnTl_XOAbvNoPqxbR-xIFMYXrBovsf_WZUQ/rs:fit/g:sm/q:90/h:595/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM2/Ni00ODA0LmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/9_TtLGR2DnTl_XOAbvNoPqxbR-xIFMYXrBovsf_WZUQ/rs:fit/g:sm/q:90/h:595/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM2/Ni00ODA0LmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/nhU_elBTYUAp5OSYOIj352f61Y1LHd6faHo95TGSPp0/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM2/Ni00ODA0LmpwZWc.jpeg",
+      "width": 600,
+      "height": 595
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/Wz8boMyk85n07vFufnNdq5MCELkbPMFMMhD6SwrYywk/rs:fit/g:sm/q:90/h:599/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM0/My00NTc5LmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/Wz8boMyk85n07vFufnNdq5MCELkbPMFMMhD6SwrYywk/rs:fit/g:sm/q:90/h:599/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM0/My00NTc5LmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/qr9LXsWQihgKr07MxZWATiB-BaN1DMuxdPs4Ycpmt3o/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM0/My00NTc5LmpwZWc.jpeg",
+      "width": 600,
+      "height": 599
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/ZDW7Pcx_avF-1TO9kBYn_kojM7hpjOZWzhwhgHPJ8_s/rs:fit/g:sm/q:90/h:597/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM3/OC05NjQxLmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/ZDW7Pcx_avF-1TO9kBYn_kojM7hpjOZWzhwhgHPJ8_s/rs:fit/g:sm/q:90/h:597/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM3/OC05NjQxLmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/B8qiXWnh6WkIKPOsBfj1YNOxgReZOZShrEwl9jUUP2w/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM3/OC05NjQxLmpwZWc.jpeg",
+      "width": 600,
+      "height": 597
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/dUpBfez6FI4bAfQ6snNWYyE-xi_-9kMYGK3vr8EYc_k/rs:fit/g:sm/q:90/h:600/w:598/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTQy/Mi0zODk1LmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/dUpBfez6FI4bAfQ6snNWYyE-xi_-9kMYGK3vr8EYc_k/rs:fit/g:sm/q:90/h:600/w:598/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTQy/Mi0zODk1LmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/p-viFW1nrMlPvIjQupxTUVdSzNns5t8LRWJ81uNwnug/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTQy/Mi0zODk1LmpwZWc.jpeg",
+      "width": 598,
+      "height": 600
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/TsxYdWXc0QxxRkT1o-xKvhrk4JVDBOuqSzhCTirhV-U/rs:fit/g:sm/q:90/h:593/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTU2/NC00OTg5LmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/TsxYdWXc0QxxRkT1o-xKvhrk4JVDBOuqSzhCTirhV-U/rs:fit/g:sm/q:90/h:593/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTU2/NC00OTg5LmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/emoD6lLf4GwmIT_uRPmOmPr6rSz6DrEIQ7gq23OkDfE/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTU2/NC00OTg5LmpwZWc.jpeg",
+      "width": 600,
+      "height": 593
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/4_mfup3DGkOgtyhpU4aB1_J3i5jpKXfHx4M_fCqO01g/rs:fit/g:sm/q:90/h:582/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM0/Ny00ODYwLmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/4_mfup3DGkOgtyhpU4aB1_J3i5jpKXfHx4M_fCqO01g/rs:fit/g:sm/q:90/h:582/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM0/Ny00ODYwLmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/39sT98UV6B8Oa_KIlFT04vxpPMrvSa1tfR4lbvo-4Ok/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM0/Ny00ODYwLmpwZWc.jpeg",
+      "width": 600,
+      "height": 582
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/vBXv16mYg_kPsHBMHlM62W3gn7Ax_dzoIDzF4225oX0/rs:fit/g:sm/q:90/h:583/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM3/Mi0yNjU5LmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/vBXv16mYg_kPsHBMHlM62W3gn7Ax_dzoIDzF4225oX0/rs:fit/g:sm/q:90/h:583/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM3/Mi0yNjU5LmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/G9stRoXBvIklCTR1XNFIHsIphqPubja2v3mW88kdEjQ/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM3/Mi0yNjU5LmpwZWc.jpeg",
+      "width": 600,
+      "height": 583
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/q36VLYagdihRrmd8kyIVnLxOOawScu_pzy64gjrSvsg/rs:fit/g:sm/q:90/h:600/w:194/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM1/MS04ODQzLmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/q36VLYagdihRrmd8kyIVnLxOOawScu_pzy64gjrSvsg/rs:fit/g:sm/q:90/h:600/w:194/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM1/MS04ODQzLmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/IUqc9CvjeXzBWLy-hEiaM_ePU5fBr4xq-Y7XuRAHmDs/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTM1/MS04ODQzLmpwZWc.jpeg",
+      "width": 194,
+      "height": 600
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/sq3-w3ukVUzZwvtaVgakKSxM3MfUr8V3xSfGvYMfk-o/rs:fit/g:sm/q:90/h:600/w:375/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTU1/My0yNDgzLmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/sq3-w3ukVUzZwvtaVgakKSxM3MfUr8V3xSfGvYMfk-o/rs:fit/g:sm/q:90/h:600/w:375/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTU1/My0yNDgzLmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/2SdpOKrpsKg-xzO5g7eYbV58xkNNBxUeVIR03gVy19g/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTU1/My0yNDgzLmpwZWc.jpeg",
+      "width": 375,
+      "height": 600
+    },
+    {
+      "type": "secondary",
+      "uri": "https://i.discogs.com/Ve3FRLCVdTSHw8IK92co-vMEp0SjNKm5tyTDT-nkvqo/rs:fit/g:sm/q:90/h:600/w:155/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTU0/MS03OTM3LmpwZWc.jpeg",
+      "resource_url": "https://i.discogs.com/Ve3FRLCVdTSHw8IK92co-vMEp0SjNKm5tyTDT-nkvqo/rs:fit/g:sm/q:90/h:600/w:155/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTU0/MS03OTM3LmpwZWc.jpeg",
+      "uri150": "https://i.discogs.com/3XOzJ1qgno2KfqYVeoW2io9EKLmeYzMGUwp5LE3ro1s/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0ODc0/OTYtMTYyNTMyOTU0/MS03OTM3LmpwZWc.jpeg",
+      "width": 155,
+      "height": 600
+    }
+  ],
+  "genres": [
+    "Rock"
+  ],
+  "styles": [
+    "Heavy Metal"
+  ],
+  "year": 1984,
+  "tracklist": [
+    {
+      "position": "A1",
+      "type_": "track",
+      "title": "All Men Play On 10",
+      "duration": "3:54"
+    },
+    {
+      "position": "A2",
+      "type_": "track",
+      "title": "Animals",
+      "duration": "3:35"
+    },
+    {
+      "position": "A3",
+      "type_": "track",
+      "title": "Thor (The Powerhead)",
+      "duration": "5:22"
+    },
+    {
+      "position": "A4",
+      "type_": "track",
+      "title": "Mountains",
+      "duration": "7:40"
+    },
+    {
+      "position": "B1",
+      "type_": "track",
+      "title": "Sign Of The Hammer",
+      "duration": "4:16"
+    },
+    {
+      "position": "B2",
+      "type_": "track",
+      "title": "The Oath",
+      "duration": "4:50"
+    },
+    {
+      "position": "B3",
+      "type_": "track",
+      "title": "Thunderpick",
+      "duration": "3:33"
+    },
+    {
+      "position": "B4",
+      "type_": "track",
+      "title": "Guyana (Cult Of The Damned)",
+      "duration": "7:06"
+    }
+  ],
+  "artists": [
+    {
+      "name": "Manowar",
+      "anv": "",
+      "join": "",
+      "role": "",
+      "tracks": "",
+      "id": 253699,
+      "resource_url": "https://api.discogs.com/artists/253699",
+      "thumbnail_url": "https://i.discogs.com/nLP6dlGGmDkJe10vaQS834yc2677qBRgOun6LuwMMQg/rs:fit/g:sm/q:90/h:500/w:401/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9BLTI1MzY5/OS0xMjkzNjE4Nzgy/LmpwZWc.jpeg"
+    }
+  ],
+  "title": "Sign Of The Hammer",
+  "notes": "Originally released 25th of October 1984 in the UK, by 10 records.\r\n\r\nRecorded at Phase One Studios, Toronto, Canada from November 1983 to Manor Studios, Oxford UK 1984.\r\nIt was announced with [m=552570].\r\n\r\n\"Thor (The Powerhead)\" is about the Norse God Thor.\r\nThe song often brings about the Ragnarök, with \"live to fight on that final day\" stated many times. \r\n\r\nThe following two songs show a turn lyricaly to real facts\r\n\"Guyana (Cult of the Damned)\" is a song about the 1978 mass suicide led by Jim Jones of the Peoples Temple group, at Jonestown, northwestern Guyana.\r\n\"Mountains\" refers to the Vietnam war.\r\n\r\nIn 2005, Sign of the Hammer was ranked number 418 in Rock Hard magazine's book of The 500 Greatest Rock & Metal Albums of All Time.\r\n_______________________________\r\n\r\n1984\r\n[url=https://www.discogs.com/release/2487496-Manowar-Sign-Of-The-Hammer]UK first press with matte-UV details[/url] I [url=https://www.discogs.com/release/3528260-Manowar-Sign-Of-The-Hammer]repress[/url]\r\n[url=https://www.discogs.com/release/543463-Manowar-Sign-Of-The-Hammer]EU Sonopress[/url] I [url=https://www.discogs.com/release/11228013-Manowar-Sign-Of-The-Hammer]misprint[/url] I [url=https://www.discogs.com/release/5243395-Manowar-Sign-Of-The-Hammer]repress[/url]\r\n[url=https://www.discogs.com/release/3879109-Manowar-Sign-Of-The-Hammer]Greece[/url] I [url=https://www.discogs.com/release/1520348-Manowar-Sign-Of-The-Hammer]Greece[/url]\r\n[url=https://www.discogs.com/release/5215681-Manowar-Sign-Of-The-Hammer]Italy[/url]\r\n[url=https://www.discogs.com/release/3052003-Manowar-Sign-Of-The-Hammer]France[/url]\r\n[url=https://www.discogs.com/release/4327669-Manowar-Sign-Of-The-Hammer]Canada[/url]\r\n[url=https://www.discogs.com/release/7647938-Manowar-Sign-Of-The-Hammer]Mexico[/url]\r\n[url=https://www.discogs.com/release/2503752-Manowar-Sign-Of-The-Hammer-%E3%82%B5%E3%82%A4%E3%83%B3%E3%82%AA%E3%83%96%E3%82%B6%E3%83%8F%E3%83%B3%E3%83%9E%E3%83%BC]Japan[/url] I [url=https://www.discogs.com/release/9072433-Manowar-Sign-Of-The-Hammer-%E3%82%B5%E3%82%A4%E3%83%B3%E3%82%AA%E3%83%96%E3%82%B6%E3%83%8F%E3%83%B3%E3%83%9E%E3%83%BC]promo[/url] (different artwork similar to the [url=https://www.discogs.com/release/1238814-Manowar-Anthology]comp[/url])\r\n[url=https://www.discogs.com/release/5243393-Manowar-Sign-Of-The-Hammer]Zimbabwe[/url]\r\n[url=https://www.discogs.com/release/10976208-Manowar-Sign-Of-The-Hammer]New Zealand[/url]\r\n\r\n1985\r\n[url=https://www.discogs.com/release/6153302-Manowar-Sign-Of-The-Hammer]South Korea[/url] I [url=https://www.discogs.com/release/2457900-Manowar-Sign-Of-The-Hammer]promo[/url]\r\n[url=https://www.discogs.com/release/3662853-Manowar-Sign-Of-The-Hammer]Venezuela[/url]\r\n[url=https://www.discogs.com/release/4782302-Manowar-Sign-Of-The-Hammer]South Africa[/url]\r\n\r\n1987 [url=https://www.discogs.com/release/4134896-Manowar-Sign-Of-The-Hammer]Spain[/url]\r\n\r\n1990 [url=https://www.discogs.com/release/3101428-Manowar-Sign-Of-The-Hammer]US[/url]\r\n\r\n1991\r\n[url=https://www.discogs.com/release/6879362-Manowar-Sign-Of-The-Hammer]black[/url] I [url=https://www.discogs.com/release/7157217-Manowar-Sign-Of-The-Hammer]promo[/url]\r\n[url=https://www.discogs.com/release/2503706-Manowar-Sign-Of-The-Hammer]green[/url]\r\n\r\n2009\r\n[url=https://www.discogs.com/release/3581137-Manowar-Sign-Of-The-Hammer]black[/url]\r\n[url=https://www.discogs.com/release/5044445-Manowar-Sign-Of-The-Hammer]clear[/url]\r\n[url=https://www.discogs.com/release/2480543-Manowar-Sign-Of-The-Hammer]500 brown[/url]",
+  "data_quality": "Correct",
+  "videos": [
+    {
+      "uri": "https://www.youtube.com/watch?v=0pmpviLVuwo",
+      "title": "Manowar - Sign Of The Hammer",
+      "description": "Sign of the Hammer",
+      "duration": 260,
+      "embed": true
+    },
+    {
+      "uri": "https://www.youtube.com/watch?v=8iSQvXbfpVE",
+      "title": "Manowar - Guyana (Cult Of The Damned) – (Sign Of The Hammer - 1984)",
+      "description": "Band: Manowar\nTopic: Guyana (Cult Of The Damned)\nAlbum: Sign Of The Hammer\nYear: 1984\nCountry: USA\n\nManowar - Guyana (Cult Of The Damned) – (Sign Of The Hammer - 1984)\n\nThank you for the kool aid reverend jim\nWe're glad to leave behind their world of sin\n",
+      "duration": 438,
+      "embed": true
+    },
+    {
+      "uri": "https://www.youtube.com/watch?v=ZO7WnxKG63g",
+      "title": "Manowar - Sign of the Hammer",
+      "description": "Taken from \"Sign of the Hammer\" Album (1984).",
+      "duration": 259,
+      "embed": true
+    },
+    {
+      "uri": "https://www.youtube.com/watch?v=C2idOwkeXHM",
+      "title": "Manowar - Sign of the Hammer (Vinyl Rip) - 1987 Spanish Edition | 3 Tracks Only",
+      "description": "",
+      "duration": 0,
+      "embed": true
+    }
+  ]
+}

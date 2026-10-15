@@ -1,0 +1,28 @@
+{
+  "folders": [
+    {
+      "id": 0,
+      "name": "All",
+      "count": 383,
+      "resource_url": "https://api.discogs.com/users/bram.vdackerveken/collection/folders/0"
+    },
+    {
+      "id": 1336133,
+      "name": "Bram",
+      "count": 257,
+      "resource_url": "https://api.discogs.com/users/bram.vdackerveken/collection/folders/1336133"
+    },
+    {
+      "id": 9566615,
+      "name": "Laura",
+      "count": 2,
+      "resource_url": "https://api.discogs.com/users/bram.vdackerveken/collection/folders/9566615"
+    },
+    {
+      "id": 1,
+      "name": "Uncategorized",
+      "count": 124,
+      "resource_url": "https://api.discogs.com/users/bram.vdackerveken/collection/folders/1"
+    }
+  ]
+}

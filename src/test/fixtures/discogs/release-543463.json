@@ -1,0 +1,55 @@
+{
+  "id": 543463,
+  "title": "Sign Of The Hammer",
+  "year": 1984,
+  "tracklist": [
+    {
+      "position": "A1",
+      "type_": "track",
+      "title": "All Men Play On 10",
+      "duration": "3:54"
+    },
+    {
+      "position": "A2",
+      "type_": "track",
+      "title": "Animals",
+      "duration": "3:35"
+    },
+    {
+      "position": "A3",
+      "type_": "track",
+      "title": "Thor (The Powerhead)",
+      "duration": "5:22"
+    },
+    {
+      "position": "A4",
+      "type_": "track",
+      "title": "Mountains",
+      "duration": "7:40"
+    },
+    {
+      "position": "B1",
+      "type_": "track",
+      "title": "Sign Of The Hammer",
+      "duration": "4:16"
+    },
+    {
+      "position": "B2",
+      "type_": "track",
+      "title": "The Oath",
+      "duration": "4:50"
+    },
+    {
+      "position": "B3",
+      "type_": "track",
+      "title": "Thunderpick",
+      "duration": "3:33"
+    },
+    {
+      "position": "B4",
+      "type_": "track",
+      "title": "Guyana (Cult Of The Damned)",
+      "duration": "7:06"
+    }
+  ]
+}
