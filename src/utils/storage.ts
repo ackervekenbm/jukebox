@@ -3,6 +3,7 @@
 
 import { getCachedCollection, getMasterYears, countReleaseDetails } from '../db/collection'
 import { countListenEntries } from '../db/listenLog'
+import { getCabinet } from '../db/cabinet'
 import type { MasterYears } from '../api/discogs'
 
 const encoder = new TextEncoder()
@@ -84,11 +85,17 @@ export interface MasterYearsStat {
   bytes: number
 }
 
+export interface CabinetStat {
+  slots: number
+  placements: number
+}
+
 export interface IndexedDbStat {
   collection: CollectionCacheStat | null
   masterYears: MasterYearsStat
   detailCount: number
   listenCount: number
+  cabinet: CabinetStat | null
 }
 
 export async function scanIndexedDb(username: string): Promise<IndexedDbStat> {
@@ -96,6 +103,7 @@ export async function scanIndexedDb(username: string): Promise<IndexedDbStat> {
   const years: MasterYears = await getMasterYears().catch(() => ({} as MasterYears))
   const detailCount = await countReleaseDetails().catch(() => 0)
   const listenCount = await countListenEntries(username).catch(() => 0)
+  const cabinetRow = await getCabinet(username).catch(() => null)
 
   const collectionStat: CollectionCacheStat | null = collection
     ? (() => {
@@ -128,6 +136,12 @@ export async function scanIndexedDb(username: string): Promise<IndexedDbStat> {
     },
     detailCount,
     listenCount,
+    cabinet: cabinetRow
+      ? {
+          slots: cabinetRow.doc.cabinets.reduce((sum, cabinet) => sum + cabinet.slots.length, 0),
+          placements: Object.keys(cabinetRow.doc.placements).length,
+        }
+      : null,
   }
 }
 

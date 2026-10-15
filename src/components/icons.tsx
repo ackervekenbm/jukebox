@@ -68,6 +68,29 @@ export function StatsIcon({ size = 16 }: IconProps) {
   )
 }
 
+export function CabinetIcon({ size = 16 }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="3" width="18" height="18" rx="1.5" />
+      <path d="M3 10.5h18" />
+      <path d="M3 15.5h18" />
+      <path d="M7 7h2" />
+      <path d="M7 13h2" />
+      <path d="M7 18h2" />
+    </svg>
+  )
+}
+
 export function FilterIcon({ size = 16 }: IconProps) {
   return (
     <svg

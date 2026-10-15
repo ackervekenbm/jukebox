@@ -29,6 +29,7 @@ import {
 } from './utils/collection'
 import { SettingsForm } from './components/Settings'
 import { StorageStats } from './components/StorageStats'
+import { CabinetScreen } from './components/CabinetScreen'
 import { useScrollLock } from './hooks/useScrollLock'
 import { SearchBar } from './components/SearchBar'
 import { FiltersButton, FilterPanel } from './components/FilterMenu'
@@ -37,7 +38,8 @@ import { ArtistSection } from './components/ArtistSection'
 import { RecentList } from './components/RecentList'
 import { ReleaseDetail, type RecentPick } from './components/ReleaseDetail'
 import { StatsPanel } from './components/StatsPanel'
-import { SettingsIcon, RefreshIcon, ShuffleIcon, ChevronIcon, RecordPlayer, StatsIcon } from './components/icons'
+import { SettingsIcon, RefreshIcon, ShuffleIcon, ChevronIcon, RecordPlayer, StatsIcon, CabinetIcon } from './components/icons'
+import { clearCabinet } from './db/cabinet'
 import { loadViews, saveViews, clearViews } from './db/views'
 import {
   clampSkip,
@@ -143,6 +145,7 @@ export default function App() {
   const [artistSortMode, setArtistSortMode] = useState<ArtistSortMode>('chronological')
   const [viewMode, setViewMode] = useState<ViewMode>('artists')
   const [selected, setSelected] = useState<DisplayRelease | null>(null)
+  const [showCabinet, setShowCabinet] = useState(false)
   // Recent-pick history shown in the detail overlay; non-null only while the
   // release on screen came from the random picker.
   const [recentPicks, setRecentPicks] = useState<RecentPick[] | null>(null)
@@ -190,6 +193,7 @@ export default function App() {
     setRecentPicks(null)
     setStack(null)
     setActiveViewId(null)
+    setShowCabinet(false)
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [accountKey])
 
@@ -212,6 +216,11 @@ export default function App() {
   const recentSections = useMemo(
     () => groupByDateAdded(filtered.map((release) => toDisplayRelease(release, masterYears))),
     [filtered, masterYears],
+  )
+  // The cabinet plans the physical collection, so it ignores search/filters.
+  const displayReleases = useMemo(
+    () => releases.map((release) => toDisplayRelease(release, masterYears)),
+    [releases, masterYears],
   )
 
   const artistCount = grouped.length
@@ -404,6 +413,9 @@ export default function App() {
     await clearListenLog()
     clearPickerConfig()
     clearPreferences()
+    // The cabinet document is synced to the server but the local copy is user
+    // data; wiping everything has to drop it too.
+    await clearCabinet()
     setPickerSkip(DEFAULT_SKIP)
     setPreferences(DEFAULT_PREFERENCES)
     setRecentPicks(null)
@@ -514,6 +526,15 @@ export default function App() {
                   aria-label="Refresh collection"
                 >
                   <RefreshIcon />
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => setShowCabinet(true)}
+                  title="Record cabinet"
+                  aria-label="Record cabinet"
+                >
+                  <CabinetIcon />
                 </button>
                 <button
                   type="button"
@@ -726,6 +747,16 @@ export default function App() {
           )}
         </div>
       )}
+      {/* Record cabinet overlay */}
+      {showCabinet && settings && (
+        <CabinetScreen
+          username={settings.username}
+          token={settings.token}
+          releases={displayReleases}
+          onClose={() => setShowCabinet(false)}
+        />
+      )}
+
       {/* Release detail overlay */}
       {selected && (
         <ReleaseDetail

@@ -7,12 +7,20 @@ export const DB_NAME = 'vinyl-vault'
 
 /**
  * Schema version. Bump when a store is added or a row shape changes so every
- * browser re-runs the upgrade below. v5 added the listenLog store.
+ * browser re-runs the upgrade below. v5 added the listenLog store, v6 the
+ * cabinet store.
  */
-export const VERSION = 5
+export const VERSION = 6
 
 /** Every object store the app uses; the upgrade creates any that are missing. */
-const STORES = ['collection', 'masterYears', 'releaseDetails', 'collectionValue', 'listenLog']
+const STORES = [
+  'collection',
+  'masterYears',
+  'releaseDetails',
+  'collectionValue',
+  'listenLog',
+  'cabinet',
+]
 
 /**
  * One shared connection (and one shared upgrade) for the whole app: idb opens
