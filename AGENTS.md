@@ -64,9 +64,12 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   `DISCOGS_TOKEN`). `src/api/discogs-contract.test.ts` replays them through the
   real parsers with `fetch` mocked (hermetic; skips when fixtures are absent),
   so `npm test` itself never touches the network. The nightly
-  `discogs-contract` workflow refreshes fixtures with the `DISCOGS_TOKEN`
-  secret: red = Discogs changed a shape we parse, green + diff = auto-PR of
-  the drifted fixtures.
+  `discogs-contract` workflow refreshes fixtures on the runner with the
+  `DISCOGS_TOKEN` secret and reruns the tests: red = Discogs changed a shape we
+  parse (run `npm run fixtures`, fix the parser, commit the refreshed baseline).
+  It commits nothing — the fixtures carry live, churning data (marketplace
+  values, collection counts), so the committed copies are a frozen baseline for
+  offline PR CI, not a mirror of the API.
 - `src/db/database.ts` — one shared `openDB` connection for IndexedDB
   `vinyl-vault` (idb lib), five stores: `collection` (1 row/username),
   `masterYears` (1 row), `collectionValue` (1 row/username), `releaseDetails`
