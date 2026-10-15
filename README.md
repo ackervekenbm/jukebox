@@ -22,7 +22,7 @@ Browse your personal **Discogs collection** on any device — grouped by artist 
 ## What you need
 
 - A free **Discogs personal access token** — create one at <https://www.discogs.com/settings/developers>.
-- That's it. There's no account, no server and nothing to install — the app runs entirely in your browser and your data stays there (see [Where your data lives](#where-your-data-lives)).
+- That's it. There's no account, no sign-up and nothing to install — the app runs in your browser and your data stays there (see [Where your data lives](#where-your-data-lives)).
 
 ## How it works
 
@@ -32,18 +32,18 @@ Browse your personal **Discogs collection** on any device — grouped by artist 
 4. **Dive deeper** — original release years are enriched in the background from each album's Discogs master record, streaming in as results arrive, so you gradually see original-year and pressing-year where they differ.
 5. **Details on demand** — opening a release shows everything on hand; the full tracklist is fetched per release and cached after first view.
 
-> **For the technical reader:** all API calls go through a same-origin `/discogs` proxy (the vite dev server, and nginx in the Docker image). Discogs rate-limit responses carry no CORS headers, so without that proxy the browser would mask throttling as an opaque CORS error instead of a retryable response.
+> **For the technical reader:** all API calls go through a same-origin `/discogs` proxy owned by the app's Express server (the vite dev server forwards to it; the Docker container runs it). Discogs rate-limit responses carry no CORS headers, so without that proxy the browser would mask throttling as an opaque CORS error instead of a retryable response.
 
 ## Where your data lives
 
-- Your **token stays in your browser** (localStorage). It's sent to Discogs and nowhere else. Anyone with access to your device could extract it — regenerate it anytime at <https://www.discogs.com/settings/developers>.
-- The **collection, tracklists, cached years and pick history live in your browser** (IndexedDB). Nothing is stored on a server — the deployment is completely stateless.
-- **Saved views** are stored in the browser too (localStorage), as plain filter definitions — no account, no API calls.
+- Your **token stays in your browser** (localStorage). It's sent to Discogs — and to your own server only when it verifies a sync request — and nowhere else. Anyone with access to your device could extract it — regenerate it anytime at <https://www.discogs.com/settings/developers>.
+- The **collection, tracklists, cached years and pick history live in your browser** (IndexedDB). Saved views, the listen log and settings are localStorage. Browser data is the source of truth; nothing else stores your collection.
+- The container keeps a small **SQLite database in a Docker volume** for the upcoming cross-device cabinet sync (issues [#55](../../issues/55) and [#108](../../issues/108)). Until that feature ships, it holds no user data.
 - **"Clear everything"** in settings removes the cached collection, your saved views, the listen log, the picker preference and stored credentials from your device.
 
 ## Deployment (production)
 
-The app is a static frontend; the published container bundles it with nginx. Every push to `main` builds a multi-arch image for **amd64 and arm64** and publishes one tag: `ghcr.io/ackervekenbm/jukebox:latest`.
+The container is a single Node process serving the static frontend, the API and the `/discogs` proxy. Every push to `main` builds a multi-arch image for **amd64 and arm64** and publishes one tag: `ghcr.io/ackervekenbm/jukebox:latest`.
 
 **Pull and run** on any machine with Docker (arm64 runs natively on a Raspberry Pi):
 
@@ -52,8 +52,13 @@ services:
   jukebox:
     image: ghcr.io/ackervekenbm/jukebox:latest
     ports:
-      - "8080:80"
+      - "8080:3000"
+    volumes:
+      - jukebox-data:/app/data
     restart: unless-stopped
+
+volumes:
+  jukebox-data:
 ```
 
 **Or build from source:**
@@ -64,8 +69,8 @@ docker compose up --build    # serves on http://localhost:8080
 
 Notes for self-hosting:
 
-- The container is **stateless** — all user data lives in the browser, so updates and redeploys are lossless (`docker compose pull && docker compose up -d`).
-- The nginx image **proxies `/discogs` → `api.discogs.com`**. If you serve the static files some other way, you must replicate that proxy or API calls will run into Discogs' CORS/rate-limit wall (see the note under *How it works*).
+- The volume at `/app/data` holds the app's small SQLite database (the cross-device sync store landing with the cabinet organizer). **Keep the volume** when redeploys happen — it's the one piece of server-side state; everything else lives in the browser, so `docker compose pull && docker compose up -d` is lossless for your collection data.
+- The server **proxies `/discogs` → `api.discogs.com`**. If you serve the static files some other way, you must replicate that proxy or API calls will run into Discogs' CORS/rate-limit wall (see the note under *How it works*).
 - **Offline launch needs HTTPS.** Over plain HTTP, iOS adds the app to the home screen fine (it honors the legacy `apple-*` meta tags) and the app runs as long as the server is up — but the service worker that allows launching with the server down only registers in a secure context, and the certificate must be one the device trusts. From least to most setup:
 
   | Approach | What's needed | Notes |
@@ -78,7 +83,7 @@ Notes for self-hosting:
 
 ## Development
 
-**Tech stack** — React 19 · TypeScript · Vite · idb (IndexedDB) · vite-plugin-pwa (service worker + manifest) · nginx (container host + API proxy).
+**Tech stack** — React 19 · TypeScript · Vite · idb (IndexedDB) · vite-plugin-pwa (service worker + manifest) · Express + better-sqlite3 (container: static host, `/discogs` proxy, sync API).
 
 **Requirements** — Node.js **22+**, plus a Discogs token if you want to test against a real collection.
 
@@ -89,16 +94,18 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:5199> (if the port is taken, Vite moves to the next free one and prints the address). The dev server proxies `/discogs` to the Discogs API, just like nginx does in production.
+Open <http://localhost:5199> (if the port is taken, Vite moves to the next free one and prints the address). `npm run dev` starts both the API server (port 3000) and the Vite dev server; Vite proxies `/discogs` and `/api` to it, exactly like production.
 
 **Scripts**
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Vite dev server with hot reload |
-| `npm run build` | Type-check, lint, then production build to `dist/` (also regenerates the PWA service worker + manifest) |
-| `npm run preview` | Serve the production build locally |
-| `npm test` / `npm run test:watch` | Unit tests (vitest + jsdom, @testing-library/react) |
+| `npm run dev` | API server + Vite dev server together (hot reload) |
+| `npm run dev:server` / `dev:client` | Just one side of the above |
+| `npm run build` | Type-check, lint, then production build of client (`dist/`) and server (`dist-server/`) |
+| `npm start` | Run the built server (after `npm run build`) |
+| `npm run preview` | Serve the production client build locally (no API) |
+| `npm test` / `npm run test:watch` | Unit tests (vitest — jsdom for client, node for API route tests) |
 | `npm run lint` / `lint:fix` | ESLint (flat config) |
 | `npm run icons` | Regenerate app icons from `public/icons/icon.svg` |
 
@@ -111,19 +118,22 @@ npm run build && npm test
 **Project structure**
 
 ```
-├── Dockerfile / docker-compose.yml / nginx.conf   # containerized hosting (nginx + /discogs proxy)
+├── Dockerfile / docker-compose.yml                  # containerized hosting (one Node process)
 ├── .github/
 │   ├── workflows/
 │   │   ├── ci.yml             # PR checks (type-check + lint + build + tests)
-│   │   └── docker-build.yml   # publish multi-arch image to GHCR
+│   │   └── docker-build.yml   # smoke-test, then publish multi-arch image to GHCR
 │   └── dependabot.yml         # weekly dependency-update PRs
 ├── eslint.config.js                               # ESLint flat config
 ├── index.html                                     # app shell + PWA/iOS meta tags
 ├── vite.config.ts                                 # build, dev proxy + PWA configuration
+├── tests/                                         # API route tests (vitest, node, supertest)
 ├── public/                                        # icons (192, 512, maskable), favicon, apple-touch-icon
 ├── scripts/gen-icons.mjs                          # icon generator
 └── src/
     ├── api/discogs.ts                             # Discogs client (proxy base, pacing, retries)
+    ├── server/                                    # Express API: sync store, Discogs proxy, health, static+SPA
+    ├── shared/cabinetDoc.ts                       # sync document schema (server validates, client types)
     ├── db/                                        # IndexedDB stores (collection, tracklists, listen log) + localStorage settings/views/picker
     ├── hooks/                                     # useCollection (sync lifecycle), useReleaseTracklist, useScrollLock
     ├── utils/                                     # sortName (filing sort keys), collection (group/filter/shape)

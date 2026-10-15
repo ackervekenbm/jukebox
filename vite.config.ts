@@ -11,14 +11,17 @@ export default defineConfig({
       interval: 150,
     },
     proxy: {
-      // Same-origin Discogs proxy: strips the CORS preflight that cross-origin
-      // requests with an Authorization header trigger, so Discogs' rate-limit
-      // 429s (which carry no Access-Control-Allow-Origin) surface as retryable
-      // responses instead of opaque browser CORS errors.
+      // Same-origin proxy: the API server owns /discogs and /api in both dev
+      // and production, so the browser never talks cross-origin to Discogs
+      // (Discogs' rate-limit 429s carry no Access-Control-Allow-Origin).
       '/discogs': {
-        target: 'https://api.discogs.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/discogs/, ''),
+        target: 'http://127.0.0.1:3000',
+      },
+      '/api': {
+        target: 'http://127.0.0.1:3000',
+      },
+      '/oauth': {
+        target: 'http://127.0.0.1:3000',
       },
     },
   },
