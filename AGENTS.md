@@ -71,6 +71,17 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
 - `src/shared/cabinetDoc.ts` — zod schema + types for the sync document,
   imported by both server (validation) and client (types only, so zod never
   enters the browser bundle).
+- `src/utils/cabinet.ts` — the shelf-layout engine (`planCabinet`): assigns
+  releases to shelves keeping artists together, optionally separating 12" from
+  7"/10" (size class read from each release's format text), and reports
+  over-capacity / size-mix / artist-split / unplaced conflicts. Manual pins
+  (`overrides`) always beat the auto layout.
+- Record cabinet — `src/hooks/useCabinet.ts` orchestrates it: storage-first
+  load from IndexedDB, debounced `PUT /api/sync/cabinet` when local changes are
+  dirty, and a 409 rebase-and-retry when the server copy moved. Client sync
+  lives in `src/api/sync.ts`; the screen is `src/components/CabinetScreen.tsx`.
+  Storage-first and local-overrides-win are the invariants: browser data is the
+  source of truth and the server copy is only the cross-device echo.
 - Discogs contract coverage — `scripts/refresh-discogs-fixtures.mjs` captures
   real payloads into `src/test/fixtures/discogs/` (`npm run fixtures`, needs
   `DISCOGS_TOKEN`). `src/api/discogs-contract.test.ts` replays them through the
@@ -83,13 +94,15 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   values, collection counts), so the committed copies are a frozen baseline for
   offline PR CI, not a mirror of the API.
 - `src/db/database.ts` — one shared `openDB` connection for IndexedDB
-  `vinyl-vault` (idb lib), five stores: `collection` (1 row/username),
+  `vinyl-vault` (idb lib), six stores: `collection` (1 row/username),
   `masterYears` (1 row), `collectionValue` (1 row/username), `releaseDetails`
-  (unbounded tracklist cache — the app's main space grower) and `listenLog`
-  (random-pick history, capped at 200 entries/username). Bump `VERSION` there
-  to invalidate caches after a shape change. `src/db/collection.ts` and
-  `src/db/listenLog.ts` are the typed store APIs; `settings.ts`, `views.ts`
-  and `picker.ts` in the same folder are the localStorage counterparts.
+  (unbounded tracklist cache — the app's main space grower), `listenLog`
+  (random-pick history, capped at 200 entries/username) and `cabinet` (one
+  cabinet doc + revision/`dirty` flag per username). Bump `VERSION` there
+  to invalidate caches after a shape change. `src/db/collection.ts`,
+  `src/db/listenLog.ts` and `src/db/cabinet.ts` are the typed store APIs;
+  `settings.ts`, `views.ts`, `cabinetOptions.ts` and `picker.ts` in the same
+  folder are the localStorage counterparts.
 - `src/theme.ts` + `src/styles.css` — CSS-variable themes
   (`midnight`/`paper`/`club`/`forest`); new UI styles must use existing `--*`
   tokens, never hardcoded colors.

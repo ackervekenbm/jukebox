@@ -2280,3 +2280,283 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Record cabinet                                                             */
+/* -------------------------------------------------------------------------- */
+
+.cabinet-card {
+  max-width: 720px;
+}
+
+.cabinet-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 6px;
+}
+
+.cabinet-name {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin-left: -8px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.cabinet-name:hover,
+.cabinet-name:focus {
+  border-color: var(--border);
+  background: var(--bg-elevated);
+}
+
+.cabinet-sync {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+
+.cabinet-sync.synced {
+  color: var(--ok);
+}
+
+.cabinet-sync.error,
+.cabinet-sync.offline {
+  color: var(--danger);
+}
+
+.cabinet-summary {
+  margin: 0 0 14px;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+
+.cabinet-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.cabinet-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.cabinet-conflicts {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cabinet-conflict {
+  font-size: 0.76rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.cabinet-conflict.over-capacity,
+.cabinet-conflict.unplaced {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.cabinet-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.cabinet-slot {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  padding: 12px 14px;
+}
+
+.cabinet-slot-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cabinet-slot-label {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin-left: -8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.cabinet-slot-label:hover,
+.cabinet-slot-label:focus {
+  border-color: var(--border);
+  background: var(--panel);
+}
+
+.cabinet-slot-capacity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+}
+
+.cabinet-slot-capacity input {
+  width: 68px;
+  padding: 4px 6px;
+  text-align: right;
+}
+
+.cabinet-slot-count {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.cabinet-slot-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 0;
+}
+
+.cabinet-tag {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.cabinet-tag.size-mix,
+.cabinet-conflict.size-mix {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.cabinet-record {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+
+.cabinet-slot .cabinet-record:first-child {
+  border-top: 0;
+}
+
+.cabinet-record-art {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--panel);
+}
+
+.cabinet-record-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.cabinet-record-title {
+  font-size: 0.86rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cabinet-record-artist {
+  font-size: 0.76rem;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cabinet-record-year {
+  font-size: 0.76rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.cabinet-pin {
+  flex-shrink: 0;
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+
+.cabinet-record-slot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.cabinet-record-slot-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+}
+
+.cabinet-record-slot select {
+  max-width: 130px;
+  padding: 4px 6px;
+}
+
+.cabinet-records {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+@media (max-width: 560px) {
+  .cabinet-record-slot-label {
+    display: none;
+  }
+
+  .cabinet-slot-capacity span {
+    display: none;
+  }
+}

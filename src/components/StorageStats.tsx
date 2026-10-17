@@ -214,6 +214,17 @@ export function StorageStats({ username, onClearData }: StorageStatsProps) {
             </div>
 
             <div className="stats-row">
+              <span className="stats-label">Record cabinet</span>
+              <span className="stats-value">
+                {stats.indexedDb.cabinet
+                  ? `${stats.indexedDb.cabinet.slots} shelf${
+                      stats.indexedDb.cabinet.slots !== 1 ? 'ves' : ''
+                    } · ${stats.indexedDb.cabinet.placements.toLocaleString()} placed`
+                  : 'not set up'}
+              </span>
+            </div>
+
+            <div className="stats-row">
               <span className="stats-label">App shell</span>
               <span className="stats-value">
                 {cacheReadable
