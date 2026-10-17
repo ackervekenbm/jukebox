@@ -16,7 +16,7 @@
 
   --radius: 12px;
   --font-display: inherit;
-  --header-h: 64px;
+  --header-h: 76px;
   --card-pad: 28px;
   --close-inset: 6px;
   --close-size: 34px;
@@ -621,11 +621,22 @@ button:disabled {
   /* Keep content clear of the iOS notch / dynamic island and the home
      indicator (viewport-fit=cover + black-translucent status bar). In
      landscape the island sits on the left or right edge, hence the
-     horizontal insets. */
+     horizontal insets. The generous 16px top pad (over the safe-area
+     inset) keeps the title well clear of the iOS 26 Liquid Glass status
+     bar, which can otherwise blur content sitting just under the
+     dynamic island (#111). */
   height: calc(var(--header-h) + env(safe-area-inset-top, 0px));
-  padding: calc(6px + env(safe-area-inset-top, 0px))
+  padding: calc(16px + env(safe-area-inset-top, 0px))
     calc(16px + env(safe-area-inset-right, 0px)) 7px
     calc(16px + env(safe-area-inset-left, 0px));
+  /* Deliberately opaque and blur-free (#111). On iOS 26+ a
+     `backdrop-filter` (or the translucent fill that needs it) on a sticky
+     top bar makes Safari blur the bar's own text and mangle its Liquid
+     Glass chrome tinting — the "Jukebox" title came out fuzzy while the
+     cards below stayed crisp. See WebKit #319479; several projects had to
+     drop the blur from sticky headers for the same reason. A solid colour
+     keeps the title sharp. */
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
   /* Break fully out of the .app content box so the header background
      spans edge-to-edge (off the safe-area insets). Its own padding then
@@ -635,25 +646,6 @@ button:disabled {
      the header inset by the safe-area amount in landscape. */
   margin: 0 calc(-16px - env(safe-area-inset-right, 0px)) 0
     calc(-16px - env(safe-area-inset-left, 0px));
-}
-
-/* The blurred, translucent bar lives on a pseudo-element rather than on
-   .app-header itself. On iOS, text painted inside a `backdrop-filter`
-   element gets rasterised with the backdrop and comes out soft — the
-   "Jukebox" title looked fuzzy while the meta line beneath it stayed
-   crisp (issue #111). Keeping the header's text outside the filtered
-   element renders it normally; the pseudo (z-index: -1, so it sits behind
-   the content but still inside the header's stacking context) preserves
-   the same look. */
-.app-header::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--bg);
-  background: color-mix(in srgb, var(--bg) 86%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .header-top {
