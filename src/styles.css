@@ -16,7 +16,7 @@
 
   --radius: 12px;
   --font-display: inherit;
-  --header-h: 76px;
+  --header-h: 96px;
   --card-pad: 28px;
   --close-inset: 6px;
   --close-size: 34px;
@@ -621,12 +621,14 @@ button:disabled {
   /* Keep content clear of the iOS notch / dynamic island and the home
      indicator (viewport-fit=cover + black-translucent status bar). In
      landscape the island sits on the left or right edge, hence the
-     horizontal insets. The generous 16px top pad (over the safe-area
-     inset) keeps the title well clear of the iOS 26 Liquid Glass status
-     bar, which can otherwise blur content sitting just under the
-     dynamic island (#111). */
+     horizontal insets. The extra top pad (on top of the safe-area inset)
+     pushes the title and icons below iOS 26's scroll-view "top edge
+     effect" — a system Liquid Glass blur band at the top of the
+     viewport that softens whatever sits under it (WKWebView
+     `scrollView.topEdgeEffect`, not CSS, so the only web-side fix is
+     clearance). #111. */
   height: calc(var(--header-h) + env(safe-area-inset-top, 0px));
-  padding: calc(16px + env(safe-area-inset-top, 0px))
+  padding: calc(32px + env(safe-area-inset-top, 0px))
     calc(16px + env(safe-area-inset-right, 0px)) 7px
     calc(16px + env(safe-area-inset-left, 0px));
   /* Deliberately opaque and blur-free (#111). On iOS 26+ a
