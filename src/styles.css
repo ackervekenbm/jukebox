@@ -160,10 +160,14 @@ button:disabled {
   overflow-y: auto;
   overscroll-behavior: contain;
   z-index: 50;
+  /* Same viewport clamp as the detail overlay (issue #112): a wide row must
+     not let the auto column size the card past the padded viewport. */
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .settings-overlay-content {
   width: 100%;
+  min-width: 0;
   max-width: 600px;
 }
 
@@ -1611,11 +1615,19 @@ button:disabled {
   overflow-y: auto;
   /* Don't let swiping past the modal's scroll edges push the page behind it. */
   overscroll-behavior: contain;
+  /* A single, viewport-bounded column. Without an explicit track the auto
+     column sizes to the card's min/max-content, so a release whose details
+     contain a wide, unbreakable row (long title, nowrap label) pushes the
+     card past the viewport — its close button lands off-screen to the right
+     (issue #112). minmax(0, 1fr) pins the column to the padded viewport so the
+     card can never exceed it. */
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .detail-card {
   position: relative;
   width: 100%;
+  min-width: 0;
   max-width: 600px;
   background: var(--panel);
   border: 1px solid var(--border);
