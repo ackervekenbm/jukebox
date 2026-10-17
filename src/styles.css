@@ -626,10 +626,6 @@ button:disabled {
   padding: calc(6px + env(safe-area-inset-top, 0px))
     calc(16px + env(safe-area-inset-right, 0px)) 7px
     calc(16px + env(safe-area-inset-left, 0px));
-  background: var(--bg);
-  background: color-mix(in srgb, var(--bg) 86%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   /* Break fully out of the .app content box so the header background
      spans edge-to-edge (off the safe-area insets). Its own padding then
@@ -639,6 +635,25 @@ button:disabled {
      the header inset by the safe-area amount in landscape. */
   margin: 0 calc(-16px - env(safe-area-inset-right, 0px)) 0
     calc(-16px - env(safe-area-inset-left, 0px));
+}
+
+/* The blurred, translucent bar lives on a pseudo-element rather than on
+   .app-header itself. On iOS, text painted inside a `backdrop-filter`
+   element gets rasterised with the backdrop and comes out soft — the
+   "Jukebox" title looked fuzzy while the meta line beneath it stayed
+   crisp (issue #111). Keeping the header's text outside the filtered
+   element renders it normally; the pseudo (z-index: -1, so it sits behind
+   the content but still inside the header's stacking context) preserves
+   the same look. */
+.app-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .header-top {
