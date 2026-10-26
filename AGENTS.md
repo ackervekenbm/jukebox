@@ -71,11 +71,14 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
 - `src/shared/cabinetDoc.ts` — zod schema + types for the sync document,
   imported by both server (validation) and client (types only, so zod never
   enters the browser bundle).
-- `src/utils/cabinet.ts` — the shelf-layout engine (`planCabinet`): assigns
-  releases to shelves keeping artists together, optionally separating 12" from
-  7"/10" (size class read from each release's format text), counts a gatefold
-  sleeve as two capacity spaces, and reports size-mix / artist-split / unplaced
-  conflicts. Layout is fully automatic — there are no manual pins.
+- `src/utils/cabinet.ts` — the shelf-layout engine (`planCabinet`): shelves
+  follow the selected artist/title/year order, keeping artists together.
+  Optionally it groups 12" and 7"/10" onto separate shelves (size class read
+  from each release's format text); that mode orders the size groups by their
+  earliest record so the cabinet still starts with the earliest artist. It
+  counts a gatefold sleeve as two capacity spaces and reports size-mix /
+  artist-split / unplaced conflicts. Layout is fully automatic — there are no
+  manual pins.
 - Record cabinet — `src/hooks/useCabinet.ts` orchestrates it: storage-first
   load from IndexedDB, debounced `PUT /api/sync/cabinet` when local changes are
   dirty, and a 409 rebase-and-retry when the server copy moved. Client sync

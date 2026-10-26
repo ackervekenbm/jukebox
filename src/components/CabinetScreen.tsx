@@ -6,6 +6,7 @@ import { useScrollLock } from '../hooks/useScrollLock'
 import { useCabinet, type CabinetStatus } from '../hooks/useCabinet'
 import { SIZE_CLASS_LABELS, conflictLabel, spaceUnitsOf } from '../utils/cabinet'
 import { CloseIcon, TrashIcon } from './icons'
+import { useState } from 'react'
 
 const STATUS_TEXT: Record<CabinetStatus, string> = {
   local: 'Saved on this device',
@@ -47,6 +48,25 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
   } = useCabinet({ username, token, releases, enabled: true })
 
   const placed = Object.keys(plan.placements).length
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+  const [adding, setAdding] = useState(false)
+  const [newCapacity, setNewCapacity] = useState('75')
+
+  const toggleExpanded = (slotId: string) => {
+    setExpanded((current) => {
+      const next = new Set(current)
+      if (next.has(slotId)) next.delete(slotId)
+      else next.add(slotId)
+      return next
+    })
+  }
+
+  const handleAdd = () => {
+    const cap = Math.max(1, Math.round(Number(newCapacity) || 75))
+    addSlot(cap)
+    setNewCapacity(String(cap))
+    setAdding(false)
+  }
 
   const recordRow = (record: DisplayRelease) => (
     <li className="cabinet-record" key={record.key}>
@@ -127,9 +147,41 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
               Keep 12&quot; and 7&quot; apart
             </label>
 
-            <button type="button" className="secondary-btn" onClick={addSlot}>
-              Add shelf
-            </button>
+            {adding ? (
+              <div className="cabinet-add">
+                <label className="cabinet-slot-capacity">
+                  <span>Shelf size</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={newCapacity}
+                    onChange={(event) => setNewCapacity(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') handleAdd()
+                      if (event.key === 'Escape') setAdding(false)
+                    }}
+                    autoFocus
+                  />
+                </label>
+                <button type="button" className="secondary-btn" onClick={handleAdd}>
+                  Add
+                </button>
+                <button type="button" className="secondary-btn" onClick={() => setAdding(false)}>
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => {
+                  setNewCapacity('75')
+                  setAdding(true)
+                }}
+              >
+                Add shelf
+              </button>
+            )}
           </div>
 
           {error && (
@@ -152,75 +204,92 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
           )}
 
           <div className="cabinet-slots">
-            {plan.slots.map((slot) => (
-              <section key={slot.slot.id} className="cabinet-slot">
-                <div className="cabinet-slot-head">
-                  <input
-                    className="cabinet-slot-label"
-                    value={slot.slot.label}
-                    onChange={(event) => updateSlot(slot.slot.id, { label: event.target.value })}
-                    aria-label="Shelf name"
-                  />
-                  <label className="cabinet-slot-capacity">
-                    <span>Capacity</span>
-                    <input
-                      type="number"
-                      min={1}
-                      aria-label={`Capacity of ${slot.slot.label}`}
-                      value={slot.slot.capacity}
-                      onChange={(event) => {
-                        const capacity = Math.max(1, Math.round(Number(event.target.value) || 1))
-                        updateSlot(slot.slot.id, { capacity })
-                      }}
-                    />
-                  </label>
-                  <span className="cabinet-slot-count" title="Record spaces used">
-                    {slot.used.toLocaleString()} / {slot.slot.capacity.toLocaleString()}
-                  </span>
+            {plan.slots.map((slot) => {
+              const isExpanded = expanded.has(slot.slot.id)
+              return (
+                <section key={slot.slot.id} className="cabinet-slot">
                   <button
                     type="button"
-                    className="icon-btn"
-                    onClick={() => removeSlot(slot.slot.id)}
-                    disabled={cabinet.slots.length <= 1}
-                    title="Remove shelf"
-                    aria-label={`Remove ${slot.slot.label}`}
+                    className="cabinet-slot-head cabinet-slot-toggle"
+                    onClick={() => toggleExpanded(slot.slot.id)}
+                    aria-expanded={isExpanded}
+                    aria-controls={`cabinet-slot-${slot.slot.id}`}
                   >
-                    <TrashIcon />
-                  </button>
-                </div>
-
-                <div className="cabinet-slot-meta">
-                  {slot.sizeClass !== 'mixed' && (
-                    <span className="cabinet-tag">{SIZE_CLASS_LABELS[slot.sizeClass]}</span>
-                  )}
-                  {slot.sizeClass === 'mixed' && <span className="cabinet-tag warn">Mixed sizes</span>}
-                  {slot.overCapacity > 0 && (
-                    <span className="cabinet-tag danger">
-                      {slot.overCapacity} over capacity
+                    <span className="cabinet-slot-toggle-label">{slot.slot.label}</span>
+                    <span className="cabinet-slot-count" title="Record spaces used">
+                      {slot.used.toLocaleString()} / {slot.slot.capacity.toLocaleString()}
                     </span>
-                  )}
-                </div>
+                    <span className="cabinet-slot-count" title="Records on shelf">
+                      {slot.records.length.toLocaleString()} records
+                    </span>
+                    {slot.sizeClass !== 'mixed' && (
+                      <span className="cabinet-tag">{SIZE_CLASS_LABELS[slot.sizeClass]}</span>
+                    )}
+                    {slot.sizeClass === 'mixed' && <span className="cabinet-tag warn">Mixed sizes</span>}
+                    {slot.overCapacity > 0 && (
+                      <span className="cabinet-tag danger">
+                        {slot.overCapacity} over capacity
+                      </span>
+                    )}
+                    <span className="cabinet-slot-chevron">{isExpanded ? '▾' : '▸'}</span>
+                  </button>
 
-                {slot.records.length === 0 ? (
-                  <p className="cabinet-empty">Nothing on this shelf yet.</p>
-                ) : (
-                  <ul className="cabinet-records">
-                    {slot.records.map((record) => recordRow(record.display))}
-                  </ul>
-                )}
-              </section>
-            ))}
+                  {isExpanded && (
+                    <div id={`cabinet-slot-${slot.slot.id}`} className="cabinet-slot-body">
+                      <div className="cabinet-slot-tools">
+                        <input
+                          className="cabinet-slot-label"
+                          value={slot.slot.label}
+                          onChange={(event) => updateSlot(slot.slot.id, { label: event.target.value })}
+                          aria-label="Shelf name"
+                        />
+                        <label className="cabinet-slot-capacity">
+                          <span>Capacity</span>
+                          <input
+                            type="number"
+                            min={1}
+                            aria-label={`Capacity of ${slot.slot.label}`}
+                            value={slot.slot.capacity}
+                            onChange={(event) => {
+                              const capacity = Math.max(1, Math.round(Number(event.target.value) || 1))
+                              updateSlot(slot.slot.id, { capacity })
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className="icon-btn"
+                          onClick={() => removeSlot(slot.slot.id)}
+                          disabled={cabinet.slots.length <= 1}
+                          title="Remove shelf"
+                          aria-label={`Remove ${slot.slot.label}`}
+                        >
+                          <TrashIcon />
+                        </button>
+                      </div>
+
+                      {slot.records.length === 0 ? (
+                        <p className="cabinet-empty">Nothing on this shelf yet.</p>
+                      ) : (
+                        <ul className="cabinet-records">
+                          {slot.records.map((record) => recordRow(record.display))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </section>
+              )
+            })}
           </div>
 
-          {plan.unplaced.length > 0 && (
-            <section className="cabinet-slot cabinet-unplaced">
-              <h3>Without a shelf</h3>
-              <p className="cabinet-hint">
-                These do not fit anywhere yet — add a shelf or raise a capacity.
-              </p>
-              <ul className="cabinet-records">{plan.unplaced.map((record) => recordRow(record))}</ul>
-            </section>
-          )}
+            <button type="button" className="cabinet-unplaced-toggle">
+              <span>Without a shelf ({plan.unplaced.length.toLocaleString()})</span>
+              <span className="cabinet-slot-chevron">▸</span>
+            </button>
+            <p className="cabinet-hint">
+              These do not fit anywhere yet — add a shelf or raise a capacity.
+            </p>
+            <ul className="cabinet-records">{plan.unplaced.map((record) => recordRow(record))}</ul>
         </div>
       </div>
     </div>

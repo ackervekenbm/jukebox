@@ -72,7 +72,7 @@ export interface UseCabinetResult {
   dirty: boolean
   error: string | null
   setName: (name: string) => void
-  addSlot: () => void
+  addSlot: (capacity?: number) => void
   updateSlot: (slotId: string, patch: Partial<Slot>) => void
   removeSlot: (slotId: string) => void
   setSort: (sort: CabinetSortMode) => void
@@ -230,11 +230,26 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
     setDirty(true)
   }, [])
 
-  const addSlot = useCallback(() => {
+  const addSlot = useCallback((capacity?: number) => {
     setCabinets((current) => {
       const first = current[0]
+      const cap =
+        typeof capacity === 'number' && Number.isFinite(capacity) && capacity > 0
+          ? Math.max(1, Math.round(capacity))
+          : DEFAULT_SHELF_CAPACITY
+      const nextIndex = first.slots.length + 1
       return [
-        { ...first, slots: [...first.slots, defaultCabinetSlot(first.slots.length + 1)] },
+        {
+          ...first,
+          slots: [
+            ...first.slots,
+            {
+              id: `slot-${nextIndex}`,
+              label: `Shelf ${nextIndex}`,
+              capacity: cap,
+            },
+          ],
+        },
         ...current.slice(1),
       ]
     })

@@ -66,7 +66,7 @@ export interface CabinetPlanOptions {
 
 export const DEFAULT_PLAN_OPTIONS: CabinetPlanOptions = {
   sort: 'artist',
-  separateSizeClasses: true,
+  separateSizeClasses: false,
 }
 
 /** A collection record as it appears in a planned slot. */
@@ -116,6 +116,23 @@ interface SortedRecord {
   artistKey: string
 }
 
+function compareSortedRecords(
+  a: SortedRecord,
+  b: SortedRecord,
+  sort: CabinetSortMode,
+): number {
+  const yearOf = (record: SortedRecord) =>
+    record.display.year > 0 ? record.display.year : Number.MAX_SAFE_INTEGER
+  const artistOrder = compareSortKeys(a.artistKey, b.artistKey)
+  const titleOrder = compareSortKeys(a.display.titleKey, b.display.titleKey)
+  const yearOrder = yearOf(a) - yearOf(b)
+  const keyOrder = a.display.key.localeCompare(b.display.key)
+
+  if (sort === 'title') return titleOrder || yearOrder || artistOrder || keyOrder
+  if (sort === 'year') return yearOrder || artistOrder || titleOrder || keyOrder
+  return artistOrder || yearOrder || titleOrder || keyOrder
+}
+
 function sortKeyed(
   releases: DisplayRelease[],
   sort: CabinetSortMode,
@@ -126,20 +143,7 @@ function sortKeyed(
     artistKey: artistKeys.get(display.artistName) ?? makeSortKey(display.artistName),
   }))
 
-  const yearOf = (record: SortedRecord) =>
-    record.display.year > 0 ? record.display.year : Number.MAX_SAFE_INTEGER
-
-  keyed.sort((a, b) => {
-    const artistOrder = compareSortKeys(a.artistKey, b.artistKey)
-    const titleOrder = compareSortKeys(a.display.titleKey, b.display.titleKey)
-    const yearOrder = yearOf(a) - yearOf(b)
-    const keyOrder = a.display.key.localeCompare(b.display.key)
-
-    if (sort === 'title') return titleOrder || yearOrder || artistOrder || keyOrder
-    if (sort === 'year') return yearOrder || artistOrder || titleOrder || keyOrder
-    return artistOrder || yearOrder || titleOrder || keyOrder
-  })
-
+  keyed.sort((a, b) => compareSortedRecords(a, b, sort))
   return keyed
 }
 
@@ -284,13 +288,20 @@ export function planCabinet(input: CabinetPlanInput): CabinetPlan {
   for (const display of releases) byKey.set(display.key, display)
 
   const sorted = options.separateSizeClasses
-    ? SIZE_CLASSES.flatMap((sizeClass) =>
-        sortKeyed(
+    ? SIZE_CLASSES.map((sizeClass, index) => ({
+        index,
+        records: sortKeyed(
           releases.filter((display) => (sizeOf.get(display.key) ?? 'other') === sizeClass),
           options.sort,
           artistKeys,
         ),
-      )
+      }))
+        .filter((group) => group.records.length > 0)
+        .sort(
+          (a, b) =>
+            compareSortedRecords(a.records[0], b.records[0], options.sort) || a.index - b.index,
+        )
+        .flatMap((group) => group.records)
     : sortKeyed(releases, options.sort, artistKeys)
 
   const { placements, unplaced } = allocate(

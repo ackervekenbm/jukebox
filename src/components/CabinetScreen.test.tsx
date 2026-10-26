@@ -98,7 +98,8 @@ describe('CabinetScreen', () => {
     renderScreen()
 
     expect(screen.getByLabelText('Cabinet name')).toHaveValue('Cabinet')
-    expect(screen.getAllByLabelText('Shelf name')).toHaveLength(2)
+    expect(screen.getAllByText('Shelf 1')).toHaveLength(1)
+    expect(screen.getAllByText('Shelf 2')).toHaveLength(1)
     expect(screen.getByText(/2 releases · 2 placed/)).toBeInTheDocument()
     expect(screen.queryByText(/without a slot/)).not.toBeInTheDocument()
   })
@@ -109,6 +110,7 @@ describe('CabinetScreen', () => {
     fireEvent.change(screen.getByLabelText('Cabinet name'), { target: { value: 'Loft' } })
     expect(actions.setName).toHaveBeenCalledWith('Loft')
 
+    fireEvent.click(screen.getByRole('button', { name: /Shelf 1/ }))
     fireEvent.change(screen.getAllByLabelText('Shelf name')[0], { target: { value: 'Wall A' } })
     expect(actions.updateSlot).toHaveBeenCalledWith('slot-1', { label: 'Wall A' })
   })
@@ -116,7 +118,9 @@ describe('CabinetScreen', () => {
   it('adds a shelf', () => {
     renderScreen()
     fireEvent.click(screen.getByRole('button', { name: 'Add shelf' }))
-    expect(actions.addSlot).toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText('Shelf size'), { target: { value: '60' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    expect(actions.addSlot).toHaveBeenCalledWith(60)
   })
 
   it('manages records automatically without per-record shelf controls', () => {
@@ -168,6 +172,7 @@ describe('CabinetScreen', () => {
       />,
     )
 
+    fireEvent.click(screen.getByRole('button', { name: /Shelf 1/ }))
     expect(screen.getByText('2 spaces')).toBeInTheDocument()
   })
 
