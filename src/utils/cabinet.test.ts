@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import type { DiscogsCollectionRelease } from '../types/discogs'
 import type { DisplayRelease } from './collection'
 import { makeSortKey } from './sortName'
-import { planCabinet, sizeClassOf } from './cabinet'
+import { planCabinet, sizeClassOf, spaceUnitsOf } from './cabinet'
 
 interface FakeInput {
   artist: string
@@ -76,6 +76,16 @@ describe('sizeClassOf', () => {
     expect(
       sizeClassOf(fake({ artist: 'A', title: 'T', formatText: 'Box Set · 12" / 7"' })),
     ).toBe('12-inch')
+  })
+})
+
+describe('spaceUnitsOf', () => {
+  it('counts a gatefold sleeve as two spaces', () => {
+    expect(spaceUnitsOf(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · 12" · LP · Gatefold' }))).toBe(2)
+  })
+
+  it('counts a standard sleeve as one space', () => {
+    expect(spaceUnitsOf(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · 12" · LP' }))).toBe(1)
   })
 })
 
@@ -155,45 +165,84 @@ describe('planCabinet', () => {
     expect(plan.conflicts).toContainEqual({ type: 'unplaced', count: 2 })
   })
 
-  it('moves an overridden record and reports the slot it overfills', () => {
+  it('fills every shelf before reporting records as unplaced', () => {
+    const releases = Array.from({ length: 391 }, (_, index) =>
+      fake({ id: index + 1, artist: `Artist ${String(index).padStart(3, '0')}`, title: `t${index}` }),
+    )
+
+    const one = planCabinet({ releases, cabinet: cabinetWith([70]) })
+    expect(one.slots[0].records).toHaveLength(70)
+    expect(one.unplaced).toHaveLength(321)
+
+    const two = planCabinet({ releases, cabinet: cabinetWith([70, 70]) })
+    expect(two.slots.map((slot) => slot.records.length)).toEqual([70, 70])
+    expect(two.unplaced).toHaveLength(251)
+
+    const plenty = planCabinet({ releases, cabinet: cabinetWith(Array(6).fill(70)) })
+    expect(plenty.unplaced).toEqual([])
+  })
+
+  it('groups size classes even when artists interleave sizes', () => {
     const releases = [
-      fake({ artist: 'A', title: 'a', id: 1 }),
-      fake({ artist: 'B', title: 'b', id: 2 }),
-      fake({ artist: 'C', title: 'c', id: 3 }),
-      fake({ artist: 'D', title: 'd', id: 4 }),
+      fake({ id: 1, artist: 'A', title: 'a12', formatText: 'Vinyl · 12"' }),
+      fake({ id: 2, artist: 'A', title: 'a7', formatText: 'Vinyl · 7"' }),
+      fake({ id: 3, artist: 'B', title: 'b12', formatText: 'Vinyl · 12"' }),
+      fake({ id: 4, artist: 'B', title: 'b7', formatText: 'Vinyl · 7"' }),
     ]
-    const cabinet = cabinetWith([2, 2])
-    const plan = planCabinet({
-      releases,
-      cabinet,
-      overrides: { '1-1': 'slot-2' },
-    })
-    expect(plan.placements['1-1']).toBe('slot-2')
-    const target = plan.slots[1]
-    expect(target.overCapacity).toBe(1)
-    expect(target.records.find((record) => record.key === '1-1')?.overridden).toBe(true)
-    expect(plan.conflicts).toContainEqual({ type: 'over-capacity', slotId: 'slot-2', count: 1 })
+    const plan = planCabinet({ releases, cabinet: cabinetWith([10, 10]) })
+    expect(plan.slots[0].sizeClass).toBe('12-inch')
+    expect(plan.slots[1].sizeClass).toBe('small')
+    expect(keysIn(plan.slots[0].records)).toEqual(['1-1', '3-3'])
+    expect(keysIn(plan.slots[1].records)).toEqual(['2-2', '4-4'])
+  })
+
+  it('reuses spare shelf space before leaving records unplaced', () => {
+    const releases = [
+      fake({ id: 1, artist: 'A', title: 'a', formatText: 'Vinyl · 12"' }),
+      fake({ id: 2, artist: 'B', title: 'b', formatText: 'Vinyl · 12"' }),
+      fake({ id: 3, artist: 'C', title: 'c', formatText: 'Vinyl · 12"' }),
+      ...[4, 5, 6, 7, 8, 9, 10, 11].map((id) =>
+        fake({ id, artist: `S${id}`, title: `s${id}`, formatText: 'Vinyl · 7"' }),
+      ),
+      ...[12, 13, 14, 15].map((id) =>
+        fake({ id, artist: `O${id}`, title: `o${id}`, formatText: 'CD · Album' }),
+      ),
+    ]
+    const plan = planCabinet({ releases, cabinet: cabinetWith([10, 10]) })
+    expect(plan.unplaced).toEqual([])
+    expect(plan.slots[0].records).toHaveLength(5)
+    expect(plan.slots[1].records).toHaveLength(10)
   })
 
   it('reports an artist split across slots', () => {
     const releases = [
       fake({ artist: 'A', title: 'a1', id: 1 }),
       fake({ artist: 'A', title: 'a2', id: 2 }),
-      fake({ artist: 'B', title: 'b1', id: 3 }),
+      fake({ artist: 'A', title: 'a3', id: 3 }),
     ]
-    const plan = planCabinet({ releases, cabinet: cabinetWith([2, 2]), overrides: { '1-1': 'slot-2' } })
+    const plan = planCabinet({ releases, cabinet: cabinetWith([2, 2]) })
+    expect(plan.slots.map((slot) => slot.records.length)).toEqual([2, 1])
     expect(plan.conflicts).toContainEqual({ type: 'artist-split', artist: 'A' })
   })
 
-  it('reports overrides whose record or slot is gone', () => {
-    const releases = [fake({ artist: 'A', title: 'a', id: 1 })]
-    const plan = planCabinet({
-      releases,
-      cabinet: cabinetWith([5]),
-      overrides: { 'ghost-9': 'slot-1', '1-1': 'slot-missing' },
-    })
-    expect(plan.staleOverrides).toEqual(['ghost-9', '1-1'])
-    expect(plan.placements['1-1']).toBe('slot-1')
+  it('counts a gatefold as two spaces against shelf capacity', () => {
+    const releases = [
+      fake({ id: 1, artist: 'A', title: 'gatefold', formatText: 'Vinyl · 12" · Gatefold' }),
+      fake({ id: 2, artist: 'B', title: 'normal' }),
+      fake({ id: 3, artist: 'C', title: 'overflow' }),
+    ]
+    const plan = planCabinet({ releases, cabinet: cabinetWith([3]) })
+    expect(plan.slots[0].used).toBe(3)
+    expect(plan.slots[0].records).toHaveLength(2)
+    expect(plan.unplaced).toEqual([releases[2]])
+  })
+
+  it('leaves a gatefold unplaced when no shelf has room for both spaces', () => {
+    const releases = [
+      fake({ id: 1, artist: 'A', title: 'gatefold', formatText: 'Vinyl · 12" · Gatefold' }),
+    ]
+    const plan = planCabinet({ releases, cabinet: cabinetWith([1, 1]) })
+    expect(plan.unplaced).toEqual([releases[0]])
   })
 
   it('leaves the caller collection untouched', () => {

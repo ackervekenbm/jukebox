@@ -61,22 +61,19 @@ const actions = {
   addSlot: vi.fn(),
   updateSlot: vi.fn(),
   removeSlot: vi.fn(),
-  assign: vi.fn(),
-  unassign: vi.fn(),
   setSort: vi.fn(),
   setSeparateSizeClasses: vi.fn(),
   retry: vi.fn(),
   reset: vi.fn(),
 }
 
-function setState(capacities: number[], overrides: Record<string, string> = {}, status = 'synced') {
+function setState(capacities: number[], status = 'synced') {
   const cabinet = cabinetOf(capacities)
   mock.state = {
     cabinets: [cabinet],
     cabinet,
-    overrides,
     options: { sort: 'artist', separateSizeClasses: true },
-    plan: planCabinet({ releases, cabinet, overrides }),
+    plan: planCabinet({ releases, cabinet }),
     status,
     dirty: false,
     error: null,
@@ -122,15 +119,11 @@ describe('CabinetScreen', () => {
     expect(actions.addSlot).toHaveBeenCalled()
   })
 
-  it('moves a record to another shelf and back to auto', () => {
+  it('manages records automatically without per-record shelf controls', () => {
     renderScreen()
 
-    const select = screen.getByLabelText('Shelf for First')
-    fireEvent.change(select, { target: { value: 'slot-2' } })
-    expect(actions.assign).toHaveBeenCalledWith(releases[0].key, 'slot-2')
-
-    fireEvent.change(select, { target: { value: '' } })
-    expect(actions.unassign).toHaveBeenCalledWith(releases[0].key)
+    expect(screen.queryByLabelText('Shelf for First')).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   })
 
   it('changes the sort and the size separation', () => {
@@ -153,13 +146,29 @@ describe('CabinetScreen', () => {
     expect(within(warnings).getByText('1 without a slot')).toBeInTheDocument()
   })
 
-  it('warns about an overfilled shelf', () => {
-    setState([1, 1], { '1-1': 'slot-2' })
-    renderScreen()
+  it('shows when a release takes two spaces', () => {
+    const gatefold = { ...releases[0], formatText: 'Vinyl · 12" · Gatefold' }
+    const cabinet = cabinetOf([75, 75])
+    mock.state = {
+      cabinets: [cabinet],
+      cabinet,
+      options: { sort: 'artist', separateSizeClasses: true },
+      plan: planCabinet({ releases: [gatefold, releases[1]], cabinet }),
+      status: 'synced',
+      dirty: false,
+      error: null,
+      ...actions,
+    }
+    render(
+      <CabinetScreen
+        username="alice"
+        token="tok"
+        releases={[gatefold, releases[1]]}
+        onClose={vi.fn()}
+      />,
+    )
 
-    const warnings = screen.getByRole('list', { name: 'Cabinet warnings' })
-    expect(within(warnings).getByText('1 over capacity')).toBeInTheDocument()
-    expect(screen.getByText('Pinned')).toBeInTheDocument()
+    expect(screen.getByText('2 spaces')).toBeInTheDocument()
   })
 
   it('offers a retry when a sync fails', () => {

@@ -4,7 +4,7 @@
 import type { DisplayRelease } from '../utils/collection'
 import { useScrollLock } from '../hooks/useScrollLock'
 import { useCabinet, type CabinetStatus } from '../hooks/useCabinet'
-import { SIZE_CLASS_LABELS, conflictLabel } from '../utils/cabinet'
+import { SIZE_CLASS_LABELS, conflictLabel, spaceUnitsOf } from '../utils/cabinet'
 import { CloseIcon, TrashIcon } from './icons'
 
 const STATUS_TEXT: Record<CabinetStatus, string> = {
@@ -33,7 +33,6 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
   useScrollLock(true)
   const {
     cabinet,
-    overrides,
     options,
     plan,
     status,
@@ -42,17 +41,14 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
     addSlot,
     updateSlot,
     removeSlot,
-    assign,
-    unassign,
     setSort,
     setSeparateSizeClasses,
     retry,
   } = useCabinet({ username, token, releases, enabled: true })
 
   const placed = Object.keys(plan.placements).length
-  const slotOptions = cabinet.slots
 
-  const recordRow = (record: DisplayRelease, currentSlot: string | null) => (
+  const recordRow = (record: DisplayRelease) => (
     <li className="cabinet-record" key={record.key}>
       {record.thumb ? (
         <img className="cabinet-record-art" src={record.thumb} alt="" loading="lazy" />
@@ -64,30 +60,11 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
         <span className="cabinet-record-artist">{record.artistName}</span>
       </span>
       {record.year > 0 && <span className="cabinet-record-year">{record.year}</span>}
-      {overrides[record.key] && (
-        <span className="cabinet-pin" title="You placed this record by hand">
-          Pinned
+      {spaceUnitsOf(record) > 1 && (
+        <span className="cabinet-record-space" title="Gatefold — takes two spaces">
+          2 spaces
         </span>
       )}
-      <label className="cabinet-record-slot">
-        <span className="cabinet-record-slot-label">Shelf</span>
-        <select
-          aria-label={`Shelf for ${record.title}`}
-          value={currentSlot && slotOptions.some((slot) => slot.id === currentSlot) ? currentSlot : ''}
-          onChange={(event) => {
-            const slotId = event.target.value
-            if (slotId) assign(record.key, slotId)
-            else unassign(record.key)
-          }}
-        >
-          <option value="">Auto</option>
-          {slotOptions.map((slot) => (
-            <option key={slot.id} value={slot.id}>
-              {slot.label}
-            </option>
-          ))}
-        </select>
-      </label>
     </li>
   )
 
@@ -197,8 +174,8 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
                       }}
                     />
                   </label>
-                  <span className="cabinet-slot-count">
-                    {slot.records.length.toLocaleString()} / {slot.slot.capacity.toLocaleString()}
+                  <span className="cabinet-slot-count" title="Record spaces used">
+                    {slot.used.toLocaleString()} / {slot.slot.capacity.toLocaleString()}
                   </span>
                   <button
                     type="button"
@@ -228,7 +205,7 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
                   <p className="cabinet-empty">Nothing on this shelf yet.</p>
                 ) : (
                   <ul className="cabinet-records">
-                    {slot.records.map((record) => recordRow(record.display, slot.slot.id))}
+                    {slot.records.map((record) => recordRow(record.display))}
                   </ul>
                 )}
               </section>
@@ -241,7 +218,7 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
               <p className="cabinet-hint">
                 These do not fit anywhere yet — add a shelf or raise a capacity.
               </p>
-              <ul className="cabinet-records">{plan.unplaced.map((record) => recordRow(record, null))}</ul>
+              <ul className="cabinet-records">{plan.unplaced.map((record) => recordRow(record))}</ul>
             </section>
           )}
         </div>

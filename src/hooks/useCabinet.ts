@@ -31,31 +31,26 @@ export function defaultCabinet(): Cabinet {
 }
 
 /** The synced document for a computed layout, stamped with the current time. */
-export function buildCabinetDoc(
-  cabinets: Cabinet[],
-  overrides: Record<string, string>,
-  plan: CabinetPlan,
-): CabinetDoc {
+export function buildCabinetDoc(cabinets: Cabinet[], plan: CabinetPlan): CabinetDoc {
   return {
     schemaVersion: 1,
     cabinets,
     placements: plan.placements,
-    overrides,
+    overrides: {},
     unplaced: plan.unplaced.map((record: DisplayRelease) => record.key),
     updatedAt: new Date().toISOString(),
   }
 }
 
 /**
- * Merges the server's copy into the local one after a 409: the local cabinets
- * and overrides win (this is the device the user is editing on) and the
- * placements are recomputed from the collection anyway.
+ * Keeps the local copy after a 409: the device that is being edited wins, and
+ * the placements are recomputed from the collection anyway.
  */
-export function rebaseCabinetDoc(local: CabinetDoc, server: CabinetDoc): CabinetDoc {
+export function rebaseCabinetDoc(local: CabinetDoc): CabinetDoc {
   return {
     ...local,
     cabinets: local.cabinets,
-    overrides: { ...server.overrides, ...local.overrides },
+    overrides: {},
     updatedAt: new Date().toISOString(),
   }
 }
@@ -71,7 +66,6 @@ export interface UseCabinetArgs {
 export interface UseCabinetResult {
   cabinets: Cabinet[]
   cabinet: Cabinet
-  overrides: Record<string, string>
   options: CabinetOptions
   plan: CabinetPlan
   status: CabinetStatus
@@ -81,8 +75,6 @@ export interface UseCabinetResult {
   addSlot: () => void
   updateSlot: (slotId: string, patch: Partial<Slot>) => void
   removeSlot: (slotId: string) => void
-  assign: (recordKey: string, slotId: string) => void
-  unassign: (recordKey: string) => void
   setSort: (sort: CabinetSortMode) => void
   setSeparateSizeClasses: (separate: boolean) => void
   retry: () => void
@@ -91,7 +83,6 @@ export interface UseCabinetResult {
 
 export function useCabinet({ username, token, releases, enabled }: UseCabinetArgs): UseCabinetResult {
   const [cabinets, setCabinets] = useState<Cabinet[]>(() => [defaultCabinet()])
-  const [overrides, setOverrides] = useState<Record<string, string>>({})
   const [options, setOptions] = useState<CabinetOptions>(() => loadCabinetOptions())
   const [revision, setRevision] = useState(0)
   const [dirty, setDirty] = useState(false)
@@ -100,10 +91,10 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
 
   const cabinet = cabinets[0]
   const plan = useMemo(
-    () => planCabinet({ releases, cabinet, overrides, options }),
-    [releases, cabinet, overrides, options],
+    () => planCabinet({ releases, cabinet, options }),
+    [releases, cabinet, options],
   )
-  const doc = useMemo(() => buildCabinetDoc(cabinets, overrides, plan), [cabinets, overrides, plan])
+  const doc = useMemo(() => buildCabinetDoc(cabinets, plan), [cabinets, plan])
 
   // Debounced pushes and retries read the live copies through this ref.
   const live = useRef({ token, revision, doc })
@@ -146,10 +137,9 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
           return
         } catch (err) {
           if (err instanceof SyncConflictError) {
-            nextDoc = rebaseCabinetDoc(nextDoc, err.doc ?? nextDoc)
+            nextDoc = rebaseCabinetDoc(nextDoc)
             nextRevision = revisionFromEtag(err.etag, nextRevision)
             setCabinets(nextDoc.cabinets)
-            setOverrides(nextDoc.overrides)
             setRevision(nextRevision)
             persist(nextDoc, nextRevision, true)
             continue
@@ -175,12 +165,10 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
       if (cancelled) return
       if (stored) {
         setCabinets(stored.doc.cabinets.length > 0 ? stored.doc.cabinets : [defaultCabinet()])
-        setOverrides(stored.doc.overrides)
         setRevision(stored.revision)
         setDirty(stored.dirty)
       } else {
         setCabinets([defaultCabinet()])
-        setOverrides({})
         setRevision(0)
         setDirty(false)
       }
@@ -201,15 +189,13 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
           return
         }
         if (stored?.dirty) {
-          const rebased = rebaseCabinetDoc(stored.doc, remote.doc)
+          const rebased = rebaseCabinetDoc(stored.doc)
           setCabinets(rebased.cabinets)
-          setOverrides(rebased.overrides)
           setRevision(remoteRevision)
           await push(rebased, remoteRevision)
           return
         }
         setCabinets(remote.doc.cabinets.length > 0 ? remote.doc.cabinets : [defaultCabinet()])
-        setOverrides(remote.doc.overrides)
         setRevision(remoteRevision)
         setStatus('synced')
         persist(remote.doc, remoteRevision, false)
@@ -283,21 +269,6 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
     setDirty(true)
   }, [])
 
-  const assign = useCallback((recordKey: string, slotId: string) => {
-    setOverrides((current) => ({ ...current, [recordKey]: slotId }))
-    setDirty(true)
-  }, [])
-
-  const unassign = useCallback((recordKey: string) => {
-    setOverrides((current) => {
-      if (!(recordKey in current)) return current
-      const next = { ...current }
-      delete next[recordKey]
-      return next
-    })
-    setDirty(true)
-  }, [])
-
   const setSort = useCallback((sort: CabinetSortMode) => {
     setOptions((current) => {
       const next = { ...current, sort }
@@ -323,7 +294,6 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
   const reset = useCallback(async () => {
     if (username) await clearCabinet(username)
     setCabinets([defaultCabinet()])
-    setOverrides({})
     setRevision(0)
     setDirty(false)
     setStatus('local')
@@ -333,7 +303,6 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
   return {
     cabinets,
     cabinet,
-    overrides,
     options,
     plan,
     status,
@@ -343,8 +312,6 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
     addSlot,
     updateSlot,
     removeSlot,
-    assign,
-    unassign,
     setSort,
     setSeparateSizeClasses,
     retry,
