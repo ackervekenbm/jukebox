@@ -132,7 +132,11 @@ describe('planCabinet', () => {
       fake({ artist: 'E', title: 'e', formatText: 'Vinyl · 7"' }),
       fake({ artist: 'F', title: 'f', formatText: 'Vinyl · 7"' }),
     ]
-    const plan = planCabinet({ releases, cabinet: cabinetWith([10, 10]) })
+    const plan = planCabinet({
+      releases,
+      cabinet: cabinetWith([10, 10]),
+      options: { sort: 'artist', separateSizeClasses: true },
+    })
     expect(plan.slots[0].sizeClass).toBe('12-inch')
     expect(plan.slots[1].sizeClass).toBe('small')
     expect(plan.conflicts).toEqual([])
@@ -189,11 +193,51 @@ describe('planCabinet', () => {
       fake({ id: 3, artist: 'B', title: 'b12', formatText: 'Vinyl · 12"' }),
       fake({ id: 4, artist: 'B', title: 'b7', formatText: 'Vinyl · 7"' }),
     ]
-    const plan = planCabinet({ releases, cabinet: cabinetWith([10, 10]) })
-    expect(plan.slots[0].sizeClass).toBe('12-inch')
-    expect(plan.slots[1].sizeClass).toBe('small')
-    expect(keysIn(plan.slots[0].records)).toEqual(['1-1', '3-3'])
-    expect(keysIn(plan.slots[1].records)).toEqual(['2-2', '4-4'])
+    const plan = planCabinet({
+      releases,
+      cabinet: cabinetWith([10, 10]),
+      options: { sort: 'artist', separateSizeClasses: true },
+    })
+    expect(plan.slots[0].sizeClass).toBe('small')
+    expect(plan.slots[1].sizeClass).toBe('12-inch')
+    expect(keysIn(plan.slots[0].records)).toEqual(['2-2', '4-4'])
+    expect(keysIn(plan.slots[1].records)).toEqual(['1-1', '3-3'])
+  })
+
+  it('keeps shelves in artist order when a shelf is added', () => {
+    const releases = [
+      fake({ id: 1, artist: 'A', title: 'a', formatText: 'Vinyl · 7"' }),
+      fake({ id: 2, artist: 'B', title: 'b', formatText: 'Vinyl · 12"' }),
+      fake({ id: 3, artist: 'C', title: 'c', formatText: 'Vinyl · 12"' }),
+    ]
+
+    const one = planCabinet({ releases, cabinet: cabinetWith([2]) })
+    expect(keysIn(one.slots[0].records)).toEqual(['1-1', '2-2'])
+
+    const two = planCabinet({ releases, cabinet: cabinetWith([2, 2]) })
+    expect(keysIn(two.slots[0].records)).toEqual(['1-1', '2-2'])
+    expect(keysIn(two.slots[1].records)).toEqual(['3-3'])
+
+    const three = planCabinet({ releases, cabinet: cabinetWith([2, 2, 2]) })
+    expect(three.slots.map((slot) => keysIn(slot.records))).toEqual([
+      ['1-1'],
+      ['2-2'],
+      ['3-3'],
+    ])
+  })
+
+  it('starts a size-separated layout with the earliest class', () => {
+    const releases = [
+      fake({ id: 1, artist: 'B', title: 'b12', formatText: 'Vinyl · 12"' }),
+      fake({ id: 2, artist: 'A', title: 'a7', formatText: 'Vinyl · 7"' }),
+    ]
+    const plan = planCabinet({
+      releases,
+      cabinet: cabinetWith([10, 10]),
+      options: { sort: 'artist', separateSizeClasses: true },
+    })
+    expect(keysIn(plan.slots[0].records)).toEqual(['2-2'])
+    expect(keysIn(plan.slots[1].records)).toEqual(['1-1'])
   })
 
   it('reuses spare shelf space before leaving records unplaced', () => {
@@ -208,7 +252,11 @@ describe('planCabinet', () => {
         fake({ id, artist: `O${id}`, title: `o${id}`, formatText: 'CD · Album' }),
       ),
     ]
-    const plan = planCabinet({ releases, cabinet: cabinetWith([10, 10]) })
+    const plan = planCabinet({
+      releases,
+      cabinet: cabinetWith([10, 10]),
+      options: { sort: 'artist', separateSizeClasses: true },
+    })
     expect(plan.unplaced).toEqual([])
     expect(plan.slots[0].records).toHaveLength(5)
     expect(plan.slots[1].records).toHaveLength(10)
