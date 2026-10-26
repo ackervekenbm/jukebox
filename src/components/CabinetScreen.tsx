@@ -282,14 +282,15 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
             })}
           </div>
 
-            <button type="button" className="cabinet-unplaced-toggle">
-              <span>Without a shelf ({plan.unplaced.length.toLocaleString()})</span>
-              <span className="cabinet-slot-chevron">▸</span>
-            </button>
-            <p className="cabinet-hint">
-              These do not fit anywhere yet — add a shelf or raise a capacity.
-            </p>
-            <ul className="cabinet-records">{plan.unplaced.map((record) => recordRow(record))}</ul>
+          {plan.unplaced.length > 0 && (
+            <section className="cabinet-slot cabinet-unplaced">
+              <h3>Without a shelf</h3>
+              <p className="cabinet-hint">
+                These do not fit anywhere yet — add a shelf or raise a capacity.
+              </p>
+              <ul className="cabinet-records">{plan.unplaced.map((record) => recordRow(record))}</ul>
+            </section>
+          )}
         </div>
       </div>
     </div>
