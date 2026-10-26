@@ -17,6 +17,7 @@ export const SIZE_CLASS_LABELS: Record<SizeClass, string> = {
 }
 
 const INCH_PATTERN = /(\d+(?:[.,]\d+)?)\s*(?:"|″|”|inch|inches)/gi
+const GATEFOLD_PATTERN = /\bgatefold\b/i
 
 function inchesOf(display: DisplayRelease): number | null {
   let max: number | null = null
@@ -46,6 +47,14 @@ export function sizeClassOf(display: DisplayRelease): SizeClass {
   return inches >= 12 ? '12-inch' : 'small'
 }
 
+/**
+ * How much shelf space a release takes. A gatefold sleeve is twice as thick as
+ * a standard sleeve, so it uses two of the slots a shelf capacity counts.
+ */
+export function spaceUnitsOf(display: DisplayRelease): number {
+  return GATEFOLD_PATTERN.test(display.formatText) ? 2 : 1
+}
+
 export type CabinetSortMode = 'artist' | 'title' | 'year'
 
 export interface CabinetPlanOptions {
@@ -64,8 +73,8 @@ export const DEFAULT_PLAN_OPTIONS: CabinetPlanOptions = {
 export interface PlannedRecord {
   key: string
   display: DisplayRelease
-  /** True when a manual override, not the rules, put it here. */
-  overridden: boolean
+  /** Shelf space used, counting a gatefold as two. */
+  units: number
 }
 
 export interface PlannedSlot {
@@ -73,7 +82,9 @@ export interface PlannedSlot {
   records: PlannedRecord[]
   /** The single size class in the slot, or 'mixed' when it breaks the rule. */
   sizeClass: SizeClass | 'mixed'
-  /** How many records the slot holds beyond its capacity. */
+  /** Shelf space used by the records, in capacity units. */
+  used: number
+  /** How many capacity units the slot holds beyond its capacity. */
   overCapacity: number
 }
 
@@ -87,19 +98,16 @@ export interface CabinetConflict {
 }
 
 export interface CabinetPlan {
-  /** Final record key → slot id, overrides included. */
+  /** Final record key → slot id. */
   placements: Record<string, string>
   slots: PlannedSlot[]
   unplaced: DisplayRelease[]
   conflicts: CabinetConflict[]
-  /** Overrides whose record vanished from the collection or whose slot is gone. */
-  staleOverrides: string[]
 }
 
 export interface CabinetPlanInput {
   releases: DisplayRelease[]
   cabinet: Cabinet
-  overrides?: Record<string, string>
   options?: CabinetPlanOptions
 }
 
@@ -143,9 +151,14 @@ function sortDisplays(
   return sortKeyed(releases, sort, artistKeys).map((record) => record.display)
 }
 
-function hasRoomAfter(slots: Slot[], load: Map<string, number>, index: number): boolean {
+function hasRoomAfter(
+  slots: Slot[],
+  used: Map<string, number>,
+  index: number,
+  units: number,
+): boolean {
   for (let i = index + 1; i < slots.length; i++) {
-    if ((load.get(slots[i].id) ?? 0) < slots[i].capacity) return true
+    if ((used.get(slots[i].id) ?? 0) + units <= slots[i].capacity) return true
   }
   return false
 }
@@ -154,11 +167,18 @@ function hasRoomAfter(slots: Slot[], load: Map<string, number>, index: number): 
  * Places every record into a slot: class-grouped first, then in the requested
  * order, filling each slot to an even share of the collection before moving on.
  * Artists are kept together by walking the already artist-sorted list.
+ *
+ * Shelf capacity is measured in record spaces, so a gatefold consumes two. The
+ * even-target pass can leave unused space in earlier slots (a size class that
+ * ends early, or a target reached before the next class starts). A second pass
+ * reuses that space before anything is called unplaced, so records are only
+ * stranded when the cabinet is genuinely full.
  */
 function allocate(
   sorted: SortedRecord[],
   slots: Slot[],
   sizeOf: Map<string, SizeClass>,
+  unitsOf: Map<string, number>,
   separateSizeClasses: boolean,
 ): { placements: Map<string, string>; unplaced: DisplayRelease[] } {
   const placements = new Map<string, string>()
@@ -167,27 +187,39 @@ function allocate(
     return { placements, unplaced: sorted.map((record) => record.display) }
   }
 
-  const load = new Map<string, number>()
+  const used = new Map<string, number>()
   const classOfSlot = new Map<string, SizeClass>()
-  const target = Math.ceil(sorted.length / slots.length)
+  const totalUnits = sorted.reduce(
+    (total, record) => total + (unitsOf.get(record.display.key) ?? 1),
+    0,
+  )
+  const target = Math.ceil(totalUnits / slots.length)
+  const overflow: SortedRecord[] = []
   let current = 0
   let lastArtist: string | null = null
 
+  const place = (slot: Slot, record: SortedRecord, size: SizeClass, units: number) => {
+    placements.set(record.display.key, slot.id)
+    used.set(slot.id, (used.get(slot.id) ?? 0) + units)
+    if (!classOfSlot.has(slot.id)) classOfSlot.set(slot.id, size)
+  }
+
   for (const record of sorted) {
     const size = sizeOf.get(record.display.key) ?? 'other'
+    const units = unitsOf.get(record.display.key) ?? 1
     const sameArtist = lastArtist !== null && record.artistKey === lastArtist
     while (current < slots.length) {
       const slot = slots[current]
-      const count = load.get(slot.id) ?? 0
-      if (count >= slot.capacity) {
+      const space = used.get(slot.id) ?? 0
+      if (space + units > slot.capacity) {
         current++
         continue
       }
       const slotClass = classOfSlot.get(slot.id)
       // Size classes share a shelf only when no clean slot is left, so a tight
       // cabinet reports a mix instead of stranding records as unplaced.
-      if (separateSizeClasses && count > 0 && slotClass !== size) {
-        if (hasRoomAfter(slots, load, current)) {
+      if (separateSizeClasses && space > 0 && slotClass !== size) {
+        if (hasRoomAfter(slots, used, current, units)) {
           current++
           continue
         }
@@ -195,89 +227,101 @@ function allocate(
       }
       // Staying under the same artist is allowed to overshoot the even target
       // (cohesion outranks distribution); capacity is the hard limit.
-      if (count >= target && !sameArtist) {
-        current++
-        continue
+      if (space >= target && !sameArtist) {
+        if (hasRoomAfter(slots, used, current, units)) {
+          current++
+          continue
+        }
+        break
       }
       break
     }
     if (current >= slots.length) {
-      unplaced.push(record.display)
+      overflow.push(record)
       continue
     }
 
-    const slot = slots[current]
-    placements.set(record.display.key, slot.id)
-    load.set(slot.id, (load.get(slot.id) ?? 0) + 1)
-    if (!classOfSlot.has(slot.id)) classOfSlot.set(slot.id, size)
+    place(slots[current], record, size, units)
     lastArtist = record.artistKey
+  }
+
+  // The first pass walks forward only, so a class change or even target can
+  // leave room on an earlier shelf. Fill that room, preferring shelves that
+  // already hold the same size class, before reporting records as unplaced.
+  for (const record of overflow) {
+    const size = sizeOf.get(record.display.key) ?? 'other'
+    const units = unitsOf.get(record.display.key) ?? 1
+    const hasRoom = (slot: Slot) => (used.get(slot.id) ?? 0) + units <= slot.capacity
+    const clean = separateSizeClasses
+      ? slots.find((slot) => hasRoom(slot) && classOfSlot.get(slot.id) === size)
+      : undefined
+    const slot = clean ?? slots.find(hasRoom)
+    if (!slot) {
+      unplaced.push(record.display)
+      continue
+    }
+    place(slot, record, size, units)
   }
 
   return { placements, unplaced }
 }
 
 export function planCabinet(input: CabinetPlanInput): CabinetPlan {
-  const { releases, cabinet, overrides = {}, options = DEFAULT_PLAN_OPTIONS } = input
+  const { releases, cabinet, options = DEFAULT_PLAN_OPTIONS } = input
 
   const artistKeys = new Map<string, string>()
   const sizeOf = new Map<string, SizeClass>()
+  const unitsOf = new Map<string, number>()
   for (const display of releases) {
     if (!artistKeys.has(display.artistName)) {
       artistKeys.set(display.artistName, makeSortKey(display.artistName))
     }
     sizeOf.set(display.key, sizeClassOf(display))
+    unitsOf.set(display.key, spaceUnitsOf(display))
   }
 
   const byKey = new Map<string, DisplayRelease>()
   for (const display of releases) byKey.set(display.key, display)
 
-  const ordered = [...releases].sort((a, b) => {
-    if (!options.separateSizeClasses) return 0
-    return SIZE_CLASSES.indexOf(sizeOf.get(a.key) ?? 'other') -
-      SIZE_CLASSES.indexOf(sizeOf.get(b.key) ?? 'other')
-  })
-  const sorted = sortKeyed(ordered, options.sort, artistKeys)
-
-  const slotIds = new Set(cabinet.slots.map((slot) => slot.id))
-  const staleOverrides = Object.keys(overrides).filter(
-    (key) => !byKey.has(key) || !slotIds.has(overrides[key]),
-  )
+  const sorted = options.separateSizeClasses
+    ? SIZE_CLASSES.flatMap((sizeClass) =>
+        sortKeyed(
+          releases.filter((display) => (sizeOf.get(display.key) ?? 'other') === sizeClass),
+          options.sort,
+          artistKeys,
+        ),
+      )
+    : sortKeyed(releases, options.sort, artistKeys)
 
   const { placements, unplaced } = allocate(
     sorted,
     cabinet.slots,
     sizeOf,
+    unitsOf,
     options.separateSizeClasses,
   )
 
-  const finalPlacements = new Map(placements)
-  const pinned = new Map<string, boolean>()
-  for (const [key, slotId] of Object.entries(overrides)) {
-    if (!byKey.has(key) || !slotIds.has(slotId)) continue
-    finalPlacements.set(key, slotId)
-    pinned.set(key, true)
-    const unplacedIndex = unplaced.findIndex((display) => display.key === key)
-    if (unplacedIndex >= 0) unplaced.splice(unplacedIndex, 1)
-  }
-
   const slotPlans: PlannedSlot[] = cabinet.slots.map((slot) => {
     const records: DisplayRelease[] = []
-    for (const [key, slotId] of finalPlacements) {
+    for (const [key, slotId] of placements) {
       if (slotId !== slot.id) continue
       const display = byKey.get(key)
       if (display) records.push(display)
     }
     const sortedRecords = sortDisplays(records, options.sort, artistKeys)
     const classes = new Set(sortedRecords.map((display) => sizeOf.get(display.key) ?? 'other'))
+    const plannedRecords = sortedRecords.map((display) => ({
+      key: display.key,
+      display,
+      units: unitsOf.get(display.key) ?? 1,
+    }))
+    const used = plannedRecords.reduce((total, record) => total + record.units, 0)
     return {
       slot,
-      records: sortedRecords.map((display) => ({
-        key: display.key,
-        display,
-        overridden: pinned.get(display.key) === true,
-      })),
+      records: plannedRecords,
       sizeClass: classes.size === 1 ? [...classes][0] : 'mixed',
-      overCapacity: Math.max(0, sortedRecords.length - slot.capacity),
+      used,
+      overCapacity: Math.max(0, used - slot.capacity),
     }
   })
 
@@ -292,7 +336,7 @@ export function planCabinet(input: CabinetPlanInput): CabinetPlan {
   }
 
   const artistSlots = new Map<string, Set<string>>()
-  for (const [key, slotId] of finalPlacements) {
+  for (const [key, slotId] of placements) {
     const display = byKey.get(key)
     if (!display) continue
     const seen = artistSlots.get(display.artistName) ?? new Set<string>()
@@ -306,11 +350,10 @@ export function planCabinet(input: CabinetPlanInput): CabinetPlan {
   if (unplaced.length > 0) conflicts.push({ type: 'unplaced', count: unplaced.length })
 
   return {
-    placements: Object.fromEntries(finalPlacements),
+    placements: Object.fromEntries(placements),
     slots: slotPlans,
     unplaced,
     conflicts,
-    staleOverrides,
   }
 }
 

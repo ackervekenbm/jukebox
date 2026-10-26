@@ -75,21 +75,19 @@ describe('helpers', () => {
       slots: [],
       unplaced: [releases[1]],
       conflicts: [],
-      staleOverrides: [],
     }
-    const doc = buildCabinetDoc([cabinet], { '1-1': 'slot-2' }, plan)
+    const doc = buildCabinetDoc([cabinet], plan)
     expect(doc.schemaVersion).toBe(1)
     expect(doc.placements).toEqual({ '1-1': 'slot-1' })
     expect(doc.unplaced).toEqual([releases[1].key])
-    expect(doc.overrides).toEqual({ '1-1': 'slot-2' })
+    expect(doc.overrides).toEqual({})
   })
 
-  it('rebases the server overrides under the local ones', () => {
-    const local = { ...docWith('Local'), overrides: { a: 'slot-1', b: 'slot-1' } }
-    const server = { ...docWith('Server'), overrides: { b: 'slot-2', c: 'slot-2' } }
-    const rebased = rebaseCabinetDoc(local, server)
+  it('keeps the local cabinet after a sync conflict', () => {
+    const local = docWith('Local')
+    const rebased = rebaseCabinetDoc(local)
     expect(rebased.cabinets).toEqual(local.cabinets)
-    expect(rebased.overrides).toEqual({ a: 'slot-1', b: 'slot-1', c: 'slot-2' })
+    expect(rebased.overrides).toEqual({})
   })
 })
 
@@ -174,7 +172,7 @@ describe('useCabinet', () => {
 
     expect(pushSpy).toHaveBeenCalledTimes(2)
     expect(pushSpy.mock.calls[1][2]).toBe('"r5"')
-    expect(result.current.overrides.fromServer).toBe('slot-1')
+    expect(result.current.cabinet.name).toBe('Mine')
     expect(result.current.status).toBe('synced')
   })
 
@@ -196,22 +194,6 @@ describe('useCabinet', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
     expect(pushSpy).not.toHaveBeenCalled()
     expect(result.current.status).toBe('local')
-  })
-
-  it('keeps a manual nudge in the plan and clears it again', async () => {
-    vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
-    vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
-    vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: null, etag: '"r0"' })
-
-    const { result } = renderHook(() => useIt())
-    await waitFor(() => expect(result.current.status).toBe('synced'))
-
-    const key = releases[0].key
-    act(() => result.current.assign(key, 'slot-2'))
-    expect(result.current.plan.placements[key]).toBe('slot-2')
-
-    act(() => result.current.unassign(key))
-    expect(result.current.plan.placements[key]).toBe('slot-1')
   })
 
   it('never removes the last shelf', async () => {
