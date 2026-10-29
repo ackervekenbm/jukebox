@@ -5,7 +5,10 @@ ARG COMMIT_SHA
 ARG BUILD_TIME
 ARG GITHUB_REPOSITORY
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+# No dependency install script is needed to compile the client/server, and
+# skipping them keeps npm's legacy implicit `node-gyp rebuild` (triggered by
+# better-sqlite3's binding.gyp) out of this stage.
+RUN npm ci --ignore-scripts --no-audit --no-fund
 COPY . .
 RUN npm run build
 
@@ -17,7 +20,13 @@ ENV NODE_ENV=production \
     DATA_DIR=/app/data
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --no-audit --no-fund
+# The runtime needs a loadable better-sqlite3 binary. From v13 on it ships musl
+# prebuilds, but npm still also runs its legacy implicit `node-gyp rebuild`
+# (binding.gyp without an install script, upstream issue #1516), so a toolchain
+# has to be present. It is removed again in the same layer.
+RUN apk add --no-cache --virtual .build-deps python3 build-base \
+ && npm ci --omit=dev --no-audit --no-fund \
+ && apk del .build-deps
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/dist-server ./dist-server
 RUN mkdir -p /app/data
