@@ -42,45 +42,31 @@ Browse your personal **Discogs collection** on any device — grouped by artist 
 - The container keeps a small **SQLite database in a Docker volume** that stores only your **record cabinet layout** (shelf names and capacities) so it can sync across devices ([#55](../../issues/55)). The collection itself never leaves your browser.
 - **"Clear everything"** in settings removes the cached collection, your saved views, the listen log, the picker preference, the cabinet layout and stored credentials from your device.
 
-## Deployment (production)
+## Deployment
 
-The container is a single Node process serving the static frontend, the API and the `/discogs` proxy. Every push to `main` builds a multi-arch image for **amd64 and arm64** and publishes one tag: `ghcr.io/ackervekenbm/jukebox:latest`.
+Jukebox is **one Node process**: it serves the built client, the `/api` sync store and the same-origin `/discogs` proxy. It runs anywhere Node 22+ or Docker does.
 
-**Pull and run** on any machine with Docker (arm64 runs natively on a Raspberry Pi):
+| Route | Good for |
+| --- | --- |
+| [Prebuilt Docker image](docs/deploy/docker-image.md) | Anything with Docker — multi-arch (`amd64`/`arm64`), no build, easy updates and rollback |
+| [Docker, built from a checkout](docs/deploy/from-source-docker.md) | You want to patch it yourself, or can't pull an image |
+| [Bare Node](docs/deploy/from-source-node.md) | A host that already runs Node 22 (systemd + optional reverse proxy) |
+| [OpenMediaVault](docs/deploy/openmediavault.md) | The OMV Compose plugin (ports 80/443 are OMV's, so 8080) |
 
-```yaml
-services:
-  jukebox:
-    image: ghcr.io/ackervekenbm/jukebox:latest
-    ports:
-      - "8080:3000"
-    volumes:
-      - jukebox-data:/app/data
-    restart: unless-stopped
+Prerequisites, the shared port/environment contract, TLS and offline launch, backups, updates, rollback and troubleshooting live in **[docs/deploy/](docs/deploy/README.md)**.
 
-volumes:
-  jukebox-data:
-```
-
-**Or build from source:**
+Quickest start, on any machine with Docker:
 
 ```bash
-docker compose up --build    # serves on http://localhost:8080
+docker run -d --name jukebox -p 8080:3000 -v jukebox-data:/app/data \
+  --restart unless-stopped ghcr.io/ackervekenbm/jukebox:latest
 ```
 
-Notes for self-hosting:
+Then open <http://localhost:8080>. Three things hold for every route:
 
-- The volume at `/app/data` holds the app's small SQLite database (the cross-device sync store landing with the cabinet organizer). **Keep the volume** when redeploys happen — it's the one piece of server-side state; everything else lives in the browser, so `docker compose pull && docker compose up -d` is lossless for your collection data.
-- The server **proxies `/discogs` → `api.discogs.com`**. If you serve the static files some other way, you must replicate that proxy or API calls will run into Discogs' CORS/rate-limit wall (see the note under *How it works*).
-- **Offline launch needs HTTPS.** Over plain HTTP, iOS adds the app to the home screen fine (it honors the legacy `apple-*` meta tags) and the app runs as long as the server is up — but the service worker that allows launching with the server down only registers in a secure context, and the certificate must be one the device trusts. From least to most setup:
-
-  | Approach | What's needed | Notes |
-  | --- | --- | --- |
-  | **mkcert — your own local CA** | Install your CA profile once on each device | Fully self-hosted and offline; no external party involved |
-  | **Domain + Let's Encrypt** (DuckDNS + Caddy/nginx) | A free domain and a TLS reverse proxy; use the **DNS-01** challenge so no ports need to be opened | Public CA, so devices trust it with zero setup |
-  | **Tailscale** | Tailscale on the server and your devices | Free, auto-renewing Let's Encrypt certs on your private tailnet via `tailscale serve` |
-
-> The maintainer runs this at home on an OpenMediaVault box — the detailed step-by-step ops runbook lives in `AGENTS.md`.
+- **Keep the data volume.** `/app/data` holds the only server-side state (a small SQLite database with the cabinet layout); `GET /api/health` reports `{"ok":true,"db":true}` when it's writable. Everything else — collection, tracklists, saved views, settings — lives in your browser, so `docker compose pull && docker compose up -d` is lossless for your collection data.
+- **Serve it through the app's server.** The browser must reach Discogs through the same-origin `/discogs` proxy; serving `dist/` from a plain static server makes collection fetches fail with CORS/rate-limit noise (see the note under *How it works*).
+- **Offline launch needs HTTPS.** Over plain HTTP the app works and installs to the home screen on iOS (it honors the legacy `apple-*` meta tags), but the service worker that allows launching with the server down only registers in a secure context, with a certificate the device trusts — see [HTTPS & offline](docs/deploy/https-and-offline.md) for mkcert, Let's Encrypt (DNS-01) and Tailscale.
 
 ## Development
 
@@ -120,6 +106,7 @@ npm run build && npm test
 
 ```
 ├── Dockerfile / docker-compose.yml                  # containerized hosting (one Node process)
+├── docs/deploy/                                     # deployment guides: one file per route + operations
 ├── .github/
 │   ├── workflows/
 │   │   ├── ci.yml             # PR checks (type-check + lint + build + tests)

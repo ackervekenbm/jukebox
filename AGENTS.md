@@ -146,6 +146,12 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
 
 ## Deployment (internal)
 
+User-facing deployment guides live in `docs/deploy/` — one file per route, with
+`docs/deploy/README.md` as the decision guide and the shared port/env contract.
+This section is the maintainer-specific runbook: when a port, environment
+variable, image tag, the Dockerfile or a workflow changes, update
+`docs/deploy/` too (and the README pointer).
+
 The production host is a Raspberry Pi running **OpenMediaVault**. OMV's web UI
 owns ports 80/443, so the app is exposed on host port **8080**. One container,
 one node process: it serves the static build, the API and the `/discogs` proxy.
