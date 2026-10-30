@@ -14,6 +14,16 @@ npm run build     # = tsc --noEmit && eslint . && vite build && tsup (server)
 npm test          # unit tests (vitest) — jsdom for client, node for server
 ```
 
+Installs are **script-free**: `.npmrc` sets `ignore-scripts=true`.
+`better-sqlite3` ships `prebuilds/<platform>.node`, so nothing needs compiling,
+but npm would otherwise run its legacy implicit `node-gyp rebuild` on every
+install (its lockfile metadata drops the package's `gypfile: false`), which
+wants python3/make/g++ and discards the shipped binary. The Dockerfile relies on
+this — keep the install toolchain-free. The consequence: a dependency that
+genuinely needs an install/postinstall script cannot be added without revisiting
+`.npmrc`; prefer packages that ship prebuilds or use optional platform packages
+(esbuild does).
+
 **Verification for every change is `npm run build && npm test`.** CI runs the
 `check` job (`npm ci && npm run build && npm test`) on every PR, and a green
 `check` is required to merge. There is no other test suite.
