@@ -167,6 +167,31 @@ export function toDisplayRelease(
   }
 }
 
+/**
+ * The folder chips are a multi-select. An empty selection means "All", and
+ * folder 0 is Discogs' "All" folder, so it clears rather than adds.
+ */
+export type FolderSelection = readonly number[]
+
+/** Toggles one chip. Picking a folder while "All" is active narrows to it. */
+export function toggleFolder(selection: FolderSelection, id: number): number[] {
+  if (id === 0) return []
+  if (selection.length === 0) return [id]
+  if (selection.includes(id)) return selection.filter((entry) => entry !== id)
+  return [...selection, id]
+}
+
+/** Releases in any selected folder, or every release while nothing is picked. */
+export function selectFolderReleases<T extends { folder_id?: number }>(
+  releases: T[],
+  selection: FolderSelection,
+): T[] {
+  if (selection.length === 0) return releases
+  const wanted = new Set(selection)
+  // Discogs omits folder_id on some records; they count as Uncategorized (1).
+  return releases.filter((release) => wanted.has(release.folder_id ?? 1))
+}
+
 export function filterReleases(
   releases: DiscogsCollectionRelease[],
   options: FilterOptions,
