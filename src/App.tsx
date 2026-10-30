@@ -21,6 +21,8 @@ import {
   groupByDateAdded,
   toDisplayRelease,
   DEFAULT_FILTERS,
+  selectFolderReleases,
+  toggleFolder,
   type DisplayRelease,
   type Filters,
   type PressingGroup,
@@ -141,7 +143,9 @@ export default function App() {
   const [views, setViews] = useState<SavedView[]>(loadViews)
   const [viewsOpen, setViewsOpen] = useState(false)
   const [activeViewId, setActiveViewId] = useState<string | null>(null)
-  const [folderId, setFolderId] = useState(0)
+  // Collection folders on screen; empty means every folder ("All"). Folder
+  // chips are toggles so several folders can be browsed as one list.
+  const [folderSelection, setFolderSelection] = useState<number[]>([])
   const [artistSortMode, setArtistSortMode] = useState<ArtistSortMode>('chronological')
   const [viewMode, setViewMode] = useState<ViewMode>('artists')
   const [selected, setSelected] = useState<DisplayRelease | null>(null)
@@ -186,7 +190,7 @@ export default function App() {
     /* eslint-disable react-hooks/set-state-in-effect */
     setQuery('')
     setFilters(DEFAULT_FILTERS)
-    setFolderId(0)
+    setFolderSelection([])
     setArtistSortMode('chronological')
     setViewMode('artists')
     setSelected(null)
@@ -197,10 +201,18 @@ export default function App() {
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [accountKey])
 
-  const folderReleases = useMemo(() => {
-    if (folderId === 0) return releases
-    return releases.filter((release) => (release.folder_id ?? 1) === folderId)
-  }, [releases, folderId])
+  const folderReleases = useMemo(
+    () => selectFolderReleases(releases, folderSelection),
+    [releases, folderSelection],
+  )
+
+  // Scope suffix for the "nothing matches this view" message.
+  const folderScopeLabel =
+    folderSelection.length > 1
+      ? ' in these folders'
+      : folderSelection.length === 1
+        ? ' in this folder'
+        : ''
 
   const formats = useMemo(() => distinctFormats(folderReleases), [folderReleases])
   const genres = useMemo(() => distinctGenres(folderReleases), [folderReleases])
@@ -338,7 +350,7 @@ export default function App() {
   }
 
   const onFolderChange = (id: number) => {
-    setFolderId(id)
+    setFolderSelection((current) => toggleFolder(current, id))
     // Folder switching resets the filters, so a saved view is no longer what's
     // on screen: drop it rather than claim it is still applied.
     setFilters(DEFAULT_FILTERS)
@@ -580,20 +592,27 @@ export default function App() {
           )}
 
           {folders.length > 0 && (
-            <div className="folder-bar" role="tablist" aria-label="Collection folders">
-              {folders.map((folder) => (
-                <button
-                  key={folder.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={folderId === folder.id}
-                  className={`folder-chip${folderId === folder.id ? ' active' : ''}`}
-                  onClick={() => onFolderChange(folder.id)}
-                >
-                  <span className="folder-name">{folder.name}</span>
-                  <span className="folder-count">{folder.count.toLocaleString()}</span>
-                </button>
-              ))}
+            <div className="folder-bar" role="group" aria-label="Collection folders">
+              {folders.map((folder) => {
+                // "All" is the absence of a folder filter, so it is only active
+                // while no specific folder is picked.
+                const active =
+                  folder.id === 0
+                    ? folderSelection.length === 0
+                    : folderSelection.includes(folder.id)
+                return (
+                  <button
+                    key={folder.id}
+                    type="button"
+                    aria-pressed={active}
+                    className={`folder-chip${active ? ' active' : ''}`}
+                    onClick={() => onFolderChange(folder.id)}
+                  >
+                    <span className="folder-name">{folder.name}</span>
+                    <span className="folder-count">{folder.count.toLocaleString()}</span>
+                  </button>
+                )
+              })}
             </div>
           )}
 
@@ -712,7 +731,7 @@ export default function App() {
             <div className="full-state empty">
               <p>
                 {activeView
-                  ? `Nothing matches “${activeView.name}”${folderId === 0 ? '' : ' in this folder'}.`
+                  ? `Nothing matches “${activeView.name}”${folderScopeLabel}.`
                   : 'No releases match your search or filters.'}
               </p>
               {activeView && (

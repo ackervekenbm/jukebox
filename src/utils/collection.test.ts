@@ -17,8 +17,10 @@ import {
   groupByDateAdded,
   groupPressings,
   groupReleases,
+  selectFolderReleases,
   sortPressingGroups,
   toDisplayRelease,
+  toggleFolder,
   yearBounds,
   DEFAULT_FILTERS,
   type FilterOptions,
@@ -731,5 +733,45 @@ describe('computeCollectionStats', () => {
     expect(stats.totalReleases).toBe(0)
     expect(stats.topGenres).toEqual([])
     expect(stats.yearDistribution).toEqual([])
+  })
+})
+
+describe('toggleFolder', () => {
+  it('adds, removes and clears', () => {
+    expect(toggleFolder([], 7)).toEqual([7])
+    expect(toggleFolder([7], 9)).toEqual([7, 9])
+    expect(toggleFolder([7, 9], 7)).toEqual([9])
+    expect(toggleFolder([7, 9], 0)).toEqual([])
+  })
+
+  it('narrows to the picked folder instead of adding it to "All"', () => {
+    // With nothing selected the listing is everything, so the first chip is a
+    // replacement: "All" + one folder would still be "All".
+    expect(toggleFolder([], 9)).toEqual([9])
+  })
+
+  it('falls back to "All" when the last chip is switched off', () => {
+    expect(toggleFolder([7], 7)).toEqual([])
+  })
+})
+
+describe('selectFolderReleases', () => {
+  const releases = [
+    release({ id: 1, folder_id: 1 }),
+    release({ id: 2, folder_id: 7 }),
+    release({ id: 3, folder_id: 9 }),
+    release({ id: 4 }),
+  ]
+
+  it('returns everything for an empty selection', () => {
+    expect(selectFolderReleases(releases, [])).toHaveLength(4)
+  })
+
+  it('unions the selected folders', () => {
+    expect(selectFolderReleases(releases, [7, 9]).map((r) => r.id)).toEqual([2, 3])
+  })
+
+  it('treats a missing folder_id as Uncategorized (1)', () => {
+    expect(selectFolderReleases(releases, [1]).map((r) => r.id)).toEqual([1, 4])
   })
 })
