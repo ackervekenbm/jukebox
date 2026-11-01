@@ -62,9 +62,8 @@ docker run -d --name jukebox -p 8080:3000 -v jukebox-data:/app/data \
   --restart unless-stopped ghcr.io/ackervekenbm/jukebox:latest
 ```
 
-The image is `amd64`/`arm64` only (a Pi needs a 64-bit OS), and GHCR usually
-wants a login first because anonymous pulls are rate-limited: `docker login
-ghcr.io` with a GitHub classic token that has `read:packages`.
+The image is public (no `docker login` needed) and built for `amd64`/`arm64`
+only — a Pi needs a 64-bit OS.
 
 Then open <http://localhost:8080>. Three things hold for every route:
 

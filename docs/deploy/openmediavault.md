@@ -2,7 +2,7 @@
 
 The reference deployment: a Raspberry Pi running OpenMediaVault with the Docker
 and Compose plugins, serving the app on host port **8080**. Everything happens in
-the OMV web UI after a one-time registry login over SSH.
+the OMV web UI.
 
 ## Why port 8080
 
@@ -19,20 +19,21 @@ use `8080`. These are host-side choices; leave the container port alone.
   Raspberry Pi OS fails with `exec format error`; `better-sqlite3` has no `armv7`
   prebuild either. Use the 64-bit Raspberry Pi OS image.
 
-## One-time: log in to GHCR over SSH
+## If a pull is denied
 
-GHCR serves public images anonymously, but those pulls are rate-limited and
-usually fail the plugin's **Pull** with an auth error. Logging in once fixes it.
-On the OMV host:
+The image is public, so the plugin pulls it anonymously — there is no required
+login. If **Pull** fails with an authentication error (stale credentials on the
+host, or you switched to a private fork), log in once over SSH with a GitHub
+**classic** personal access token that has `read:packages`
+(<https://github.com/settings/tokens> → *Tokens (classic)*; fine-grained tokens
+don't work with GitHub Packages):
 
 ```bash
 sudo docker login ghcr.io -u <your-github-username>
 ```
 
-Password: a GitHub **classic** personal access token with `read:packages`
-(<https://github.com/settings/tokens> → *Tokens (classic)*). Fine-grained tokens
-don't work with GitHub Packages. Give it an expiry ≤ 1 year; when it lapses the
-web UI's **Pull** fails with an auth error and this login has to be redone.
+Keep the token's expiry ≤ 1 year; when it lapses **Pull** fails again and the
+login has to be redone. `sudo docker logout ghcr.io` returns to anonymous pulls.
 
 ## Create the stack (web UI)
 
@@ -76,7 +77,8 @@ Verify: **Services → Compose → Services** shows the container as running, an
 - **Pull** fetches `:latest`; if the image hasn't changed it's a no-op.
 - **Up** recreates the container when the image did change. The named volume is
   kept, so the cabinet sync data survives.
-- If **Pull** fails with an authentication error, redo the SSH login above.
+- If **Pull** fails with an authentication error, see
+  [If a pull is denied](#if-a-pull-is-denied).
 
 Phone/browser side: a plain reload picks up the new build (the server sends
 `no-cache` for `index.html` and `sw.js`). Force-refresh once if a stale service

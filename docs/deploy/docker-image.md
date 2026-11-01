@@ -22,19 +22,22 @@ Pi needs a 64-bit OS (32-bit Raspberry Pi OS fails with `exec format error`).
 Images are only rebuilt when app paths change on `main` (`src/**`, `Dockerfile`,
 `package.json`, …) — a docs-only merge leaves the current `:latest` in place.
 
-## Pull: log in once
+## Pull
 
-GHCR serves public images anonymously, but those pulls are rate-limited and often
-fail with `denied`/`unauthorized`. Logging in once makes them reliable. Use a
-GitHub **classic** personal access token with `read:packages`:
+The image is **public**, so `docker pull` and `docker compose pull` work without
+a login — no `docker login` step.
+
+If a pull is refused with `denied`/`unauthorized` (stale credentials on the host,
+a private fork, or a package that was switched back to private), log in with a
+GitHub **classic** personal access token that has `read:packages` — fine-grained
+tokens don't work with GitHub Packages:
 
 ```bash
 echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u <your-github-username> --password-stdin
 ```
 
-Fine-grained tokens don't work with GitHub Packages. Keep the token's expiry ≤ 1
-year and redo the login when it lapses (symptom: `denied`/`unauthorized` on
-`docker pull`).
+Keep that token's expiry ≤ 1 year and redo the login when it lapses;
+`sudo docker logout ghcr.io` returns you to anonymous pulls.
 
 ## Run it
 
@@ -117,5 +120,5 @@ three self-hosting certificate options.
 ## Next
 
 - [operations.md](operations.md) — env vars, backups, health monitoring, log rotation
-- [troubleshooting.md](troubleshooting.md) — arch mismatch, `db:false`, GHCR auth
+- [troubleshooting.md](troubleshooting.md) — arch mismatch, `db:false`, `denied` pulls
 - [openmediavault.md](openmediavault.md) — the same image, via the OMV plugin

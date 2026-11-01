@@ -29,7 +29,7 @@ dir, config, wrong port).
 | `/discogs` → `502 {"error":"Discogs API is unreachable"}` | The host can't reach `api.discogs.com`, or the call exceeded `DISCOGS_TIMEOUT_MS` | Check outbound DNS/HTTPS from the host; raise the timeout if Discogs is just slow |
 | Proxy answers `502` / connection refused, app is "up" | Proxy points at `3000` when only `8080` is published | Point it at the published host port — [https-and-offline.md](https-and-offline.md#topology) |
 | `[jukebox] no client build found; serving API only` | Started without a client build | `npm run build`; or set `CLIENT_DIST` |
-| `docker pull` → `denied` / `unauthorized` | GHCR login missing/expired, or a fine-grained token | Redo `docker login ghcr.io` with a classic PAT (`read:packages`) |
+| `docker pull` → `denied` / `unauthorized` | Rare: the image is public, so this is a stale/incorrect local credential (or a private fork) | `docker logout ghcr.io` for anonymous pulls, or log in with a classic PAT (`read:packages`) — fine-grained tokens don't work with Packages |
 | `exec format error` | Single-arch image for the wrong CPU, or 32-bit Raspberry Pi OS (the image is `amd64`/`arm64` only) | Use `:latest` (multi-arch) or the right `-amd64`/`-arm64` tag; on a Pi, install 64-bit Raspberry Pi OS |
 | Old UI after a deploy | Service worker still holding the old shell | Force-refresh; or unregister the SW in DevTools → Application |
 | Collection never loads, console shows CORS/429 | `dist/` served by a static server instead of the Node process | Proxy `/` (including `/discogs`) to the app |

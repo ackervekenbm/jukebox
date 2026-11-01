@@ -16,7 +16,7 @@ layout so it can follow you between devices.
 
 | Route | Guide | Good for | Needs |
 | --- | --- | --- | --- |
-| **Prebuilt image** | [docker-image.md](docker-image.md) | Anything with Docker. Multi-arch (`amd64` + `arm64`), no build step, easy updates and rollback | Docker, a GHCR login |
+| **Prebuilt image** | [docker-image.md](docker-image.md) | Anything with Docker. Public image, multi-arch (`amd64` + `arm64`), no build step, easy updates and rollback | Docker |
 | **Build from a checkout (Docker)** | [from-source-docker.md](from-source-docker.md) | A variant you patch yourself, or a host that shouldn't pull an image | Docker, git |
 | **Bare Node** | [from-source-node.md](from-source-node.md) | A box that already runs Node 22 (systemd + optional reverse proxy) | Node 22+, git, 64-bit OS |
 | **OpenMediaVault** | [openmediavault.md](openmediavault.md) | The OMV Compose plugin (this is what the maintainer runs) | OMV + Docker/Compose plugins |

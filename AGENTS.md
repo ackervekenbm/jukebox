@@ -172,18 +172,17 @@ matrix and the Dockerfile.
   it, poll `/api/health` and assert the PWA cache headers — the image only
   publishes when smoke passes. The tag derives from
   `${{ github.repository }}`, so it follows repo renames.
-- **GHCR login (one-time per host).** GHCR serves public images anonymously,
-  but those pulls are rate-limited and often fail with `denied`; log in over
-  SSH:
+- **GHCR pull.** The package is public, so `docker pull` and the OMV plugin's
+  **Pull** work anonymously — there is no one-time login. If a pull is ever
+  denied (`denied`/`unauthorized`), log in over SSH with a GitHub **classic**
+  personal access token that has `read:packages` (fine-grained tokens don't
+  support GitHub Packages):
   ```bash
   sudo docker login ghcr.io -u ackervekenbm
   ```
-  The password is a GitHub **classic** personal access token (fine-grained
-  tokens don't support GitHub Packages). Create one at
-  https://github.com/settings/tokens → *Tokens (classic)* → tick `read:packages`
-  (add `repo` too if you also `git pull` on the Pi with the same token). Keep
-  the expiry to ≤1 year and re-login when it lapses — a classic token can reach
-  everything your account can, so never paste it anywhere public.
+  `sudo docker logout ghcr.io` returns to anonymous pulls. Keep any token's
+  expiry ≤ 1 year, and never paste it anywhere public — a classic token can
+  reach everything your account can.
 - **Route A — prebuilt image (all via the OMV web UI, no building on the Pi).**
   With omv-extras installed and Docker + the Compose plugin enabled
   (Services → Compose): create a compose file `jukebox.yml`:
@@ -203,9 +202,9 @@ matrix and the Dockerfile.
   ```
   Save → select it → **Up** (creates/starts the container; open
   `http://<pi-ip>:8080`). To update after a merge: select → **Pull** → **Up**
-  (an unchanged image is a no-op; the volume keeps the sync DB). If **Pull**
-  fails with an auth error, redo the SSH login first. The app is plain HTTP:
-  a normal phone refresh picks up the new build (the server sends
+  (an unchanged image is a no-op; the volume keeps the sync DB). **Pull** works
+  anonymously; if it returns an auth error, see the GHCR note above. The app is
+  plain HTTP: a normal phone refresh picks up the new build (the server sends
   `Cache-Control: no-cache` for `index.html`); force-refresh once if a tab
   looks stale.
 - **Route B — build on the Pi** (e.g. local variants):
