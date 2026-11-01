@@ -1,7 +1,9 @@
 # Docker image (prebuilt)
 
-Pull the published multi-arch image — no source, no build. This is the shortest
-path and the one to prefer for a home server.
+Part of the [deployment guides](README.md).
+
+Pull the published image: no source, no build. This is the shortest path and the
+one to prefer for a home server.
 
 ```
 ghcr.io/ackervekenbm/jukebox
@@ -9,8 +11,8 @@ ghcr.io/ackervekenbm/jukebox
 
 ## What you need
 
-- Docker Engine or Docker Desktop. The Compose v2 plugin is only needed for the
-  compose variant.
+- Docker Engine or Docker Desktop. The Compose v2 plugin (`docker compose`) is
+  only needed for the compose variant.
 - A 64-bit `amd64` or `arm64` host. On a Raspberry Pi that means the 64-bit OS
   ([why](README.md#the-contract-every-route-shares)).
 - No source, Node or login: the image is public.
@@ -19,32 +21,16 @@ ghcr.io/ackervekenbm/jukebox
 
 | Tag | What it is |
 | --- | --- |
-| `:latest` | Multi-arch index (linux/amd64 + linux/arm64), built from `main` |
-| `:<sha7>` | Multi-arch index for one commit, e.g. `:351e79b` |
-| `:latest-amd64`, `:latest-arm64` | Single-architecture images |
-| `:<full-sha>-amd64`, `:<full-sha>-arm64` | Single-architecture, per commit |
+| `:latest` | The newest build of `main`, for both `amd64` and `arm64` |
+| `:<sha7>` | The build of one commit, both architectures, e.g. `:351e79b` |
+| `:latest-amd64`, `:latest-arm64` | The newest build, one architecture only |
+| `:<full-sha>-amd64`, `:<full-sha>-arm64` | One commit, one architecture |
 
-`:latest` resolves to the right architecture per host, so the same compose file
-works on an x86 box and on a Raspberry Pi. Images are only built from `main`,
-and only when app paths change (`src/**`, `Dockerfile`, `package.json`, …): a
-docs-only merge leaves the current `:latest` in place.
-
-## Pull
-
-The image is **public**, so `docker pull` and `docker compose pull` work without
-a login — no `docker login` step.
-
-If a pull is refused with `denied`/`unauthorized` (stale credentials on the host,
-a private fork, or a package that was switched back to private), log in with a
-GitHub **classic** personal access token that has `read:packages` — fine-grained
-tokens don't work with GitHub Packages:
-
-```bash
-echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u <your-github-username> --password-stdin
-```
-
-Keep that token's expiry ≤ 1 year and redo the login when it lapses;
-`sudo docker logout ghcr.io` returns you to anonymous pulls.
+`:latest` and `:<sha7>` are multi-arch: Docker picks the right architecture for
+the host, so the same compose file works on an x86 box and on a Raspberry Pi.
+Images are only built from `main`, and only when app paths change (`src/**`,
+`Dockerfile`, `package.json`, …): a docs-only merge leaves `:latest` as it was
+and gets no tag of its own.
 
 ## Run it
 
@@ -52,19 +38,29 @@ Keep that token's expiry ≤ 1 year and redo the login when it lapses;
 docker run -d --name jukebox \
   -p 8080:3000 \
   -v jukebox-data:/app/data \
+  --log-opt max-size=10m --log-opt max-file=3 \
   --restart unless-stopped \
   ghcr.io/ackervekenbm/jukebox:latest
 ```
 
-→ <http://localhost:8080>. `docker ps` shows `healthy` once the built-in
-`HEALTHCHECK` passes ([what it checks](operations.md#health-and-monitoring)). An
-unwritable `/app/data` makes the container exit at start-up instead
-([troubleshooting.md](troubleshooting.md#the-container-restarts-in-a-loop)).
+Open <http://localhost:8080>, or `http://<server-ip>:8080` from another device.
 
-Port `3000` is fixed inside the image — the healthcheck probes it. To serve on
-port `80`, change the **host** side of the mapping (`80:3000`), not `PORT`.
+- `docker ps` shows `healthy` once the built-in `HEALTHCHECK` passes
+  ([what it checks](operations.md#health-and-monitoring)). An unwritable
+  `/app/data` makes the container exit at start-up instead
+  ([troubleshooting](troubleshooting.md#the-container-restarts-in-a-loop)).
+- Port `3000` is fixed inside the image, because the healthcheck probes it. To
+  serve on another port, change the **host** side of the mapping (`80:3000`),
+  not `PORT`.
+- `-p 8080:3000` listens on every network interface. With a reverse proxy on the
+  same host, use `-p 127.0.0.1:8080:3000` so only the proxy can reach it
+  ([why](README.md#keep-it-on-your-lan-or-tailnet)).
+- The `--log-opt` flags cap the container log at 30 MB. Without them it grows
+  until the disk is full, and a full disk is how SQLite starts failing.
 
-Or as a compose file:
+## Or with compose
+
+Make an empty folder, e.g. `~/jukebox`, and save this in it as `compose.yaml`:
 
 ```yaml
 services:
@@ -72,52 +68,42 @@ services:
     image: ghcr.io/ackervekenbm/jukebox:latest
     container_name: jukebox
     ports:
-      - "8080:3000"
+      - "8080:3000"          # "127.0.0.1:8080:3000" behind a reverse proxy on this host
     volumes:
       - jukebox-data:/app/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: unless-stopped
 
 volumes:
   jukebox-data:
-    name: jukebox-data    # same volume as the docker run command above
+    name: jukebox-data       # the same volume as the docker run command above
 ```
 
-`name:` stops compose from prefixing the volume with the project directory, so
-this file and the `docker run` command use the same `jukebox-data` volume. To
-switch from `docker run` to compose, remove the old container first
-(`docker rm -f jukebox`); the data stays in the volume. Without `name:`, compose
-would create `<dir>_jukebox-data` and start empty.
+Then, in that folder:
 
 ```bash
 docker compose up -d
 docker compose logs -f jukebox
 ```
 
-## Pin a version, roll back
+`name:` stops compose from prefixing the volume with the folder name, so this
+file and the `docker run` command share the `jukebox-data` volume. Without it,
+compose would create `jukebox_jukebox-data` and start with an empty cabinet.
 
-`:latest` is convenient but not reproducible. Pin the commit you verified:
-
-```yaml
-    image: ghcr.io/ackervekenbm/jukebox:351e79b    # a commit that has an image tag
-```
-
-Not every `main` commit has a tag. Docs-only merges build no image, so pick a SHA
-that is listed on the
-[package page](https://github.com/ackervekenbm/jukebox/pkgs/container/jukebox).
-
-Rolling back is the same edit with an older SHA, then `docker compose up -d`
-(the data volume is untouched, so the cabinet layout survives either way). For a
-byte-for-byte pin, use the digest of an image you **pulled**:
-
-```bash
-docker image inspect ghcr.io/ackervekenbm/jukebox:latest \
-  --format '{{index .RepoDigests 0}}'
-# ghcr.io/ackervekenbm/jukebox@sha256:…
-```
+**Switching from `docker run` to compose:** remove the old container first
+(`docker rm -f jukebox`); the data stays in the volume. Compose then warns
+`volume "jukebox-data" already exists but was not created by Docker Compose`.
+That is expected: it is the volume `docker run` made, and compose uses it as is.
 
 ## Update
 
-With compose:
+Take a [backup](operations.md#backups) first if the cabinet matters to you.
+
+With compose, in the folder with `compose.yaml`:
 
 ```bash
 docker compose pull && docker compose up -d
@@ -129,23 +115,74 @@ With `docker run`, pull and recreate with the same flags:
 docker pull ghcr.io/ackervekenbm/jukebox:latest
 docker rm -f jukebox
 docker run -d --name jukebox -p 8080:3000 -v jukebox-data:/app/data \
+  --log-opt max-size=10m --log-opt max-file=3 \
   --restart unless-stopped ghcr.io/ackervekenbm/jukebox:latest
 ```
 
-Only the container is replaced; `jukebox-data` (the SQLite database) stays. Then
-refresh the browser tab — `index.html` and `sw.js` are served `no-cache`, so a
-normal reload picks up the new build; force-refresh once if a stale service
-worker is still holding the old shell.
+Only the container is replaced; the `jukebox-data` volume (the SQLite database)
+stays. Devices pick up the new build on their own
+([details](operations.md#devices-after-an-update)).
+
+## Pin a version, roll back
+
+`:latest` is convenient but not reproducible. Pin a commit tag instead:
+
+```yaml
+    image: ghcr.io/ackervekenbm/jukebox:351e79b
+```
+
+Only commits that changed the app have a tag, so pick one from the
+[package page](https://github.com/ackervekenbm/jukebox/pkgs/container/jukebox).
+
+Rolling back is the same edit with an older tag, then `docker compose up -d`.
+With `docker run`, run the update commands above with the older tag in place of
+`:latest`. The data volume is untouched either way.
+
+For a byte-for-byte pin, use the digest of an image you **pulled**:
+
+```bash
+docker image inspect ghcr.io/ackervekenbm/jukebox:latest \
+  --format '{{index .RepoDigests 0}}'
+# ghcr.io/ackervekenbm/jukebox@sha256:…
+```
+
+## If a pull is denied
+
+The image is public, so pulls normally need no login. A `denied` or
+`unauthorized` error usually means the host has stale GitHub credentials stored:
+
+```bash
+sudo docker logout ghcr.io
+```
+
+Try the pull again. If you really need a login (a private fork, or the package
+was made private), use a GitHub **classic** personal access token with only the
+`read:packages` scope (<https://github.com/settings/tokens> → *Tokens
+(classic)*; fine-grained tokens don't work with GitHub Packages). Give it a short
+expiry, e.g. 30 days. Type it in rather than putting it on the command line, so
+it stays out of your shell history:
+
+```bash
+read -rsp 'GitHub token: ' GHCR_TOKEN; echo
+GH_USER=your-github-username
+printf '%s' "$GHCR_TOKEN" | sudo docker login ghcr.io -u "$GH_USER" --password-stdin
+unset GHCR_TOKEN
+# pull, then:
+sudo docker logout ghcr.io
+```
+
+`docker login` stores the token in `/root/.docker/config.json`, base64-encoded
+but not encrypted, which is why logging out again after the pull is worth it.
 
 ## Behind a proxy / with HTTPS
 
-The image serves plain HTTP on `3000`; TLS is a reverse proxy's job. See
+The image serves plain HTTP on `3000`; HTTPS is a reverse proxy's job. See
 [https-and-offline.md](https-and-offline.md) for Caddy/nginx examples and the
 three self-hosting certificate options.
 
 ## Next
 
-- [operations.md](operations.md) — env vars, backups, health monitoring, log rotation
-- [troubleshooting.md](troubleshooting.md) — arch mismatch, `db:false`, `denied` pulls
+- [operations.md](operations.md) — backups, health monitoring, env vars, logs
+- [troubleshooting.md](troubleshooting.md) — when something doesn't work
 - [openmediavault.md](openmediavault.md) — the same image, via the OMV plugin
 - Back to the overview: [docs/deploy/README.md](README.md)

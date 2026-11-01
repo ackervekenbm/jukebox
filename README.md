@@ -59,17 +59,19 @@ Quickest start, on any machine with Docker:
 
 ```bash
 docker run -d --name jukebox -p 8080:3000 -v jukebox-data:/app/data \
+  --log-opt max-size=10m --log-opt max-file=3 \
   --restart unless-stopped ghcr.io/ackervekenbm/jukebox:latest
 ```
 
 The image is public (no `docker login` needed) and built for `amd64`/`arm64`
 only — a Pi needs a 64-bit OS.
 
-Then open <http://localhost:8080>. Three things hold for every route:
+Then open <http://localhost:8080>. Four things hold for every route:
 
-- **Keep the data volume.** `/app/data` holds the only server-side state (a small SQLite database with the cabinet layout). Everything else lives in your browser: collection, tracklists, saved views and settings. Re-pulling the image and recreating the container is lossless as long as the new container mounts the same volume. Each route keeps its data in a different place, so check [where yours is](docs/deploy/operations.md#find-your-data-first) before you back up or switch routes.
+- **Keep it on your LAN or tailnet.** Jukebox has no login, so don't expose it to the internet ([why](docs/deploy/README.md#keep-it-on-your-lan-or-tailnet)).
+- **Keep the data directory** (`/app/data` in the image). It holds the only server-side state, a small SQLite database with the cabinet layout. Everything else lives in your browser: collection, tracklists, saved views and settings. Updating is lossless as long as the new container or process uses the same data. Each route keeps it in a different place, so check [where yours is](docs/deploy/operations.md#find-your-data-first) before you back up or switch routes.
 - **Serve it through the app's server.** The browser must reach Discogs through the same-origin `/discogs` proxy; serving `dist/` from a plain static server makes collection fetches fail with CORS/rate-limit noise (see the note under *How it works*).
-- **Offline launch needs HTTPS.** Over plain HTTP the app works and installs to the home screen on iOS (it honors the legacy `apple-*` meta tags), but the service worker that allows launching with the server down only registers in a secure context, with a certificate the device trusts — see [HTTPS & offline](docs/deploy/https-and-offline.md) for mkcert, Let's Encrypt (DNS-01) and Tailscale.
+- **Offline launch needs HTTPS.** Over plain HTTP the app works and installs to the home screen on iOS, but the service worker that lets it open with the server down only runs over HTTPS, with a certificate the device trusts. See [HTTPS & offline](docs/deploy/https-and-offline.md) for Tailscale, Let's Encrypt via DuckDNS, and mkcert.
 
 ## Development
 

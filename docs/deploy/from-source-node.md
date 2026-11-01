@@ -1,65 +1,62 @@
 # Bare Node (from a checkout)
 
+Part of the [deployment guides](README.md).
+
 Run the built server directly under Node, with systemd keeping it alive. Use
 this when the host already runs Node and you'd rather not add Docker.
 
 ## What you need
 
-- **Node 22 or newer** (`package.json` engines) and `git`.
+- **Node 22 or newer** (`package.json` engines) and `git`. Check with `node -v`.
+  Debian 12 and Raspberry Pi OS (bookworm) ship Node 18 in `apt`, which is too
+  old. Install 22 from [NodeSource](https://github.com/nodesource/distributions)
+  instead (read the script before you pipe it to a shell):
+
+  ```bash
+  curl -fsSL https://deb.nodesource.com/setup_22.x -o nodesource_setup.sh
+  sudo bash nodesource_setup.sh
+  sudo apt install -y nodejs git
+  ```
+
+  That puts Node at `/usr/bin/node`, which the unit below expects.
 - **A 64-bit OS** (`x64` or `arm64`; on a Pi, `uname -m` must say `aarch64`).
   On 32-bit the build succeeds but `npm start` fails; see
   [64-bit only](README.md#the-contract-every-route-shares).
-- No C compiler, Python or `make`: nothing is compiled at install time, so a
-  minimal host is enough.
-- Optional: a reverse proxy for a hostname/TLS - see
-  [https-and-offline.md](https-and-offline.md). For direct LAN access you can
-  skip it, but then the process must listen on more than loopback (below).
+- No C compiler, Python or `make`: nothing is compiled at install time.
+- Enough memory to build. `npm run build` type-checks, lints and bundles the
+  client on the machine itself. On a 2 GB Raspberry Pi that takes several minutes
+  and most of the memory. To avoid that, build on another machine and
+  [ship a tarball](#shipping-a-tarball).
+- Optional: a reverse proxy for a hostname and HTTPS, see
+  [https-and-offline.md](https-and-offline.md).
 
-## Build and run
+## Install as a service
+
+The checkout lives in `/opt/jukebox`, the database in `/var/lib/jukebox`, and a
+system user `jukebox` owns both. The user's home, `/var/cache/jukebox`, only
+holds npm's download cache.
+
+**1. Create the service user:**
 
 ```bash
-git clone https://github.com/ackervekenbm/jukebox.git
-cd jukebox
-npm ci
-npm run build          # tsc + eslint + vite build (dist/) + tsup (dist-server/)
+sudo useradd --system --create-home --home-dir /var/cache/jukebox \
+  --shell /usr/sbin/nologin jukebox
+sudo install -d -o jukebox -g jukebox /opt/jukebox
 ```
 
-Start it:
+**2. Clone and build as that user**, so the tree the service reads is the one it
+wrote. `-H` sets `HOME` to the user's home; without it `npm ci` tries to cache
+into `/root/.npm` and fails with `EACCES`:
 
 ```bash
-NODE_ENV=production \
-HOST=127.0.0.1 \
-PORT=3000 \
-DATA_DIR="$PWD/data" \
-npm start              # = node dist-server/index.js
+sudo -u jukebox -H git clone https://github.com/ackervekenbm/jukebox.git /opt/jukebox
+sudo -u jukebox -H bash -c 'cd /opt/jukebox && npm ci && npm run build'
 ```
 
-- `npm start` serves the client **and** the API. There is no separate static
-  server step: `dist/` is picked up from `CLIENT_DIST` (default `./dist`).
-- The server logs `[jukebox] http://127.0.0.1:3000 (client + API)` on boot. If it
-  logs `no client build found; serving API only`, run `npm run build` first (or
-  point `CLIENT_DIST` at the right directory).
-- **`HOST` defaults to `127.0.0.1`** — that is deliberate. Behind a reverse proxy
-  on the same machine, leave it. To reach the app directly from other devices on
-  the LAN, set `HOST=0.0.0.0`, which listens on every interface. Jukebox has no
-  login, so do that only on a trusted network
-  ([why](README.md#keep-it-on-your-lan-or-tailnet)).
-- `DATA_DIR` is created if missing and must be writable; it holds `jukebox.db`
-  (plus `-wal`/`-shm` while running).
-- If the data directory can't be opened (permissions, wrong ownership,
-  read-only mount) the process **exits during start-up** instead of answering
-  500 — `systemctl status` and the journal show the SQLite error. `/api/health`
-  will never respond in that state.
+**3. Write the unit:**
 
-The snippet above keeps the database in `./data`, owned by whoever ran it. The
-systemd unit below moves it to `/var/lib/jukebox` instead, so that the service
-user — not you — owns it.
-
-## systemd unit
-
-`/etc/systemd/system/jukebox.service`:
-
-```ini
+```bash
+sudo tee /etc/systemd/system/jukebox.service >/dev/null <<'EOF'
 [Unit]
 Description=Jukebox (Discogs collection browser)
 After=network-online.target
@@ -74,14 +71,17 @@ Environment=NODE_ENV=production
 Environment=HOST=127.0.0.1
 Environment=PORT=3000
 Environment=DATA_DIR=/var/lib/jukebox
-# Creates /var/lib/jukebox owned by User= and keeps it writable under
-# ProtectSystem=strict below.
+# Creates /var/lib/jukebox for User=, readable by it only, and keeps it
+# writable under ProtectSystem=strict below.
 StateDirectory=jukebox
+StateDirectoryMode=0700
+# New files (the database) are readable by the service user only.
+UMask=0077
 ExecStart=/usr/bin/node dist-server/index.js
 Restart=on-failure
 RestartSec=5
 
-# Optional hardening: the app only reads /opt/jukebox and writes DATA_DIR.
+# Hardening: the app only reads /opt/jukebox and writes DATA_DIR.
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
@@ -89,59 +89,84 @@ ProtectHome=yes
 
 [Install]
 WantedBy=multi-user.target
+EOF
 ```
 
-`ExecStart` assumes Node is at `/usr/bin/node` (distro package or NodeSource). If
-you installed it with `nvm`/`fnm` it lives under `$HOME`, which `ProtectHome=yes`
-in the unit hides from the service: either install Node system-wide, or drop
-`ProtectHome=yes` and point `ExecStart` at that interpreter's absolute path.
+**4. Start it:**
 
 ```bash
-sudo useradd --system --home /opt/jukebox --shell /usr/sbin/nologin jukebox
-sudo mkdir -p /opt/jukebox
-sudo chown -R jukebox: /opt/jukebox     # /var/lib/jukebox comes from StateDirectory=
-
-# Clone and build as the service user, so the tree it reads at runtime is the
-# one it wrote (a root-owned checkout breaks `npm run build` and later updates).
-# `-H` matters: without it sudo keeps HOME=/root and `npm ci` dies with
-# EACCES on /root/.npm, because it caches into $HOME.
-sudo -u jukebox -H git clone https://github.com/ackervekenbm/jukebox.git /opt/jukebox
-sudo -u jukebox -H bash -c 'cd /opt/jukebox && npm ci && npm run build'
-
 sudo systemctl daemon-reload
 sudo systemctl enable --now jukebox
 curl -fsS http://127.0.0.1:3000/api/health     # {"ok":true,"db":true}
 ```
 
-`WorkingDirectory=/opt/jukebox` is where `CLIENT_DIST`'s default `./dist`
-resolves from, and it is why the checkout has to live there. `DATA_DIR` is set
-explicitly in the unit; if you install somewhere else, change both.
+The server logs `[jukebox] http://127.0.0.1:3000 (client + API)` on boot
+(`journalctl -u jukebox`). It serves the client **and** the API; there is no
+separate static server step.
 
-The process handles `SIGTERM`/`SIGINT`: it stops accepting connections, closes
-the database and exits (force-exit after 10s), so `systemctl restart` is clean.
+### What the unit relies on
+
+- **`WorkingDirectory=/opt/jukebox`** is where the default `CLIENT_DIST=./dist`
+  resolves from. If you install somewhere else, change it and `DATA_DIR`
+  together.
+- **`HOST=127.0.0.1`** is deliberate: a reverse proxy on the same machine reaches
+  it, nothing else does. To reach the app directly from other devices, set
+  `HOST=0.0.0.0`, which listens on every interface. Jukebox has no login, so do
+  that only on a trusted network
+  ([why](README.md#keep-it-on-your-lan-or-tailnet)).
+- **`/usr/bin/node`** is where NodeSource installs Node. With `nvm`/`fnm`, Node
+  lives under a home directory that `ProtectHome=yes` hides from the service:
+  install Node system-wide, or drop `ProtectHome=yes` and point `ExecStart` at
+  that interpreter's absolute path.
+- **An unwritable data directory** makes the process exit during start-up
+  instead of answering 500, and `/api/health` never responds. `systemctl status
+  jukebox` and the journal show the SQLite error.
+- **Shutdown** is clean: on `SIGTERM` it stops accepting connections, closes the
+  database and exits (forced after 10 s).
 
 ## Updating
 
-Take a [backup](operations.md#backups) first, then stop the service before
-building:
+Take a [backup](operations.md#backups) first. Note the commit you are on, so you
+can roll back to it, then stop the service and build:
 
 ```bash
+PREV=$(sudo -u jukebox bash -c 'cd /opt/jukebox && git rev-parse --short HEAD'); echo "$PREV"
 sudo systemctl stop jukebox
-sudo -u jukebox -H bash -c 'cd /opt/jukebox && git pull --ff-only && npm ci && npm run build'
+sudo -u jukebox -H bash -c 'cd /opt/jukebox && git switch main && git pull --ff-only && npm ci && npm run build'
 sudo systemctl start jukebox
 ```
 
 The service has to be stopped because the build is destructive while it runs:
 `npm ci` deletes `node_modules`, `vite build` empties `dist/` and `tsup --clean`
-deletes `dist-server/`, so a running server would serve 404s for the whole
-build. If the build fails partway (type-check or lint run first), the tree is
-half-cleaned and the service can't start. Go back to the last good commit with
-`git checkout <previous-sha>` and run the same `npm ci && npm run build`. For an
-update with no downtime, build in a second checkout and point
-`WorkingDirectory` at it.
+deletes `dist-server/`, so a running server would answer with 404s. `git switch
+main` makes the update work after a rollback too, which leaves the checkout on a
+detached commit. For an update with no downtime, build in a second checkout and
+point `WorkingDirectory` at it.
 
-Build as the service user (`jukebox`), not as root: a root-owned
-`dist-server/` still runs, but the next update as `jukebox` fails on permissions.
+Always build as the service user, never as root: a root-owned `dist-server/`
+still runs, but the next update as `jukebox` fails on permissions.
+
+## Rolling back
+
+To go back to the commit you noted (or any other), check it out and rebuild the
+same way:
+
+```bash
+sudo systemctl stop jukebox
+sudo -u jukebox -H bash -c "cd /opt/jukebox && git checkout $PREV && npm ci && npm run build"
+sudo systemctl start jukebox
+```
+
+If the shell with `PREV` is gone, `sudo -u jukebox bash -c 'cd /opt/jukebox && git reflog'`
+lists the commits the checkout has been on. The next [update](#updating) returns
+to `main`. The data is unaffected either way: the schema is one table created with
+`CREATE TABLE IF NOT EXISTS`, and nothing migrates destructively.
+
+If a build fails partway (type-check and lint run first), the tree is
+half-cleaned and the service can't start until a build succeeds. Roll back to the
+last good commit as above.
+
+## Trimming dev dependencies
 
 To keep only what the runtime needs after building:
 
@@ -149,47 +174,66 @@ To keep only what the runtime needs after building:
 sudo -u jukebox -H bash -c 'cd /opt/jukebox && npm prune --omit=dev'
 ```
 
-The build outputs (`dist/`, `dist-server/`) stay; only dev dependencies go. You
-need `npm ci` again before the next `npm run build`.
+The build outputs (`dist/`, `dist-server/`) stay; only dev dependencies go. The
+next update's `npm ci` puts them back.
 
 ## Shipping a tarball
 
-There is no published package, but you can make your own artifact from a build:
+There is no published package, but you can build on a faster machine and ship
+the result. The tarball only contains JavaScript and the package manifests, so
+it isn't tied to the build machine's platform:
 
 ```bash
-npm ci && npm run build
+# on the build machine, in a checkout
+npm ci
+COMMIT_SHA=$(git rev-parse HEAD) BUILD_TIME=$(git log -1 --format=%cI) npm run build
 tar -czf jukebox-$(git rev-parse --short HEAD).tar.gz \
   dist dist-server package.json package-lock.json .npmrc
 ```
 
-On the target then:
+The `COMMIT_SHA`/`BUILD_TIME` variables stamp the build line in Settings;
+without them it reads `development build`.
+
+On the target, set up steps 1 and 3 of [Install as a service](#install-as-a-service)
+(the user and the unit), then:
 
 ```bash
 TARBALL=jukebox-1a2b3c4.tar.gz    # the file you copied over
 sudo -u jukebox tar -xzf - -C /opt/jukebox < "$TARBALL"
 sudo -u jukebox -H bash -c 'cd /opt/jukebox && npm ci --omit=dev'
-sudo systemctl start jukebox      # the unit above
+sudo systemctl daemon-reload && sudo systemctl enable --now jukebox
 ```
 
-This needs the service user, `/opt/jukebox` and the unit from
-[the systemd section](#systemd-unit) first. Your own shell opens the tarball
-(`< "$TARBALL"`), so it works even though the `jukebox` user can't read your home
-folder.
+Your own shell opens the tarball (`< "$TARBALL"`), so it works even though the
+`jukebox` user can't read your home folder. `npm ci --omit=dev` needs network
+access to the npm registry (or a warm npm cache) for `express`,
+`better-sqlite3`, `zod` and friends, but **no toolchain**: installs are
+script-free, and `better-sqlite3` ships prebuilt binaries for linux (glibc and
+musl), macOS and Windows on x64 and arm64 inside the one package.
 
-Extract and install as the service user, and start through the unit rather than
-by hand: starting it as root would create a root-owned
-`/var/lib/jukebox/jukebox.db` that the `jukebox` unit then can't open.
+Start it through the unit, not by hand as root: a root-run process creates its
+database as root (in `DATA_DIR`, or `./data` by default), and the `jukebox`
+service then can't open it.
 
-`npm ci --omit=dev` still needs network access to a registry (or a warm npm
-cache) for `express`, `better-sqlite3`, `zod` and friends. It needs **no
-toolchain**, because installs are script-free and `better-sqlite3` ships
-prebuilt binaries for every platform it supports in the one package (linux,
-including musl, darwin and win32, on x64 and arm64). The tarball itself is only
-JavaScript, so it isn't tied to the build machine. The target only needs Node 22+
-on a 64-bit x64 or arm64 OS.
+To update a tarball install, extract the new tarball over the old one with the
+service stopped, then run `npm ci --omit=dev` again. To roll back, extract the
+older tarball the same way.
 
-A tarball build shows `development build` in Settings unless you set `COMMIT_SHA`
-and `BUILD_TIME` when running `npm run build`.
+## Trying it without systemd
+
+For a quick look on your own machine, with no service user:
+
+```bash
+git clone https://github.com/ackervekenbm/jukebox.git
+cd jukebox
+npm ci && npm run build
+NODE_ENV=production DATA_DIR="$PWD/data" npm start    # → http://127.0.0.1:3000
+```
+
+This keeps its database in `./data`, owned by you. The service install above
+does not see it, so treat this as a throwaway: if you want to keep a cabinet you
+made here, copy `data/jukebox.db` into the service's data with the
+[restore steps](operations.md#restore).
 
 ## Next
 

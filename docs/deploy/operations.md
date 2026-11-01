@@ -13,8 +13,8 @@ and logs.
 | `PORT` | `3000` | `3000`, treat as fixed | HTTP port the process listens on. The image's `HEALTHCHECK` probes `127.0.0.1:3000`, so changing it inside the container breaks the healthcheck — publish a different **host** port instead |
 | `HOST` | `127.0.0.1` | `0.0.0.0` | Bind address. Bare Node behind a proxy: leave the default. Bare Node on the LAN: `0.0.0.0`. In the image it is already `0.0.0.0`, and overriding it to loopback makes the published port unreachable |
 | `DATA_DIR` | `./data` | `/app/data` | SQLite database location; created if missing, must be writable |
-| `CLIENT_DIST` | `./dist` | `/app/dist` (default `./dist` under `WORKDIR=/app`; not set explicitly) | Where the built client lives |
-| `NODE_ENV` | unset | `production` | Express/runtime mode |
+| `CLIENT_DIST` | `./dist` | `/app/dist` (the default `./dist`, relative to `/app`) | Where the built web app lives |
+| `NODE_ENV` | unset | `production` | Run in production mode; set it for bare Node too |
 
 Rarely needed:
 
@@ -32,7 +32,7 @@ With compose, set them under `environment:`; with systemd, `Environment=` lines.
 
 ## Which build is running?
 
-- **From a checkout:** `sudo -u jukebox git -C /opt/jukebox log -1 --format='%h %ci'`.
+- **From a checkout:** `sudo -u jukebox bash -c 'cd /opt/jukebox && git log -1 --format="%h %ci"'`.
   Run it as the user that owns the checkout; as anyone else, git refuses with
   "detected dubious ownership".
 - **Image:** compare the tag you run with `main`, or read the digest of what you
@@ -94,8 +94,11 @@ etc.) at `/api/health`.
 
 ## Backups
 
-The database is small and SQLite-specific: copying the file while the app is
-running can miss the `-wal` contents, so use SQLite's own backup for a hot copy.
+The database is one small SQLite file, `jukebox.db`. While the app runs, SQLite
+keeps the newest writes in a side file, `jukebox.db-wal` (its *write-ahead log*),
+next to an index file, `jukebox.db-shm`. Copying `jukebox.db` alone while the app
+runs can miss those writes, so a backup either uses SQLite's own `.backup`
+command (hot, app running) or copies the files with the app stopped (cold).
 
 ### Find your data first
 
@@ -146,7 +149,7 @@ jukebox_peek() {   # $1: a volume name, or an absolute folder
     /*) ;;
     *) ${DOCKER:-docker} volume inspect "$1" >/dev/null || return 1 ;;  # never create a volume
   esac
-  ${DOCKER:-docker} run --rm -v "$1":/d:ro alpine:3.20 sh -c \
+  ${DOCKER:-docker} run --rm -v "$1":/d:ro alpine:3.24 sh -c \
     'apk add -q --no-cache sqlite && cp /d/jukebox.db* /tmp/ && \
      sqlite3 /tmp/jukebox.db "select username, revision, saved_at from cabinet_docs"'
 }
@@ -172,9 +175,9 @@ sudo install -d -m 700 "$BK"
 ```
 
 It holds `jukebox.db` and, for a cold copy taken after an unclean stop, possibly
-`jukebox.db-wal`. Restore copies the directory's `jukebox.db*` back as a set, so
-committed data in a leftover `-wal` isn't lost. A `-shm` file is never backed up
-or restored; SQLite rebuilds it. Backups hold your Discogs username and your
+`jukebox.db-wal`. Restore puts both back together, so committed data in a
+leftover `-wal` isn't lost. A `-shm` file is never backed up or restored; SQLite
+rebuilds it. Backups hold your Discogs username and your
 cabinet layout, which includes the release ids in your collection, so the
 directory is readable by root only.
 
@@ -182,10 +185,11 @@ directory is readable by root only.
 
 ```bash
 # Docker volume or OMV folder (use "$DATA" in place of "$VOL" on OMV)
-${DOCKER:-docker} run --rm -v "$VOL":/data -v "$BK":/backup alpine:3.20 sh -c \
+${DOCKER:-docker} run --rm -v "$VOL":/data -v "$BK":/backup alpine:3.24 sh -c \
   'apk add -q --no-cache sqlite && sqlite3 /data/jukebox.db ".backup /backup/jukebox.db"'
 
-# Bare Node: as the service user, so it can't leave root-owned -wal/-shm files
+# Bare Node (needs `sudo apt install sqlite3`): as the service user, so it can't
+# leave root-owned -wal/-shm files behind
 sudo chown jukebox "$BK"
 sudo -u jukebox sqlite3 "$DATA/jukebox.db" ".backup '$BK/jukebox.db'"
 sudo chown root "$BK"
@@ -201,7 +205,7 @@ use `sudo sqlite3 "file:$BK/jukebox.db?immutable=1" 'select username, revision, 
 ```bash
 # Docker volume
 docker stop "$CT"
-docker run --rm -v "$VOL":/data:ro -v "$BK":/backup alpine:3.20 sh -c \
+docker run --rm -v "$VOL":/data:ro -v "$BK":/backup alpine:3.24 sh -c \
   'cp /data/jukebox.db /backup/ && { [ ! -e /data/jukebox.db-wal ] || cp /data/jukebox.db-wal /backup/; }'
 docker start "$CT"
 
@@ -227,13 +231,10 @@ removes the container. **Never `down -v`:** it deletes the volume.
    # without Docker: sudo sqlite3 "file:$BK/jukebox.db?immutable=1" 'select username, revision, saved_at from cabinet_docs'
    ```
 
-2. Stop the app and replace the database. Each command checks the backup first and
-   only then deletes the current files, in one root shell, so a wrong `BK` stops
-   it before anything is removed:
-
-   ```bash
-   The same script does the work on every route. It copies `jukebox.db` and, if
-   present, `jukebox.db-wal`, never a `-shm`:
+2. Stop the app and replace the database. The same script does the work on every
+   route: it checks the backup first and only then deletes the current files, in
+   one root shell, so a wrong `BK` stops it before anything is removed. It copies
+   `jukebox.db` and, if present, `jukebox.db-wal`, never a `-shm`:
 
    ```bash
    RESTORE='set -e; b=$1; d=$2; test -s "$b/jukebox.db"
@@ -242,7 +243,7 @@ removes the container. **Never `down -v`:** it deletes the volume.
 
    # Docker volume (the container runs as root)
    docker stop "$CT"
-   docker run --rm -v "$VOL":/data -v "$BK":/backup:ro alpine:3.20 sh -c "$RESTORE" _ /backup /data
+   docker run --rm -v "$VOL":/data -v "$BK":/backup:ro alpine:3.24 sh -c "$RESTORE" _ /backup /data
    docker start "$CT"
 
    # OMV folder
@@ -292,27 +293,31 @@ Take a [backup](#backups) first. Each route's guide owns its exact steps:
   Only app-path changes on `main` produce a new image, so a docs-only merge is a
   no-op pull.
 - **Built from a checkout** (compose file with `build:`):
-  `git pull --ff-only && docker compose up -d --build`
-  ([from-source-docker.md](from-source-docker.md)).
+  [from-source-docker.md](from-source-docker.md#updating).
 - **Bare Node:** [from-source-node.md](from-source-node.md#updating). Stop the
   service before rebuilding, because the build empties `dist/` and `dist-server/`.
 
-**Clients:** a normal reload picks up the new build — `index.html`, `sw.js` and
-the manifest are served `no-cache`, hashed assets are `immutable`. If a device
-still shows the old shell, force-refresh once; the service worker keeps the old
-precache until it activates. Settings → build line tells you which build the
-browser is actually running.
+### Devices after an update
+
+The server sends `index.html`, `sw.js` and the manifest with `no-cache`, so
+devices pick up a new build by themselves:
+
+- **Browser tab:** reload. If it still shows the old version, reload once more
+  (the new service worker takes over on the next load) or force-refresh.
+- **Home-screen app:** close it completely and open it again. It can't
+  force-refresh.
+
+Settings shows a build line with the commit each device is running, which is the
+quickest way to tell a client that hasn't updated from a deploy that didn't land
+([troubleshooting](troubleshooting.md#a-stale-deployment-survives-every-reload)).
 
 ## Rollback
 
-- Image: pin an older commit tag, e.g.
-  `ghcr.io/ackervekenbm/jukebox:<sha7>`, and recreate
+- **Image:** pin an older commit tag and recreate the container
   ([docker-image.md](docker-image.md#pin-a-version-roll-back)).
-- Checkout (bare Node): the update procedure in
-  [from-source-node.md](from-source-node.md#updating) with `git checkout <sha>`
-  in place of `git pull --ff-only`. `git switch main` returns you to the tip
-  afterwards.
-- `build:`-based compose file: `git checkout <sha> && docker compose up -d --build`.
+- **Bare Node:** [from-source-node.md](from-source-node.md#rolling-back).
+- **`build:`-based compose file:**
+  [from-source-docker.md](from-source-docker.md#updating).
 
 Data is unaffected either way: the schema is a single table created with
 `CREATE TABLE IF NOT EXISTS` and nothing migrates destructively.

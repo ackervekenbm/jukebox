@@ -9,6 +9,12 @@ services:
       DATA_DIR: /app/data
     volumes:
       - jukebox-data:/app/data
+    # Cap the container log: an uncapped json-file log can fill the disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: unless-stopped
 
 volumes:

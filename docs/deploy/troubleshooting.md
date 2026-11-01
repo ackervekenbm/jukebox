@@ -6,15 +6,17 @@ The commands here use the container name `jukebox` (the `docker run` route and
 both compose files). On [OpenMediaVault](openmediavault.md) it is
 `jukebox-jukebox-1`, and commands need `sudo`.
 
-First 60 seconds, in this order:
+## First 60 seconds
+
+Docker:
 
 ```bash
-docker ps                                   # running? healthy?
+docker ps -a --filter name=jukebox          # running? healthy? restarting?
 curl -fsS http://127.0.0.1:8080/api/health  # {"ok":true,"db":true}
-docker compose logs --tail=50 jukebox       # or: journalctl -u jukebox -n 50
+docker logs --tail=50 jukebox
 ```
 
-Bare Node instead of Docker:
+Bare Node:
 
 ```bash
 systemctl status jukebox                    # active? restart loop?
@@ -22,35 +24,88 @@ curl -fsS http://127.0.0.1:3000/api/health
 journalctl -u jukebox -n 50
 ```
 
-If `health` is good, the server side is fine and the problem is in front of it
-(proxy, browser, service worker). If it isn't, the problem is behind it (data
-dir, config, wrong port).
+If health is good, the server is fine and the problem is in front of it (proxy,
+browser, service worker). If it isn't, the problem is behind it (data directory,
+config, wrong port).
+
+## Symptoms
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| `curl` → connection refused | Wrong host/port, or the process is bound to loopback (bare Node) | Bare Node: `HOST=0.0.0.0` for direct access. Any route: check the port (`8080:3000` mapping, or `3000` for bare Node) |
-| `/api/health` → `500 {"ok":false,"db":false}` | The SQLite handle itself is unusable (closed, or the driver refused the statement) — rare while serving | Restart the process; if it returns, check the logs for a driver error. Disk-full or a deleted DB file do **not** show up here — they break writes instead |
-| Container stuck in `Restarting`, or exits right after `Up` | `DATA_DIR` not writable — wrong ownership, read-only mount, or an unwritable parent | `docker ps -a` + `docker logs`; fix the mount — see [the restart loop](#the-container-restarts-in-a-loop) |
-| Bare Node exits at start-up: `Cannot find module …/better_sqlite3.node` | 32-bit OS (`armv7l`) — no `armv7` prebuild and no compile fallback | Install 64-bit Raspberry Pi OS, then `rm -rf node_modules && npm ci` |
-| `/discogs` → `502 {"error":"Discogs API is unreachable"}` | The host can't reach `api.discogs.com`, or the call exceeded `DISCOGS_TIMEOUT_MS` | Check outbound DNS/HTTPS from the host; raise the timeout if Discogs is just slow |
-| Proxy answers `502` / connection refused, app is "up" | Proxy points at `3000` when only `8080` is published | Point it at the published host port — [https-and-offline.md](https-and-offline.md#topology) |
-| `[jukebox] no client build found; serving API only` | Started without a client build | `npm run build`; or set `CLIENT_DIST` |
-| `docker pull` → `denied` / `unauthorized` | Rare: the image is public, so this is a stale/incorrect local credential (or a private fork) | `docker logout ghcr.io` for anonymous pulls, or log in with a classic PAT (`read:packages`) — fine-grained tokens don't work with Packages |
-| `exec format error` | Single-arch image for the wrong CPU, or 32-bit Raspberry Pi OS (the image is `amd64`/`arm64` only) | Use `:latest` (multi-arch) or the right `-amd64`/`-arm64` tag; on a Pi, install 64-bit Raspberry Pi OS |
-| Old UI after a deploy | Service worker still holding the old shell | Close and reopen the app (a home-screen app can't force-refresh); in a desktop browser, force-refresh. See [below](#a-stale-deployment-survives-every-reload) |
-| Collection never loads, console shows CORS/429 | `dist/` served by a static server instead of the Node process | Proxy `/` (including `/discogs`) to the app |
-| Cabinet sync fails with 401 | Discogs token invalid/expired | Generate a new token on Discogs (settings → developers) and paste it into Settings |
-| Cabinet sync fails with 409 | Another device wrote first - normally self-healing | Check the client rebased; a persistent 409 is worth an issue |
-| Cabinet sync fails with 413 | Cabinet document exceeded the server's 256 KB JSON limit (very large collection, or small cabinets leaving many records unplaced) | Report it with your collection size — see [below](#cabinet-sync-fails-with-413) |
-| Device can't open the app offline | HTTP instead of HTTPS, or untrusted cert | [https-and-offline.md](https-and-offline.md) |
-| Cert warning on the phone | CA not trusted on that device | Install/trust the CA (iOS needs the second "Certificate Trust Settings" step) |
-| Data "disappeared" after redeploy | Different volume | See below |
+| **Cabinet layout empty** after a redeploy, health OK | The app is running on a different (new, empty) database than before | [The cabinet looks empty](#the-cabinet-looks-empty) |
+| `curl` → connection refused | Wrong port, or bare Node bound to loopback | Docker: the host side of the `8080:3000` mapping. Bare Node: port `3000`, and `HOST=0.0.0.0` for access from other devices |
+| Container stuck in `Restarting`, or exits right after start | The data directory isn't writable | [The container restarts in a loop](#the-container-restarts-in-a-loop) |
+| `/api/health` → `500 {"ok":false,"db":false}` | The database connection is unusable (rare while serving) | Restart; if it comes back, check the logs for an SQLite error ([what health checks](operations.md#health-and-monitoring)) |
+| Cabinet changes don't save ("Could not save the cabinet"), health OK | Disk full, or the database file was deleted or replaced underneath the app | Free space or restore the file, then restart ([why health stays OK](operations.md#health-and-monitoring)) |
+| `exec format error` | 32-bit Raspberry Pi OS, or a single-architecture tag for the wrong CPU | 64-bit OS ([why](README.md#the-contract-every-route-shares)); use `:latest` or the matching `-amd64`/`-arm64` tag |
+| Bare Node exits at start-up: `Cannot find module …/better_sqlite3.node` | 32-bit OS | 64-bit OS ([why](README.md#the-contract-every-route-shares)), then `npm ci` again |
+| `[jukebox] no client build found; serving API only` | Started without a client build | `npm run build`, or set `CLIENT_DIST` |
+| Proxy answers `502`, the app is up | The proxy points at the wrong port | Docker: `127.0.0.1:8080`; bare Node: `127.0.0.1:3000` ([table](https-and-offline.md#reverse-proxy)) |
+| `/discogs` → `502 {"error":"Discogs API is unreachable"}` | The server can't reach `api.discogs.com`, or the call took longer than `DISCOGS_TIMEOUT_MS` | Check DNS and outbound HTTPS from the server; raise the timeout if Discogs is just slow |
+| Collection never loads, the console shows CORS or 429 errors | `dist/` is served by a static web server instead of the app | Proxy everything, including `/discogs`, to the app ([why](README.md#common-mistakes)) |
+| Old version after a deploy | The device hasn't switched to the new build yet, or a proxy caches it | [Devices after an update](operations.md#devices-after-an-update); if that doesn't help, [a stale deployment](#a-stale-deployment-survives-every-reload) |
+| `docker pull` → `denied` / `unauthorized` | Stale GitHub credentials on the host (the image is public) | [If a pull is denied](docker-image.md#if-a-pull-is-denied) |
+| Cabinet sync fails with 401 | The Discogs token is invalid or expired | Generate a new token on Discogs (settings → developers) and paste it into Settings |
+| Cabinet sync fails with 409 | Another device saved first; normally fixes itself | A 409 that keeps coming back is worth an issue |
+| Cabinet sync fails with 413 | The cabinet document is over the server's 256 KB limit | [Below](#cabinet-sync-fails-with-413) |
+| The app won't open offline | Plain HTTP, or a certificate the device doesn't trust | [https-and-offline.md](https-and-offline.md) |
+| Certificate warning on the phone | Your CA isn't trusted on that device | Install and trust it ([mkcert step 5](https-and-offline.md#mkcert-your-own-local-ca)); iOS needs the extra *Certificate Trust Settings* step |
+| Works on one device but not another | Browser data is per device | [Below](#it-works-on-my-phone-but-not-my-laptop) |
+
+## The cabinet looks empty
+
+The server stores the cabinet layout in one SQLite file, per Discogs account. An
+empty cabinet with a healthy server means the app is looking at a different
+database, or a different account, than before. Health still says
+`{"ok":true,"db":true}`, because a brand-new database is a valid one: the app
+creates it the moment it starts. Find where your old data went:
+
+**A different Docker volume.** Compose prefixes volume names with the project
+(folder) name, so the same compose file run from another folder gets a new, empty
+volume. The `docker run` command and the compose file in
+[docker-image.md](docker-image.md) both use `jukebox-data`; the repo's own
+`docker-compose.yml` uses `<folder>_jukebox-data`. List them and look inside each
+with [`jukebox_peek`](operations.md#check-what-a-database-holds):
+
+```bash
+docker volume ls | grep -i jukebox
+jukebox_peek jukebox-data
+jukebox_peek jukebox_jukebox-data
+```
+
+Then either [copy the database across](operations.md#moving-between-routes), or
+pin compose to the volume that **already has the data**:
+
+```yaml
+volumes:
+  jukebox-data:
+    name: jukebox_jukebox-data     # the volume with your data, exactly as `docker volume ls` shows it
+```
+
+Don't pin to a name that has no data yet: that gives you yet another empty volume.
+
+**A different OMV data folder.** On [OpenMediaVault](openmediavault.md) the data
+lives in the *Data* shared folder chosen in **Services → Compose → Settings**.
+Changing that setting, or the `CHANGE_TO_COMPOSE_DATA_PATH` line, starts the
+container on an empty folder. Point it back, or copy `jukebox.db` across. A stack
+from before the bind-folder layout has its data in a volume:
+[upgrading from a named-volume stack](openmediavault.md#upgrading-from-a-named-volume-stack).
+
+**A different bare-Node data directory.** A manual `npm start` keeps its
+database in `./data` in the checkout, while the systemd service uses
+`/var/lib/jukebox`. A cabinet made in one isn't in the other; copy it with the
+[restore steps](operations.md#restore).
+
+**A different Discogs account.** The cabinet is stored per Discogs username. If
+the device is signed in with another username (or a token for another account),
+it shows that account's cabinet, which may be empty. Check the username in
+Settings.
 
 ## The container restarts in a loop
 
-The database is opened at start-up (create dir → open → WAL → `CREATE TABLE`), so
-a `DATA_DIR` the process cannot write to kills it before it listens — you get
-`Restarting` in `docker ps -a`, not a 500 from `/api/health`:
+The database is opened at start-up, so a data directory the process can't write
+to stops it before it listens. You get `Restarting` in `docker ps -a`, not a 500
+from `/api/health`:
 
 ```bash
 docker ps -a --filter name=jukebox
@@ -61,117 +116,89 @@ docker logs --tail=30 jukebox
 
 Fix the mount, then restart:
 
-- **Named volume:** usually just works. If it was populated by a root-only
-  process, `docker run --rm -v "$VOL":/data alpine chown -R 0:0 /data`. Set
-  `VOL` to your route's real volume name first
-  ([operations.md](operations.md#find-your-data-first)); with the wrong name
-  this chowns a new, empty volume and fixes nothing.
-- **Bind mount:** the container runs as root by default, so a host directory owned
-  by another UID is still writable only if the permissions allow it. Check the
-  mode and `docker inspect --format '{{json .Mounts}}' jukebox`.
-- **`userns-remap`:** the container's root maps to an unprivileged host UID; chown
-  the directory to that UID (see the daemon config) or use a named volume.
-- **SELinux hosts:** a bind mount needs `:z` / `:Z`.
+- **Named volume:** usually just works. If something root-only wrote into it,
+  `docker run --rm -v "$VOL":/data alpine:3.24 chown -R 0:0 /data`. Set `VOL` to
+  your route's real volume name first ([how](operations.md#set-the-names)); with
+  the wrong name this changes a new, empty volume and fixes nothing.
+- **Bind mount (a host folder):** the container runs as root, so the folder has
+  to be writable for root. Check its mode, and where it really points with
+  `docker inspect --format '{{json .Mounts}}' jukebox`.
+- **Docker with user-namespace remapping** (`userns-remap` in the daemon
+  config): root in the container is an unprivileged user on the host. Give the
+  folder to that user, or use a named volume.
+- **SELinux hosts** (Fedora, RHEL): a bind mount needs `:z` or `:Z` after the
+  container path.
 
 ## A stale deployment survives every reload
 
-`index.html` and `sw.js` are served `no-cache` by the app, so this is almost
-always a **proxy** caching them:
+First check **Settings → the build line** on the device. If it shows the new
+commit, the device is up to date. If it shows the old one, either the device
+hasn't switched yet ([devices after an update](operations.md#devices-after-an-update))
+or the deploy didn't land ([which build is running](operations.md#which-build-is-running)).
+
+If the server does run the new build and a device keeps getting the old one, a
+**proxy is caching** `sw.js` or `index.html`. The app sends them with
+`cache-control: no-cache`, but a caching proxy passes that header through
+unchanged, so look for the proxy's own signs:
 
 ```bash
-curl -sI https://jukebox.example.com/sw.js | grep -iE 'cache-control|^age|x-cache|cf-cache-status'
-# want: cache-control: no-cache, and no Age / X-Cache: HIT / cf-cache-status: HIT
+curl -sI https://jukebox.lan/sw.js | grep -iE 'cache-control|^age|x-cache|cf-cache-status'
+# want: no Age header, no X-Cache: HIT, no cf-cache-status: HIT
 curl -sI http://127.0.0.1:8080/sw.js | grep -iE 'etag|last-modified'   # 3000 for bare Node
 ```
 
-A caching proxy passes the app's `cache-control: no-cache` through unchanged, so
-that header alone can't tell you whether the proxy is caching. An `Age` header, a
-cache `HIT`, or an `ETag` that differs from the one the app returns directly is
-the real sign. If you find one, exclude `sw.js`/`index.html` from caching
-there. Second candidate: the device kept the old service worker — DevTools →
-Application → Service Workers → *Unregister*, then reload twice. Before either,
-check **Settings → the build line**: if it already shows the new commit, the
-server is fine and this is a client-cache problem; if it shows the old commit,
-the deploy didn't land ([operations.md](operations.md#which-build-is-running)).
+An `Age` header, a cache `HIT`, or an `ETag` that differs from the one the app
+returns directly means the proxy caches; exclude `sw.js` and `index.html` there.
 
-## The volume moved
-
-Docker prefixes named volumes with the compose **project name** (usually the
-directory name). Deploying the same compose file from a different directory, or
-under a different project name, silently creates a *new* empty volume:
-
-```bash
-docker volume ls | grep -i jukebox
-```
-
-If you see two, check which one holds your cabinet with
-[`jukebox_peek`](operations.md#check-what-a-database-holds) on each. Only checking
-that `jukebox.db` exists isn't enough: the app creates an empty one in the new
-volume as soon as it starts. Then either copy the DB across
-([operations.md](operations.md#moving-between-routes)) or pin compose to the
-volume that **already has the data**:
-
-```yaml
-volumes:
-  jukebox-data:
-    name: jukebox_jukebox-data     # the existing volume, exactly as `docker volume ls` shows it
-```
-
-Don't pin to a new name such as `jukebox-data` unless that volume already holds
-the data. A new name gives you a third, empty volume.
-
-The `docker run` quickstart and the compose file in
-[docker-image.md](docker-image.md) both use the volume `jukebox-data`. The repo's
-own `docker-compose.yml` uses `<dir>_jukebox-data`. Moving between them is the
-usual way to end up here.
-
-**Bind directory (OMV route).** The same trap has a different shape: the path is
-whatever the *Data* shared folder in **Services → Compose → Settings** resolves
-to. Change that setting, or the `CHANGE_TO_COMPOSE_DATA_PATH` line, and the
-container starts on a new empty folder — `/api/health` still returns
-`{"ok":true,"db":true}`, because a fresh database is a valid one. The cabinet
-layout just looks empty. Point it back, or copy `jukebox.db` across.
+Last resort on a desktop browser: DevTools → **Application → Service Workers →
+Unregister**, then reload twice.
 
 ## Port 80/443 is taken
 
-Publish a different host port instead (`"8080:3000"`); only the left-hand side
-is yours. Common on OpenMediaVault, see [openmediavault.md](openmediavault.md).
+Publish a different host port (`"8080:3000"`); only the left-hand side is yours.
+This is the normal case on [OpenMediaVault](openmediavault.md), whose web UI holds
+80 and 443.
 
 ## Collection loading stalls or retries
 
-Discogs allows ~60 requests/minute. The app paces itself, and the `/discogs`
-proxy passes rate-limit headers through so a `429` is retried after the
-server-provided delay. If you see repeated throttling:
+Discogs allows about 60 requests a minute. The app paces itself, and the
+`/discogs` proxy passes Discogs' rate-limit headers through, so a `429` is
+retried after the delay Discogs asks for. If you see throttling again and again:
 
-- confirm traffic goes through the app's proxy (same-origin `/discogs`), not
-  directly to `api.discogs.com` — direct cross-origin calls surface throttling as
-  an opaque CORS error;
-- a very large collection's first fetch plus master-year enrichment is the
-  heaviest case; it is expected to stream in over a few minutes once, then come
-  from the browser cache.
+- make sure requests go through the app's `/discogs` proxy and not straight to
+  `api.discogs.com`; direct requests from the browser show throttling as a CORS
+  error;
+- a very large collection is slow the first time: the collection plus the
+  original release years can take a few minutes to load once, and then come from
+  the browser cache.
 
 ## Cabinet sync fails with 413
 
-`PUT /api/sync/cabinet` is capped at 256 KB (the server's `express.json` limit).
-The cabinet document stores a placement entry per release, so a very large
-collection — or a small cabinet that leaves a large `unplaced` list — can exceed
-it. The client then reports a generic "Could not save the cabinet".
+`PUT /api/sync/cabinet` is capped at 256 KB. The cabinet document stores an entry
+per release, so a very large collection, or a small cabinet that leaves many
+records without a shelf, can go over it. The app then says "Could not save the
+cabinet".
 
-This is a server limit rather than a deployment problem, and there is no setting
-for it today. Report it with your collection size:
+This is a server limit, not a deployment problem, and there is no setting for it
+today. Report it with your collection size:
 <https://github.com/ackervekenbm/jukebox/issues>. Until it is raised, the cabinet
-still works locally in the browser; only cross-device sync of that document
-fails.
+still works in the browser; only syncing it to other devices fails.
 
-## "It works on my phone but not my laptop" (or vice versa)
+## It works on my phone but not my laptop
 
-Browser data is per device and per browser profile: the collection cache, saved
+Browser data is per device and per browser profile: the cached collection, saved
 views, settings and the stored token don't transfer. Only the cabinet layout
-syncs (server-side, identified by your Discogs username). A second device starts
-with a fresh fetch.
+syncs, through the server, per Discogs username. A second device starts with a
+fresh fetch and needs the token entered once.
 
 ## Reporting a problem
 
-Include: how you deploy (image tag or commit), `curl -s http://<host>:<port>/api/health`,
-the container/service logs, browser console errors and whether it's reproducible
-in a private window (no service worker). <https://github.com/ackervekenbm/jukebox/issues>
+Include: how you deploy (image tag or commit), the output of
+`curl -s http://<server>:<port>/api/health`, the container or service logs,
+browser console errors, and whether it happens in a private window too (which
+runs without the service worker).
+<https://github.com/ackervekenbm/jukebox/issues>
+
+## Next
+
+- Back to the overview: [docs/deploy/README.md](README.md)

@@ -168,21 +168,26 @@ port/env/tag tables, in sync with the workflow matrix and the Dockerfile.
   `ghcr.io/ackervekenbm/jukebox:latest` (see `.github/workflows/docker-build.yml`).
   PRs touching the same paths run a **smoke job** first: build the image, boot
   it, poll `/api/health` and assert the PWA cache headers — the image only
-  publishes when smoke passes. The tag derives from
-  `${{ github.repository }}`, so it follows repo renames.
+  publishes when smoke passes. Publishing happens on `main` only: a manual
+  (`workflow_dispatch`) run from another branch stops after smoke, so it can't
+  overwrite `:latest`. The tag derives from `${{ github.repository }}`, so it
+  follows repo renames.
 - **GHCR pull.** The package is public, so the OMV plugin's **Pull** works
   anonymously. If a pull is ever denied, follow
-  `docs/deploy/openmediavault.md#if-a-pull-is-denied`; on this host the login
+  `docs/deploy/docker-image.md#if-a-pull-is-denied`; on this host the login
   user is `ackervekenbm`.
 - **Route A — prebuilt image (production).** The stack is the one in
   `docs/deploy/openmediavault.md`: stack name `jukebox`, port `8080`, data in
-  the *Data* shared folder. To update after a merge: **Services → Compose →
-  Files** → `jukebox` → **Pull** → **Up**.
+  the *Data* shared folder, and a `logging:` cap on the container log (add it if
+  the production stack predates it). To update after a merge: **Services →
+  Compose → Files** → `jukebox` → **Pull** → **Up**.
 - **Route B — build on the Pi** (e.g. local variants): `docs/deploy/from-source-docker.md`.
   It uses the repo's `docker-compose.yml`, which keeps its data in the named
   volume `jukebox_jukebox-data`, **not** in Route A's bind folder. Switching
   routes starts on an empty DB unless you copy `jukebox.db` across
   (`docs/deploy/operations.md#moving-between-routes`).
 - **Offline / iPhone over HTTP**: home-screen install works over plain HTTP, but
-  offline launch needs HTTPS with a device-trusted cert. Options:
-  `docs/deploy/https-and-offline.md`.
+  offline launch needs HTTPS with a device-trusted cert. OMV holds 80/443 on this
+  host, so Tailscale `serve` is the simplest option
+  (`docs/deploy/openmediavault.md#https-on-omv`, all options in
+  `docs/deploy/https-and-offline.md`).
