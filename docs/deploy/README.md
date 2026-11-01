@@ -38,7 +38,7 @@ Cross-cutting, whichever route you pick:
 
 | Item | Value |
 | --- | --- |
-| Container port | `3000`, fixed in the image; the published host port is your choice (`8080` in most examples, `8181` on the OMV route — OMV owns `80`/`443`) |
+| Container port | `3000` (host side is yours — examples use `8080`); fixed in the image |
 | Listens on | `HOST` — `127.0.0.1` for bare Node, `0.0.0.0` in the image; `PORT` `3000` |
 | Persistent data | `DATA_DIR` (default `./data`, image uses `/app/data`) — holds `jukebox.db` |
 | Client build | `CLIENT_DIST` (default `./dist`) |

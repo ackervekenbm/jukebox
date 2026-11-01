@@ -153,7 +153,7 @@ variable, image tag, the Dockerfile or a workflow changes, update
 `docs/deploy/` too (and the README pointer).
 
 The production host is a Raspberry Pi running **OpenMediaVault**. OMV's web UI
-owns ports 80/443, so the app is exposed on host port **8181**. One container,
+owns ports 80/443, so the app is exposed on host port **8080**. One container,
 one node process: it serves the static build, the API and the `/discogs` proxy.
 The SQLite DB lives in `/app/data`, bind-mounted into the Compose plugin's *Data*
 shared folder (`CHANGE_TO_COMPOSE_DATA_PATH/jukebox-data`) — today that holds
@@ -194,13 +194,13 @@ matrix and the Dockerfile.
     jukebox:
       image: ghcr.io/ackervekenbm/jukebox:latest
       ports:
-        - "8181:3000"
+        - "8080:3000"
       volumes:
         - CHANGE_TO_COMPOSE_DATA_PATH/jukebox-data:/app/data
       restart: unless-stopped
   ```
   Save → select it → **Up** (creates/starts the container; open
-  `http://<pi-ip>:8181`). To update after a merge: select → **Pull** → **Up**
+  `http://<pi-ip>:8080`). To update after a merge: select → **Pull** → **Up**
   (an unchanged image is a no-op; the data folder keeps the sync DB). **Pull**
   works anonymously; if it returns an auth error, see the GHCR note above. The
   app is plain HTTP: a normal phone refresh picks up the new build (the server

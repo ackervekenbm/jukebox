@@ -29,7 +29,7 @@ depends on how you run it** — this is the single most common 502:
 | Route | Proxy upstream | Notes |
 | --- | --- | --- |
 | Bare Node ([from-source-node.md](from-source-node.md)) | `http://127.0.0.1:3000` | Leave `HOST` at its default `127.0.0.1` |
-| Docker ([docker-image.md](docker-image.md), [openmediavault.md](openmediavault.md)) | `http://127.0.0.1:8080` (`8181` on the OMV route) | That is the published **host** port; `3000` exists only inside the container. Don't override the image's `HOST=0.0.0.0` |
+| Docker ([docker-image.md](docker-image.md), [openmediavault.md](openmediavault.md)) | `http://127.0.0.1:8080` | `8080` is the published **host** port; `3000` exists only inside the container. Don't override the image's `HOST=0.0.0.0` |
 | Proxy in another container | the compose service name, e.g. `http://jukebox:3000` | Put both on one Docker network; the `ports:` mapping can go if only the proxy needs to reach it |
 
 The snippets below use the bare-Node port; substitute per this table.

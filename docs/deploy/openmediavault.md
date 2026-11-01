@@ -4,10 +4,9 @@ The reference deployment: a Raspberry Pi running **OpenMediaVault** with
 omv-extras and the **Compose** plugin, on a 64-bit OS. One container, managed
 entirely from the OMV web UI.
 
-OMV's own web UI owns ports **80** and **443**, so the app is published on a
-different host port — **8181** below (any free port works; the generic examples
-elsewhere in these docs use `8080`). The container's own port, `3000`, is fixed:
-only the host side is yours.
+OMV's own web UI owns ports **80** and **443**, so the app is published on
+**8080** below (any free port works). The container's own port, `3000`, is
+fixed: only the host side is yours.
 
 ## Prerequisites
 
@@ -43,7 +42,7 @@ only the host side is yours.
      jukebox:
        image: ghcr.io/ackervekenbm/jukebox:latest
        ports:
-         - "8181:3000"
+         - "8080:3000"
        volumes:
          - CHANGE_TO_COMPOSE_DATA_PATH/jukebox-data:/app/data
        restart: unless-stopped
@@ -54,10 +53,10 @@ only the host side is yours.
 6. **Save**.
 7. Select the entry → **Check** if you want compose to validate the file, then
    **Up**. That pulls the image and starts the container.
-8. Open `http://<pi-ip>:8181`.
+8. Open `http://<pi-ip>:8080`.
 
 Verify: **Services → Compose → Services** lists the container as running, and
-`http://<pi-ip>:8181/api/health` returns `{"ok":true,"db":true}`.
+`http://<pi-ip>:8080/api/health` returns `{"ok":true,"db":true}`.
 
 ## What that file does
 
@@ -69,7 +68,7 @@ Verify: **Services → Compose → Services** lists the container as running, an
 - **No `container_name`** — compose derives it from the stack and service, so it
   is `jukebox-jukebox-1`; the plugin's **Logs** button doesn't care. Add
   `container_name: jukebox` if you want the short name in `docker logs`.
-- **Port `8181`** — host side only. Change the left-hand number if that port is
+- **Port `8080`** — host side only. Change the left-hand number if that port is
   taken; never the right-hand one.
 - **Pin instead of tracking `:latest`** — replace the image with
   `ghcr.io/ackervekenbm/jukebox:<sha7>` for a reproducible deploy. Editing that
@@ -127,15 +126,6 @@ That folder is the only server-side state, so treat it as user data:
   half-written WAL file. The commands and the restore steps are shared with the
   other routes in [operations.md](operations.md#backups).
 
-## iPhone / home screen on plain HTTP
-
-The app installs to the home screen over plain HTTP (it ships the legacy
-`apple-*` meta tags) and works while the server is up. **Offline launch is the
-part that needs HTTPS** — the service worker only registers in a secure context,
-and the certificate must be trusted by the device. Options for that on an OMV box
-(Caddy with a DNS challenge, mkcert, Tailscale) are in
-[https-and-offline.md](https-and-offline.md).
-
 ## CLI fallback
 
 If you prefer SSH over the UI, use the file the plugin wrote. Its location is
@@ -161,7 +151,9 @@ next **Save**, so keep deliberate edits in the UI.
 
 ## Next
 
-- [https-and-offline.md](https-and-offline.md) — TLS and offline launch
+- [https-and-offline.md](https-and-offline.md) — TLS, reverse proxies and offline
+  launch (plain HTTP works, but the service worker that allows launching without
+  the server needs HTTPS)
 - [operations.md](operations.md) — backups, health, env vars, log rotation (cap
   the container's json-file log — a full disk is how SQLite starts failing)
 - [troubleshooting.md](troubleshooting.md) — when **Up** starts but nothing
