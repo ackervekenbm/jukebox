@@ -81,14 +81,16 @@ Without the binfmt step the build fails inside `RUN npm ci` with
 `exec format error`, and a Pi running 32-bit Raspberry Pi OS cannot run the arm64
 image at all — the image is `amd64`/`arm64` only.
 
-**A real version line** — Settings shows the commit and build time from the
+**A real version line** — Settings shows the commit and its date from the
 `COMMIT_SHA`/`BUILD_TIME` build args; `docker compose up -d --build` passes
-neither, so a local build reads `dev`. Stamp it:
+neither, so a local build reads `development build`. Stamp it with the commit and
+the commit date (what CI passes) and recreate:
 
 ```bash
 docker compose build \
   --build-arg COMMIT_SHA=$(git rev-parse HEAD) \
   --build-arg BUILD_TIME=$(git log -1 --format=%cI)
+docker compose up -d
 ```
 
 **Your own registry** — tag and push after the build:
@@ -107,9 +109,11 @@ git pull --ff-only
 docker compose up -d --build     # rebuilds, recreates the container, keeps the volume
 ```
 
-The named volume (`jukebox-data`) survives recreation, so the cabinet sync data
-is intact. Docker's layer cache means an unchanged tree rebuilds in seconds;
-`--build` alone does not pull newer base images — add
+The named volume (`jukebox-data`, usually prefixed with the project directory)
+survives recreation, so the cabinet sync data is intact — see
+[troubleshooting.md](troubleshooting.md#the-volume-moved) if a rebuild comes up
+with an empty cabinet. Docker's layer cache means an unchanged tree rebuilds in
+seconds; `--build` alone does not pull newer base images — add
 `docker compose build --pull` if you want a fresh `node:22-alpine`.
 
 ## Prebuilt vs built here

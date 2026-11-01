@@ -24,8 +24,9 @@ Images are only rebuilt when app paths change on `main` (`src/**`, `Dockerfile`,
 
 ## Pull: log in once
 
-GHCR requires authentication even for public images. Use a GitHub **classic**
-personal access token with `read:packages`:
+GHCR serves public images anonymously, but those pulls are rate-limited and often
+fail with `denied`/`unauthorized`. Logging in once makes them reliable. Use a
+GitHub **classic** personal access token with `read:packages`:
 
 ```bash
 echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u <your-github-username> --password-stdin

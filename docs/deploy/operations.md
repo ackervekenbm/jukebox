@@ -11,16 +11,16 @@ and logs.
 | `PORT` | `3000` | `3000`, treat as fixed | HTTP port the process listens on. The image's `HEALTHCHECK` probes `127.0.0.1:3000`, so changing it inside the container breaks the healthcheck — publish a different **host** port instead |
 | `HOST` | `127.0.0.1` | `0.0.0.0` | Bind address. Bare Node behind a proxy: leave the default. Bare Node on the LAN: `0.0.0.0`. In the image it is already `0.0.0.0`, and overriding it to loopback makes the published port unreachable |
 | `DATA_DIR` | `./data` | `/app/data` | SQLite database location; created if missing, must be writable |
-| `CLIENT_DIST` | `./dist` | `/app/dist` | Where the built client lives |
+| `CLIENT_DIST` | `./dist` | `/app/dist` (default `./dist` under `WORKDIR=/app`; not set explicitly) | Where the built client lives |
 | `NODE_ENV` | unset | `production` | Express/runtime mode |
 
 Rarely needed:
 
 | Variable | Default | Used for |
 | --- | --- | --- |
-| `DISCOGS_TIMEOUT_MS` | `30000` | Upstream timeout for `/discogs` and the identity check; also the longest a request can sit behind a proxy |
+| `DISCOGS_TIMEOUT_MS` | `30000` | Upstream timeout for `/discogs`; also the longest a proxied request can sit behind a reverse proxy. The cached Discogs identity check has its own fixed 15 s timeout, not this one |
 | `DISCOGS_API_BASE` | `https://api.discogs.com` | Point the proxy at a mirror (the tests do this) |
-| `DISCOGS_USER_AGENT` | `Jukebox/1.0 (github.com/ackervekenbm/jukebox)` | Sent upstream; Discogs asks for a descriptive user agent |
+| `DISCOGS_USER_AGENT` | `Jukebox/1.0 (https://github.com/ackervekenbm/jukebox)` | Sent upstream; Discogs asks for a descriptive user agent |
 
 Image build args only affect the "build" line in the settings screen:
 `COMMIT_SHA`, `BUILD_TIME`, `GITHUB_REPOSITORY`.
@@ -35,18 +35,20 @@ With compose, set them under `environment:`; with systemd, `Environment=` lines.
   pulled: `docker image inspect ghcr.io/ackervekenbm/jukebox:latest --format '{{index .RepoDigests 0}}'`
   (`RepoDigests` is populated for pulled images; a locally built image may have
   none).
-- **In the app:** Settings shows a build line with the commit and build time of
-  the client you are looking at (`dev` and no date for a local build). It is the
-  quickest "did my deploy actually land?" check, and the fastest way to separate
-  a server problem from a stale service worker.
+- **In the app:** Settings shows a build line with the commit and its date — the
+  date is the commit date the build was stamped with, not a wall-clock build
+  time. A local build without those stamps reads `development build` and shows
+  no date. It is the quickest "did my deploy actually land?" check, and the
+  fastest way to separate a server problem from a stale service worker.
 
-A local `docker compose build` needs the same args the workflow passes, otherwise
-that line reads `dev`:
+A local `docker compose build` needs the same args the CI build passes, otherwise
+that line reads `development build`:
 
 ```bash
 docker compose build \
   --build-arg COMMIT_SHA=$(git rev-parse HEAD) \
   --build-arg BUILD_TIME=$(git log -1 --format=%cI)
+docker compose up -d
 ```
 
 ## What lives where
@@ -73,21 +75,28 @@ Two consequences worth remembering:
 curl -fsS http://127.0.0.1:3000/api/health     # from the host
 ```
 
-`/api/health` runs `SELECT 1` on the open SQLite handle, so it answers exactly
-one question: *is this process still able to use its database?*
+`/api/health` runs `SELECT 1` on the open SQLite handle — a constant expression
+that reads no table and no file. It answers exactly one question: *does this
+process still hold a usable database connection?*
 
-- `200 {"ok":true,"db":true}` — process up, handle answering.
-- `500 {"ok":false,"db":false}` — the handle stopped answering: the database file
-  was deleted or replaced underneath the process, the disk filled up, or an I/O
-  error occurred.
+- `200 {"ok":true,"db":true}` — the handle prepared and executed the statement.
+- `500 {"ok":false,"db":false}` — the handle itself is unusable (already closed,
+  or SQLite refused the statement). That is rare while serving; you see it around
+  shutdown or after a fatal driver error.
 
-It is **not** a write test, and a bad `DATA_DIR` does not show up here. The
-database is opened, switched to WAL and migrated during start-up, so a data
-directory that is missing-writable (or read-only) kills the process **before it
-starts listening** — `/api/health` never answers. In that case look for a
-container stuck in `Restarting` (`docker ps -a`) or `systemctl status jukebox`,
-then read the log for the SQLite error (`unable to open database file`,
-`attempt to write a readonly database`).
+Because `SELECT 1` never reads a page, health does **not** catch a full disk, a
+deleted or replaced database file, or a corrupt page. Those surface on the next
+write — `PUT /api/sync/cabinet` returns a 500 and the app says "Could not save
+the cabinet" — while `/api/health` keeps answering 200. Treat it as a *liveness*
+check, not a data-integrity one, and watch free space separately.
+
+A bad `DATA_DIR` never shows up here either. The database is opened, switched to
+WAL and migrated during start-up, so a data directory the process cannot create
+or write to (read-only mount, wrong ownership, unwritable parent) kills the
+process **before it starts listening** — `/api/health` never answers. In that
+case look for a container stuck in `Restarting` (`docker ps -a`) or
+`systemctl status jukebox`, then read the log for the SQLite error (`unable to
+open database file`, `attempt to write a readonly database`).
 
 The image bakes the endpoint into a `HEALTHCHECK` (`--interval=30s`,
 `--timeout=3s`, 3 retries by default), so `docker ps` reports
@@ -99,44 +108,68 @@ for restarts on a hung process, point an external monitor (Uptime Kuma, etc.) at
 
 The database is small and SQLite-specific: copying the file while the app is
 running can miss the `-wal` contents, so use SQLite's own backup for a hot copy.
+Set the volume name once — compose prefixes it with the project directory:
+
+```bash
+docker volume ls | grep -i jukebox     # usually <dir-name>_jukebox-data
+VOL=jukebox-data                       # the name you just saw
+```
 
 **Docker (hot):**
 
 ```bash
 docker run --rm \
-  -v jukebox-data:/data \
+  -v "$VOL":/data \
   -v "$PWD":/backup \
   alpine sh -c 'apk add --no-cache sqlite >/dev/null && \
                 sqlite3 /data/jukebox.db ".backup /backup/jukebox-$(date +%F).db"'
 ```
 
-Replace `jukebox-data` with the volume name from `docker volume ls` (compose
-usually prefixes it with the project name). The command needs network access for
-`apk add`; if the box is offline, use the cold copy below. The same command works
-on the OMV box over SSH.
+The command needs network access for `apk add`; if the box is offline, use the
+cold copy below. The same command works on the OMV box over SSH.
 
 **Docker (cold, no sqlite CLI):**
 
 ```bash
 docker stop jukebox
-docker run --rm -v jukebox-data:/data -v "$PWD":/backup alpine \
+docker run --rm -v "$VOL":/data -v "$PWD":/backup alpine \
   sh -c 'cp /data/jukebox.db* /backup/'
 docker start jukebox
 ```
 
 `docker compose down` is fine here; **`down -v` is not** — it deletes the volume.
 
-**Bare Node:**
+**Bare Node** (`/var/lib/jukebox` is the unit's `DATA_DIR`):
 
 ```bash
-sqlite3 "$DATA_DIR/jukebox.db" ".backup /backup/jukebox-$(date +%F).db"
-# or, with no sqlite3 CLI: systemctl stop jukebox && cp "$DATA_DIR"/jukebox.db* /backup/
+sudo sqlite3 /var/lib/jukebox/jukebox.db ".backup /var/backups/jukebox-$(date +%F).db"
+# or, with the app stopped and no sqlite3 CLI:
+sudo systemctl stop jukebox
+sudo cp /var/lib/jukebox/jukebox.db* /var/backups/
+sudo systemctl start jukebox
 ```
 
-**Restore:** stop the app, remove `jukebox.db`, `jukebox.db-wal`, `jukebox.db-shm`
-from the data dir/volume, put the backup in place as `jukebox.db`, start the app,
-then confirm `/api/health`. Keep the compose file / systemd unit in your backups
-too — they're the rest of the deployment.
+**Restore:** stop the app, remove the current `jukebox.db`, `-wal` and `-shm`,
+then put the backup in place *with the right owner* — a plain root copy leaves
+the file root-owned and bare Node then crash-loops. Docker runs as root, the
+systemd unit runs as `jukebox`. Run this from the directory that holds the backup:
+
+```bash
+# Docker: into the named volume
+docker stop jukebox
+docker run --rm -v "$VOL":/data -v "$PWD":/backup alpine \
+  sh -c 'rm -f /data/jukebox.db* && cp /backup/jukebox-2026-11-01.db /data/jukebox.db && chown 0:0 /data/jukebox.db'
+docker start jukebox
+
+# Bare Node: into DATA_DIR
+sudo systemctl stop jukebox
+sudo rm -f /var/lib/jukebox/jukebox.db*
+sudo install -o jukebox -g jukebox -m 640 /var/backups/jukebox-2026-11-01.db /var/lib/jukebox/jukebox.db
+sudo systemctl start jukebox
+```
+
+Then confirm `/api/health` and open the app. Keep the compose file / systemd unit
+in your backups too — they're the rest of the deployment.
 
 ## Moving between routes
 
@@ -144,25 +177,36 @@ The only server-side state is `jukebox.db` (plus its `-wal`/`-shm` siblings), so
 switching from bare Node to the image, or to another machine, is:
 
 1. stop the old deployment (`sudo systemctl stop jukebox`, `docker compose down`);
-2. take a backup with the `.backup` command above (or copy `jukebox.db*` while it
-   is stopped);
-3. start the new deployment and let it create its data dir;
-4. stop it, drop the backup in as `jukebox.db` (removing `-wal`/`-shm` first),
-   start it again;
-5. check `/api/health` and open the app.
+2. take a backup with the commands above (or copy `jukebox.db*` while stopped);
+3. start the new deployment once, so it creates its data dir/volume;
+4. stop it and load the backup with the **Restore** command for the new route —
+   that step clears a stale `-wal`, and its `chown`/`install -o` is what keeps the
+   image (root) and bare Node (`jukebox`) from crash-looping on ownership;
+5. start it again, check `/api/health` and open the app.
 
 Browser data does not move with it — that is per device and per browser profile.
 Only the cabinet layout comes across, via the database.
 
 ## Updating
 
-**Image:** `docker compose pull && docker compose up -d` (or OMV: **Pull** →
-**Up**, see [openmediavault.md](openmediavault.md#updating)). The volume is kept.
-Only app-path changes on `main` produce a new image, so a docs-only merge is a
-no-op pull.
+**Image** (compose file with `image:`): `docker compose pull && docker compose up -d`,
+or OMV: **Pull** → **Up** (see [openmediavault.md](openmediavault.md#updating)). The
+volume is kept. Only app-path changes on `main` produce a new image, so a docs-only
+merge is a no-op pull.
 
-**Checkout:** `git pull --ff-only && npm ci && npm run build`, then restart
-(`sudo systemctl restart jukebox` or `docker compose up -d --build`).
+**Built from a checkout** (compose file with `build:`): there is no registry to
+pull from, so update the source and rebuild:
+
+```bash
+git pull --ff-only && docker compose up -d --build
+```
+
+**Bare Node** — run it as the service user, then restart:
+
+```bash
+sudo -u jukebox -H bash -c 'cd /opt/jukebox && git pull --ff-only && npm ci && npm run build'
+sudo systemctl restart jukebox
+```
 
 **Clients:** a normal reload picks up the new build — `index.html`, `sw.js` and
 the manifest are served `no-cache`, hashed assets are `immutable`. If a device
@@ -175,7 +219,16 @@ browser is actually running.
 - Image: pin an older commit tag, e.g.
   `ghcr.io/ackervekenbm/jukebox:<sha7>`, and recreate
   ([docker-image.md](docker-image.md#pin-a-version-roll-back)).
-- Checkout: `git checkout <sha> && npm ci && npm run build` and restart.
+- Checkout (bare Node): do it as the service user, or the tree ends up root-owned
+  and the next update fails on permissions:
+
+  ```bash
+  sudo -u jukebox -H bash -c 'cd /opt/jukebox && git checkout <sha> && npm ci && npm run build'
+  sudo systemctl restart jukebox
+  ```
+
+  `git checkout main` (or `git switch main`) returns you to the tip afterwards.
+  For a `build:`-based compose file, `git checkout <sha> && docker compose up -d --build`.
 
 Data is unaffected either way: the schema is a single table created with
 `CREATE TABLE IF NOT EXISTS` and nothing migrates destructively.
@@ -195,8 +248,8 @@ data — tokens are only used in-memory to resolve the Discogs username.
 ### Log rotation
 
 Docker's default `json-file` driver grows without bound. On a small box that
-eventually fills the disk — and a full disk is how SQLite starts failing, which
-is when `/api/health` turns into a 500. Cap it in compose:
+eventually fills the disk — and a full disk is how SQLite starts failing (writes
+return 500 while `/api/health` may still say 200). Cap it in compose:
 
 ```yaml
     logging:
@@ -213,9 +266,9 @@ under systemd writes to the journal, which has its own caps
 ## Disk and housekeeping
 
 - The SQLite DB stays in the low megabytes; WAL files come and go with activity.
-- If the disk does fill: writes fail, `/api/health` flips to `500` and cabinet
-  sync stops. Free space, then restart the container/process so SQLite can
-  reopen cleanly.
+- If the disk does fill: writes fail (cabinet sync returns 500, while
+  `/api/health` may still say 200). Free space, then restart the
+  container/process so SQLite can reopen cleanly.
 - Old images accumulate on the host. `docker image prune` (or
   `docker image prune -a` after confirming nothing needs rolling back) reclaims
   space.

@@ -62,9 +62,13 @@ docker run -d --name jukebox -p 8080:3000 -v jukebox-data:/app/data \
   --restart unless-stopped ghcr.io/ackervekenbm/jukebox:latest
 ```
 
+The image is `amd64`/`arm64` only (a Pi needs a 64-bit OS), and GHCR usually
+wants a login first because anonymous pulls are rate-limited: `docker login
+ghcr.io` with a GitHub classic token that has `read:packages`.
+
 Then open <http://localhost:8080>. Three things hold for every route:
 
-- **Keep the data volume.** `/app/data` holds the only server-side state (a small SQLite database with the cabinet layout); `GET /api/health` reports `{"ok":true,"db":true}` when it's writable. Everything else — collection, tracklists, saved views, settings — lives in your browser, so `docker compose pull && docker compose up -d` is lossless for your collection data.
+- **Keep the data volume.** `/app/data` holds the only server-side state (a small SQLite database with the cabinet layout). `GET /api/health` answers `200 {"ok":true,"db":true}` while the process still holds a usable database handle — a liveness check, not a write test; an unwritable data directory stops the process at start-up instead. Everything else — collection, tracklists, saved views, settings — lives in your browser, so `docker compose pull && docker compose up -d` is lossless for your collection data.
 - **Serve it through the app's server.** The browser must reach Discogs through the same-origin `/discogs` proxy; serving `dist/` from a plain static server makes collection fetches fail with CORS/rate-limit noise (see the note under *How it works*).
 - **Offline launch needs HTTPS.** Over plain HTTP the app works and installs to the home screen on iOS (it honors the legacy `apple-*` meta tags), but the service worker that allows launching with the server down only registers in a secure context, with a certificate the device trusts — see [HTTPS & offline](docs/deploy/https-and-offline.md) for mkcert, Let's Encrypt (DNS-01) and Tailscale.
 

@@ -161,9 +161,10 @@ stateless, so treat the volume as persistent user data.
 
 The image ships `amd64` and `arm64` only, and `better-sqlite3` has no `armv7`
 prebuild (installs are script-free, so there is no compile fallback): a 32-bit
-Raspberry Pi OS can neither run the image nor build the server. Keep that
-prerequisite, and the docs' port/env/tag tables, in sync with the workflow matrix
-and the Dockerfile.
+Raspberry Pi OS cannot run the image, and a source checkout builds but fails at
+start-up with `Cannot find module …/build/Release/better_sqlite3.node`. Keep
+that prerequisite, and the docs' port/env/tag tables, in sync with the workflow
+matrix and the Dockerfile.
 
 - Every `main` push with app paths re-builds the multi-arch image and pushes
   `ghcr.io/ackervekenbm/jukebox:latest` (see `.github/workflows/docker-build.yml`).
@@ -171,8 +172,9 @@ and the Dockerfile.
   it, poll `/api/health` and assert the PWA cache headers — the image only
   publishes when smoke passes. The tag derives from
   `${{ github.repository }}`, so it follows repo renames.
-- **GHCR login (one-time per host).** GHCR requires a login even for public
-  images. Log in over SSH:
+- **GHCR login (one-time per host).** GHCR serves public images anonymously,
+  but those pulls are rate-limited and often fail with `denied`; log in over
+  SSH:
   ```bash
   sudo docker login ghcr.io -u ackervekenbm
   ```

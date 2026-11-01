@@ -23,8 +23,10 @@ dir, config, wrong port).
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
 | `curl` → connection refused | Wrong host/port, or the process is bound to loopback (bare Node) | Bare Node: `HOST=0.0.0.0` for direct access. Any route: check the port (`8080:3000` mapping, or `3000` for bare Node) |
-| `/api/health` → `500 {"ok":false,"db":false}` | The open DB handle stopped answering — file deleted/replaced underneath the process, disk full, I/O error | Free space or restore the file, then restart. Permissions problems do **not** show up here — they stop the process at boot (next row) |
-| Container stuck in `Restarting`, or exits right after `Up` | `DATA_DIR` missing, read-only, or not writable | `docker ps -a` + `docker logs`; fix ownership on the mount — see [the restart loop](#the-container-restarts-in-a-loop) |
+| `/api/health` → `500 {"ok":false,"db":false}` | The SQLite handle itself is unusable (closed, or the driver refused the statement) — rare while serving | Restart the process; if it returns, check the logs for a driver error. Disk-full or a deleted DB file do **not** show up here — they break writes instead |
+| Container stuck in `Restarting`, or exits right after `Up` | `DATA_DIR` not writable — wrong ownership, read-only mount, or an unwritable parent | `docker ps -a` + `docker logs`; fix the mount — see [the restart loop](#the-container-restarts-in-a-loop) |
+| Bare Node exits at start-up: `Cannot find module …/better_sqlite3.node` | 32-bit OS (`armv7l`) — no `armv7` prebuild and no compile fallback | Install 64-bit Raspberry Pi OS, then `rm -rf node_modules && npm ci` |
+| `/discogs` → `502 {"error":"Discogs API is unreachable"}` | The host can't reach `api.discogs.com`, or the call exceeded `DISCOGS_TIMEOUT_MS` | Check outbound DNS/HTTPS from the host; raise the timeout if Discogs is just slow |
 | Proxy answers `502` / connection refused, app is "up" | Proxy points at `3000` when only `8080` is published | Point it at the published host port — [https-and-offline.md](https-and-offline.md#topology) |
 | `[jukebox] no client build found; serving API only` | Started without a client build | `npm run build`; or set `CLIENT_DIST` |
 | `docker pull` → `denied` / `unauthorized` | GHCR login missing/expired, or a fine-grained token | Redo `docker login ghcr.io` with a classic PAT (`read:packages`) |
@@ -101,7 +103,8 @@ volumes:
 ## Port 80/443 is taken
 
 Common on OpenMediaVault (its web UI owns them). Map the container to something
-else instead of fighting it — the container always listens on `3000`:
+else instead of fighting it — the image listens on `3000` and its `HEALTHCHECK`
+probes that port:
 
 ```yaml
     ports:

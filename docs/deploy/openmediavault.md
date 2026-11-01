@@ -6,9 +6,9 @@ the OMV web UI after a one-time registry login over SSH.
 
 ## Why port 8080
 
-OMV's own web UI owns **80** and **443**. The container listens on `3000`, so map
-it to something free — the examples use `8080`. These are host-side choices; the
-container always listens on `3000`.
+OMV's own web UI owns **80** and **443**. The container listens on `3000` (and
+its `HEALTHCHECK` probes that port), so map it to something free — the examples
+use `8080`. These are host-side choices; leave the container port alone.
 
 ## Prerequisites
 
@@ -21,7 +21,9 @@ container always listens on `3000`.
 
 ## One-time: log in to GHCR over SSH
 
-GHCR needs a login even for public images. On the OMV host:
+GHCR serves public images anonymously, but those pulls are rate-limited and
+usually fail the plugin's **Pull** with an auth error. Logging in once fixes it.
+On the OMV host:
 
 ```bash
 sudo docker login ghcr.io -u <your-github-username>

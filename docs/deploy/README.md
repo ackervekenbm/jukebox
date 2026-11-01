@@ -43,7 +43,7 @@ Cross-cutting, whichever route you pick:
 | Persistent data | `DATA_DIR` (default `./data`, image uses `/app/data`) — holds `jukebox.db` |
 | Client build | `CLIENT_DIST` (default `./dist`) |
 | Health | `GET /api/health` → `200 {"ok":true,"db":true}`, `500 {"ok":false,"db":false}` — a liveness read on the open DB handle, not a write test; an unusable data dir stops the process at start-up instead |
-| Sync API | `GET`/`PUT /api/sync/cabinet` — Discogs token required, `If-Match` mandatory on `PUT` (`428` without it, `400` malformed or invalid, `409` conflict, `413` body over 256 KB) |
+| Sync API | `GET`/`PUT /api/sync/cabinet` — Discogs token required; a `PUT` needs a valid document and a matching `If-Match` (`400` invalid document or malformed header, `428` missing `If-Match`, `409` conflict, `413` body over 256 KB) |
 | Discogs proxy | `GET`/`HEAD /discogs/*` (`405` otherwise); forwards `retry-after` and `x-discogs-*` |
 | Prerequisites | Node **22+** (image ships it) on **64-bit** `x64`/`arm64` — no `armv7` prebuild; no C toolchain, installs are script-free (`.npmrc`) |
 
@@ -67,5 +67,5 @@ Images are built from `main` and published to
 `ghcr.io/ackervekenbm/jukebox`; see [docker-image.md](docker-image.md#tags) for
 the full tag list and how to pin or roll back. Source checkouts are versioned by
 commit — `git log -1` is the version you're running, and the app's Settings screen
-shows the commit and build time of the client you're looking at
+shows the commit and its date
 ([operations.md](operations.md#which-build-is-running)).

@@ -118,7 +118,7 @@ No inbound ports needed, and the DNS challenge works behind CGNAT. Caddy needs i
 DuckDNS DNS module compiled in:
 
 ```bash
-caddy add-package github.com/mholt/caddy-dns/duckdns
+caddy add-package github.com/caddy-dns/duckdns
 ```
 
 ```caddyfile
