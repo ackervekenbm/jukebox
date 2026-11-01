@@ -13,8 +13,8 @@ fixed: only the host side is yours.
 - **omv-extras** installed, and the docker repo enabled in **System →
   omv-extras**.
 - **`openmediavault-compose`** installed (**System → Plugins**). It installs the
-  Docker engine too; **Services → Compose** gains the *Settings*, *Files*,
-  *Services* and *Schedule* tabs.
+  Docker engine too. **Services → Compose** then has, among others, the
+  *Settings*, *Files*, *Services* and *Schedule* tabs used below.
 - **A 64-bit OS.** The image is published for `amd64`/`arm64` only, so 32-bit
   Raspberry Pi OS fails with `exec format error`; `better-sqlite3` has no `armv7`
   prebuild either. Use the 64-bit Raspberry Pi OS image.
@@ -58,6 +58,26 @@ fixed: only the host side is yours.
 Verify: **Services → Compose → Services** lists the container as running, and
 `http://<pi-ip>:8080/api/health` returns `{"ok":true,"db":true}`.
 
+### Upgrading from a named-volume stack
+
+Earlier versions of this guide used a named volume (`jukebox-data:/app/data`,
+with `container_name: jukebox`). That data is in the Docker volume
+`jukebox_jukebox-data`, not in the *Data* shared folder. Pasting the file above
+over the old one starts on an **empty** folder: health still says
+`{"ok":true,"db":true}`, but the cabinet layout looks gone. Carry the database
+across once:
+
+```bash
+sudo docker volume ls | grep -i jukebox                 # find the old volume
+# Services → Compose → Files → jukebox → Down, then:
+sudo mkdir -p "<data folder>/jukebox-data"
+sudo docker run --rm -v jukebox_jukebox-data:/old:ro -v "<data folder>/jukebox-data":/new alpine \
+  sh -c 'test -s /old/jukebox.db && cp /old/jukebox.db* /new/ && rm -f /new/jukebox.db-shm'
+```
+
+Then save the new file and press **Up**. Keep the old volume until the cabinet
+shows up on a device, then remove it with `sudo docker volume rm jukebox_jukebox-data`.
+
 ## What that file does
 
 - **`CHANGE_TO_COMPOSE_DATA_PATH/jukebox-data`** — the plugin substitutes the
@@ -71,7 +91,8 @@ Verify: **Services → Compose → Services** lists the container as running, an
 - **Port `8080`** — host side only. Change the left-hand number if that port is
   taken; never the right-hand one.
 - **Pin instead of tracking `:latest`** — replace the image with
-  `ghcr.io/ackervekenbm/jukebox:<sha7>` for a reproducible deploy. Editing that
+  `ghcr.io/ackervekenbm/jukebox:<sha7>` for a reproducible deploy. Use a SHA that
+  has an image tag; docs-only commits don't get one. Editing that
   line in the UI and pressing **Up** is also the rollback procedure
   ([docker-image.md](docker-image.md#pin-a-version-roll-back)).
 
@@ -111,7 +132,7 @@ The bind mount lands in the *Data* shared folder, so the SQLite file is
 you forgot which shared folder you picked:
 
 ```bash
-docker inspect jukebox-jukebox-1 --format '{{range .Mounts}}{{.Source}}{{end}}'
+sudo docker inspect jukebox-jukebox-1 --format '{{range .Mounts}}{{.Source}}{{end}}'
 ```
 
 That folder is the only server-side state, so treat it as user data:

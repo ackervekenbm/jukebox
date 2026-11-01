@@ -31,9 +31,9 @@ dir, config, wrong port).
 | `[jukebox] no client build found; serving API only` | Started without a client build | `npm run build`; or set `CLIENT_DIST` |
 | `docker pull` → `denied` / `unauthorized` | Rare: the image is public, so this is a stale/incorrect local credential (or a private fork) | `docker logout ghcr.io` for anonymous pulls, or log in with a classic PAT (`read:packages`) — fine-grained tokens don't work with Packages |
 | `exec format error` | Single-arch image for the wrong CPU, or 32-bit Raspberry Pi OS (the image is `amd64`/`arm64` only) | Use `:latest` (multi-arch) or the right `-amd64`/`-arm64` tag; on a Pi, install 64-bit Raspberry Pi OS |
-| Old UI after a deploy | Service worker still holding the old shell | Force-refresh; or unregister the SW in DevTools → Application |
+| Old UI after a deploy | Service worker still holding the old shell | Close and reopen the app (a home-screen app can't force-refresh); in a desktop browser, force-refresh. See [below](#a-stale-deployment-survives-every-reload) |
 | Collection never loads, console shows CORS/429 | `dist/` served by a static server instead of the Node process | Proxy `/` (including `/discogs`) to the app |
-| Cabinet sync fails with 401 | Discogs token invalid/expired | Regenerate the token in Settings |
+| Cabinet sync fails with 401 | Discogs token invalid/expired | Generate a new token on Discogs (settings → developers) and paste it into Settings |
 | Cabinet sync fails with 409 | Another device wrote first - normally self-healing | Check the client rebased; a persistent 409 is worth an issue |
 | Cabinet sync fails with 413 | Cabinet document exceeded the server's 256 KB JSON limit (very large collection, or small cabinets leaving many records unplaced) | Report it with your collection size — see [below](#cabinet-sync-fails-with-413) |
 | Device can't open the app offline | HTTP instead of HTTPS, or untrusted cert | [https-and-offline.md](https-and-offline.md) |
@@ -56,7 +56,10 @@ docker logs --tail=30 jukebox
 Fix the mount, then restart:
 
 - **Named volume:** usually just works. If it was populated by a root-only
-  process, `docker run --rm -v jukebox-data:/data alpine chown -R 0:0 /data`.
+  process, `docker run --rm -v "$VOL":/data alpine chown -R 0:0 /data`. Set
+  `VOL` to your route's real volume name first
+  ([operations.md](operations.md#find-your-data-first)); with the wrong name
+  this chowns a new, empty volume and fixes nothing.
 - **Bind mount:** the container runs as root by default, so a host directory owned
   by another UID is still writable only if the permissions allow it. Check the
   mode and `docker inspect --format '{{json .Mounts}}' jukebox`.
@@ -70,11 +73,15 @@ Fix the mount, then restart:
 always a **proxy** caching them:
 
 ```bash
-curl -sI https://jukebox.example.com/sw.js | grep -i cache-control
-# want: cache-control: no-cache
+curl -sI https://jukebox.example.com/sw.js | grep -iE 'cache-control|^age|x-cache|cf-cache-status'
+# want: cache-control: no-cache, and no Age / X-Cache: HIT / cf-cache-status: HIT
+curl -sI http://127.0.0.1:8080/sw.js | grep -iE 'etag|last-modified'   # 3000 for bare Node
 ```
 
-If your proxy answers with a max-age, exclude `sw.js`/`index.html` from caching
+A caching proxy passes the app's `cache-control: no-cache` through unchanged, so
+that header alone can't tell you whether the proxy is caching. An `Age` header, a
+cache `HIT`, or an `ETag` that differs from the one the app returns directly is
+the real sign. If you find one, exclude `sw.js`/`index.html` from caching
 there. Second candidate: the device kept the old service worker — DevTools →
 Application → Service Workers → *Unregister*, then reload twice. Before either,
 check **Settings → the build line**: if it already shows the new commit, the
@@ -91,14 +98,25 @@ under a different project name, silently creates a *new* empty volume:
 docker volume ls | grep -i jukebox
 ```
 
-If you see two, your data is in the older one. Either copy the DB across
-([operations.md](operations.md#backups)) or pin the volume name in compose:
+If you see two, your data is in the older one. Check which one holds a real
+database with `docker run --rm -v <volume>:/data alpine ls -l /data/jukebox.db`.
+Then either copy the DB across
+([operations.md](operations.md#moving-between-routes)) or pin compose to the
+volume that **already has the data**:
 
 ```yaml
 volumes:
   jukebox-data:
-    name: jukebox-data
+    name: jukebox_jukebox-data     # the existing volume, exactly as `docker volume ls` shows it
 ```
+
+Don't pin to a new name such as `jukebox-data` unless that volume already holds
+the data. A new name gives you a third, empty volume.
+
+The `docker run` quickstart and the compose file in
+[docker-image.md](docker-image.md) both use the volume `jukebox-data`. The repo's
+own `docker-compose.yml` uses `<dir>_jukebox-data`. Moving between them is the
+usual way to end up here.
 
 **Bind directory (OMV route).** The same trap has a different shape: the path is
 whatever the *Data* shared folder in **Services → Compose → Settings** resolves
@@ -153,6 +171,6 @@ with a fresh fetch.
 
 ## Reporting a problem
 
-Include: how you deploy (image tag or commit), `curl -s http://<host>/api/health`,
+Include: how you deploy (image tag or commit), `curl -s http://<host>:<port>/api/health`,
 the container/service logs, browser console errors and whether it's reproducible
 in a private window (no service worker). <https://github.com/ackervekenbm/jukebox/issues>

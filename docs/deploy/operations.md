@@ -72,7 +72,8 @@ Two consequences worth remembering:
 ## Health and monitoring
 
 ```bash
-curl -fsS http://127.0.0.1:3000/api/health     # from the host
+curl -fsS http://127.0.0.1:8080/api/health     # Docker: the published host port
+curl -fsS http://127.0.0.1:3000/api/health     # bare Node
 ```
 
 `/api/health` runs `SELECT 1` on the open SQLite handle — a constant expression
@@ -91,7 +92,7 @@ the cabinet" — while `/api/health` keeps answering 200. Treat it as a *livenes
 check, not a data-integrity one, and watch free space separately.
 
 A bad `DATA_DIR` never shows up here either. The database is opened, switched to
-WAL and migrated during start-up, so a data directory the process cannot create
+WAL and its table created (`CREATE TABLE IF NOT EXISTS`) during start-up, so a data directory the process cannot create
 or write to (read-only mount, wrong ownership, unwritable parent) kills the
 process **before it starts listening** — `/api/health` never answers. In that
 case look for a container stuck in `Restarting` (`docker ps -a`) or
@@ -108,119 +109,156 @@ for restarts on a hung process, point an external monitor (Uptime Kuma, etc.) at
 
 The database is small and SQLite-specific: copying the file while the app is
 running can miss the `-wal` contents, so use SQLite's own backup for a hot copy.
-Set the volume name once — compose prefixes it with the project directory:
+
+### Find your data first
+
+Where the database lives depends on the route. **Get this right before running
+anything below:** Docker silently creates an empty volume for a name that
+doesn't exist, so a wrong name gives you an empty backup that "succeeded", or a
+restore the app never sees.
+
+| Route | Data location | Container |
+| --- | --- | --- |
+| `docker run` / the compose file in [docker-image.md](docker-image.md) | volume `jukebox-data` (pinned with `name:`) | `jukebox` |
+| The repo's `docker-compose.yml` ([from-source-docker.md](from-source-docker.md)) | volume `<dir>_jukebox-data`, e.g. `jukebox_jukebox-data` for a checkout in `jukebox/` | `jukebox` |
+| [OpenMediaVault](openmediavault.md) | host folder `<Data shared folder>/jukebox-data` (bind mount, no volume) | `jukebox-jukebox-1` |
+| Bare Node ([from-source-node.md](from-source-node.md)) | `DATA_DIR`, `/var/lib/jukebox` in the example unit | systemd unit `jukebox` |
+
+For the two volume routes, set the names and check that the volume really holds a
+database. Stop if the last command prints nothing:
 
 ```bash
-docker volume ls | grep -i jukebox     # usually <dir-name>_jukebox-data
-VOL=jukebox-data                       # the name you just saw
+docker volume ls | grep -i jukebox
+VOL=jukebox-data          # or jukebox_jukebox-data — the name you just saw
+CT=jukebox
+docker run --rm -v "$VOL":/data alpine ls -l /data/jukebox.db
 ```
 
-If you mounted a **bind directory** instead (the
-[OMV route](openmediavault.md) does), there is no volume to name: the DB is a
-plain host file at `<Data shared folder>/jukebox-data/jukebox.db`. Stop the
-container and copy the folder — `sudo cp -a …/jukebox-data /var/backups/jukebox-$(date +%F)`
-— and skip the `VOL` plumbing below.
+Every backup below is a **dated directory** holding `jukebox.db` (and, for a
+cold copy taken after an unclean stop, possibly `jukebox.db-wal`). Restore
+always copies the directory's `jukebox.db*` back as a set, so committed data in a
+leftover `-wal` isn't thrown away. Never restore a `-shm` file; SQLite rebuilds
+it.
 
-**Docker (hot):**
+### Hot backup (app running)
+
+**Docker volume:**
 
 ```bash
-docker run --rm \
-  -v "$VOL":/data \
-  -v "$PWD":/backup \
-  alpine sh -c 'apk add --no-cache sqlite >/dev/null && \
-                sqlite3 /data/jukebox.db ".backup /backup/jukebox-$(date +%F).db"'
+BK=jukebox-$(date +%F); mkdir -p "$BK"
+docker run --rm -v "$VOL":/data -v "$PWD/$BK":/backup alpine sh -c \
+  'test -s /data/jukebox.db && apk add --no-cache sqlite >/dev/null && \
+   sqlite3 /data/jukebox.db ".backup /backup/jukebox.db"'
 ```
 
-The command needs network access for `apk add`; if the box is offline, use the
-cold copy below. The same command works on the OMV box over SSH.
+`test -s` makes it fail instead of backing up an empty database. It needs network
+access for `apk add`; if the box is offline, take a cold backup.
 
-**Docker (cold, no sqlite CLI):**
+**OMV bind folder** (over SSH): the same command with the folder in place of the
+volume, `-v "<Data shared folder>/jukebox-data":/data`, and `sudo docker`.
+
+**Bare Node** needs the `sqlite3` CLI (`sudo apt install sqlite3`). Run it as the
+service user so it can't leave root-owned `-wal`/`-shm` files behind:
 
 ```bash
-docker stop jukebox
-docker run --rm -v "$VOL":/data -v "$PWD":/backup alpine \
-  sh -c 'cp /data/jukebox.db* /backup/'
-docker start jukebox
+BK=/var/backups/jukebox-$(date +%F); sudo mkdir -p "$BK"
+sudo -u jukebox sqlite3 /var/lib/jukebox/jukebox.db ".backup /tmp/jukebox.db" \
+  && sudo mv /tmp/jukebox.db "$BK/"
 ```
 
-`docker compose down` is fine here; **`down -v` is not** — it deletes the volume.
-
-**Bare Node** (`/var/lib/jukebox` is the unit's `DATA_DIR`):
+### Cold backup (app stopped, no sqlite CLI)
 
 ```bash
-sudo sqlite3 /var/lib/jukebox/jukebox.db ".backup /var/backups/jukebox-$(date +%F).db"
-# or, with the app stopped and no sqlite3 CLI:
+BK=jukebox-$(date +%F); mkdir -p "$BK"
+
+# Docker volume
+docker stop "$CT"
+docker run --rm -v "$VOL":/data -v "$PWD/$BK":/backup alpine \
+  sh -c 'test -s /data/jukebox.db && cp /data/jukebox.db /backup/ && \
+         { [ ! -e /data/jukebox.db-wal ] || cp /data/jukebox.db-wal /backup/; }'
+docker start "$CT"
+
+# OMV bind folder
+sudo docker stop jukebox-jukebox-1
+sudo cp -a "<Data shared folder>/jukebox-data/." "$BK/" && sudo rm -f "$BK"/jukebox.db-shm
+sudo docker start jukebox-jukebox-1
+
+# Bare Node
 sudo systemctl stop jukebox
-sudo cp /var/lib/jukebox/jukebox.db* /var/backups/
+sudo cp -a /var/lib/jukebox/. "$BK/" && sudo rm -f "$BK"/jukebox.db-shm
 sudo systemctl start jukebox
 ```
 
-**Restore:** stop the app, remove the current `jukebox.db`, `-wal` and `-shm`,
-then put the backup in place *with the right owner* — a plain root copy leaves
-the file root-owned and bare Node then crash-loops. Docker runs as root, the
-systemd unit runs as `jukebox`. Run this from the directory that holds the
-backup, with `jukebox-2026-11-01.db` replaced by your file:
+Use `docker stop`/`docker start` (or `systemctl stop`/`start`). If you prefer
+`docker compose down`, bring it back with `docker compose up -d`, since `down`
+removes the container. **Never `down -v`:** it deletes the volume.
+
+### Restore
+
+Stop the app, remove the current `jukebox.db*`, copy the backup set in, and give
+it the right owner. Docker runs as root; the systemd unit runs as `jukebox`, and
+a root-owned file makes it crash-loop. `BK` is the backup directory:
 
 ```bash
-# Docker: into the named volume (VOL still set from above)
-docker stop jukebox
-docker run --rm -v "$VOL":/data -v "$PWD":/backup alpine \
-  sh -c 'rm -f /data/jukebox.db* && cp /backup/jukebox-2026-11-01.db /data/jukebox.db && chown 0:0 /data/jukebox.db'
-docker start jukebox
+# Docker volume (VOL and CT set as above)
+docker stop "$CT"
+docker run --rm -v "$VOL":/data -v "$PWD/$BK":/backup:ro alpine sh -c \
+  'test -s /backup/jukebox.db && rm -f /data/jukebox.db* && \
+   cp /backup/jukebox.db* /data/ && rm -f /data/jukebox.db-shm && chown 0:0 /data/jukebox.db*'
+docker start "$CT"
 
-# Docker with a bind directory (OMV route): a host path, container jukebox-jukebox-1
-docker stop jukebox-jukebox-1
-sudo rm -f <data folder>/jukebox-data/jukebox.db*
-sudo cp jukebox-2026-11-01.db <data folder>/jukebox-data/jukebox.db
-docker start jukebox-jukebox-1
+# OMV bind folder
+sudo docker stop jukebox-jukebox-1
+sudo rm -f "<Data shared folder>"/jukebox-data/jukebox.db*
+sudo cp "$BK"/jukebox.db* "<Data shared folder>/jukebox-data/"
+sudo docker start jukebox-jukebox-1
 
-# Bare Node: into DATA_DIR
+# Bare Node
 sudo systemctl stop jukebox
 sudo rm -f /var/lib/jukebox/jukebox.db*
-sudo install -o jukebox -g jukebox -m 640 /var/backups/jukebox-2026-11-01.db /var/lib/jukebox/jukebox.db
+sudo install -o jukebox -g jukebox -m 640 "$BK"/jukebox.db* /var/lib/jukebox/
 sudo systemctl start jukebox
 ```
 
-Then confirm `/api/health` and open the app. Keep the compose file / systemd unit
-in your backups too — they're the rest of the deployment.
+Then confirm `/api/health` and open the app. Keep the compose file or systemd unit
+in your backups too: they're the rest of the deployment.
 
 ## Moving between routes
 
 The only server-side state is `jukebox.db` (plus its `-wal`/`-shm` siblings), so
 switching from bare Node to the image, or to another machine, is:
 
-1. stop the old deployment (`sudo systemctl stop jukebox`, `docker compose down`);
-2. take a backup with the commands above (or copy `jukebox.db*` while stopped);
+1. stop the old deployment (`sudo systemctl stop jukebox`, `docker stop <container>`);
+2. take a cold backup of it with the commands above;
 3. start the new deployment once, so it creates its data dir/volume;
-4. stop it and load the backup with the **Restore** command for the new route —
-   re-set `VOL` first if the new route is the image. That step clears a stale
-   `-wal`, and its `chown`/`install -o` is what keeps the image (root) and bare
-   Node (`jukebox`) from crash-looping on ownership;
+4. stop it and load the backup with the **Restore** command for the new route.
+   Look its data location up in [the table](#find-your-data-first) and re-set
+   `VOL`/`CT` if it is a volume route. Restore clears a stale `-wal`, and its
+   `chown`/`install -o` is what keeps the image (root) and bare Node (`jukebox`)
+   from crash-looping on ownership;
 5. start it again, check `/api/health` and open the app.
+
+This applies to switching between Docker routes too. The three Docker routes
+keep data in three different places (the table above), so moving from the
+`docker run` quickstart to the repo's compose file, or from either to the OMV
+bind folder, starts on an empty database unless you carry `jukebox.db` across.
 
 Browser data does not move with it — that is per device and per browser profile.
 Only the cabinet layout comes across, via the database.
 
 ## Updating
 
-**Image** (compose file with `image:`): `docker compose pull && docker compose up -d`,
-or OMV: **Pull** → **Up** (see [openmediavault.md](openmediavault.md#updating)). The
-volume is kept. Only app-path changes on `main` produce a new image, so a docs-only
-merge is a no-op pull.
+Take a [backup](#backups) first. Each route's guide owns its exact steps:
 
-**Built from a checkout** (compose file with `build:`): there is no registry to
-pull from, so update the source and rebuild:
-
-```bash
-git pull --ff-only && docker compose up -d --build
-```
-
-**Bare Node** — run it as the service user, then restart:
-
-```bash
-sudo -u jukebox -H bash -c 'cd /opt/jukebox && git pull --ff-only && npm ci && npm run build'
-sudo systemctl restart jukebox
-```
+- **Image:** [docker-image.md](docker-image.md#update) (compose or `docker run`),
+  or **Pull** → **Up** on OMV ([openmediavault.md](openmediavault.md#updating)).
+  Only app-path changes on `main` produce a new image, so a docs-only merge is a
+  no-op pull.
+- **Built from a checkout** (compose file with `build:`):
+  `git pull --ff-only && docker compose up -d --build`
+  ([from-source-docker.md](from-source-docker.md)).
+- **Bare Node:** [from-source-node.md](from-source-node.md#updating). Stop the
+  service before rebuilding, because the build empties `dist/` and `dist-server/`.
 
 **Clients:** a normal reload picks up the new build — `index.html`, `sw.js` and
 the manifest are served `no-cache`, hashed assets are `immutable`. If a device
@@ -233,16 +271,11 @@ browser is actually running.
 - Image: pin an older commit tag, e.g.
   `ghcr.io/ackervekenbm/jukebox:<sha7>`, and recreate
   ([docker-image.md](docker-image.md#pin-a-version-roll-back)).
-- Checkout (bare Node): do it as the service user, or the tree ends up root-owned
-  and the next update fails on permissions:
-
-  ```bash
-  sudo -u jukebox -H bash -c 'cd /opt/jukebox && git checkout <sha> && npm ci && npm run build'
-  sudo systemctl restart jukebox
-  ```
-
-  `git checkout main` (or `git switch main`) returns you to the tip afterwards.
-  For a `build:`-based compose file, `git checkout <sha> && docker compose up -d --build`.
+- Checkout (bare Node): the update procedure in
+  [from-source-node.md](from-source-node.md#updating) with `git checkout <sha>`
+  in place of `git pull --ff-only`. `git switch main` returns you to the tip
+  afterwards.
+- `build:`-based compose file: `git checkout <sha> && docker compose up -d --build`.
 
 Data is unaffected either way: the schema is a single table created with
 `CREATE TABLE IF NOT EXISTS` and nothing migrates destructively.
@@ -255,7 +288,8 @@ docker logs -f jukebox                  # docker run
 journalctl -u jukebox -f                # systemd
 ```
 
-The server is quiet: a startup line, auth failures (`[auth]`), uncaught 5xx
+The server is quiet: a startup line, Discogs identity-check errors (`[auth]`;
+a rejected token is a plain 401 and is not logged), uncaught 5xx
 (`[server]`) and shutdown. It does **not** log requests, tokens or collection
 data — tokens are only used in-memory to resolve the Discogs username.
 

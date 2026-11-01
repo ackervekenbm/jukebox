@@ -39,7 +39,7 @@ Browse your personal **Discogs collection** on any device — grouped by artist 
 
 - Your **token stays in your browser** (localStorage). It's sent to Discogs — and to your own server only when it verifies a sync request — and nowhere else. Anyone with access to your device could extract it — regenerate it anytime at <https://www.discogs.com/settings/developers>.
 - The **collection, tracklists, cached years and pick history live in your browser** (IndexedDB). Saved views, the listen log and settings are localStorage. Browser data is the source of truth; nothing else stores your collection.
-- The container keeps a small **SQLite database in a Docker volume** that stores only your **record cabinet layout** (shelf names and capacities) so it can sync across devices ([#55](../../issues/55)). The collection itself never leaves your browser.
+- The container keeps a small **SQLite database in a Docker volume** that stores only your **record cabinet layout** (shelf names and capacities) so it can sync across devices ([#55](https://github.com/ackervekenbm/jukebox/issues/55)). The collection itself never leaves your browser.
 - **"Clear everything"** in settings removes the cached collection, your saved views, the listen log, the picker preference, the cabinet layout and stored credentials from your device.
 
 ## Deployment
@@ -67,7 +67,7 @@ only — a Pi needs a 64-bit OS.
 
 Then open <http://localhost:8080>. Three things hold for every route:
 
-- **Keep the data volume.** `/app/data` holds the only server-side state (a small SQLite database with the cabinet layout). `GET /api/health` answers `200 {"ok":true,"db":true}` while the process still holds a usable database handle — a liveness check, not a write test; an unwritable data directory stops the process at start-up instead. Everything else — collection, tracklists, saved views, settings — lives in your browser, so `docker compose pull && docker compose up -d` is lossless for your collection data.
+- **Keep the data volume.** `/app/data` holds the only server-side state (a small SQLite database with the cabinet layout). Everything else lives in your browser: collection, tracklists, saved views and settings. Re-pulling the image and recreating the container is lossless as long as the new container mounts the same volume. Each route keeps its data in a different place, so check [where yours is](docs/deploy/operations.md#find-your-data-first) before you back up or switch routes.
 - **Serve it through the app's server.** The browser must reach Discogs through the same-origin `/discogs` proxy; serving `dist/` from a plain static server makes collection fetches fail with CORS/rate-limit noise (see the note under *How it works*).
 - **Offline launch needs HTTPS.** Over plain HTTP the app works and installs to the home screen on iOS (it honors the legacy `apple-*` meta tags), but the service worker that allows launching with the server down only registers in a secure context, with a certificate the device trusts — see [HTTPS & offline](docs/deploy/https-and-offline.md) for mkcert, Let's Encrypt (DNS-01) and Tailscale.
 

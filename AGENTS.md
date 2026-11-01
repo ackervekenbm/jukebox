@@ -156,16 +156,13 @@ The production host is a Raspberry Pi running **OpenMediaVault**. OMV's web UI
 owns ports 80/443, so the app is exposed on host port **8080**. One container,
 one node process: it serves the static build, the API and the `/discogs` proxy.
 The SQLite DB lives in `/app/data`, bind-mounted into the Compose plugin's *Data*
-shared folder (`CHANGE_TO_COMPOSE_DATA_PATH/jukebox-data`) — today that holds
-only the (empty) cabinet-sync table, but the deployment is no longer stateless,
-so treat that folder as persistent user data.
+shared folder (`CHANGE_TO_COMPOSE_DATA_PATH/jukebox-data`). It holds the synced
+cabinet documents, so treat that folder as persistent user data. Backups and
+restores: `docs/deploy/operations.md#backups`.
 
-The image ships `amd64` and `arm64` only, and `better-sqlite3` has no `armv7`
-prebuild (installs are script-free, so there is no compile fallback): a 32-bit
-Raspberry Pi OS cannot run the image, and a source checkout builds but fails at
-start-up with `Cannot find module …/build/Release/better_sqlite3.node`. Keep
-that prerequisite, and the docs' port/env/tag tables, in sync with the workflow
-matrix and the Dockerfile.
+The host must run a 64-bit OS: the image is `amd64`/`arm64` only and
+`better-sqlite3` has no `armv7` prebuild. Keep that prerequisite, and the docs'
+port/env/tag tables, in sync with the workflow matrix and the Dockerfile.
 
 - Every `main` push with app paths re-builds the multi-arch image and pushes
   `ghcr.io/ackervekenbm/jukebox:latest` (see `.github/workflows/docker-build.yml`).
@@ -173,47 +170,19 @@ matrix and the Dockerfile.
   it, poll `/api/health` and assert the PWA cache headers — the image only
   publishes when smoke passes. The tag derives from
   `${{ github.repository }}`, so it follows repo renames.
-- **GHCR pull.** The package is public, so `docker pull` and the OMV plugin's
-  **Pull** work anonymously — there is no one-time login. If a pull is ever
-  denied (`denied`/`unauthorized`), log in over SSH with a GitHub **classic**
-  personal access token that has `read:packages` (fine-grained tokens don't
-  support GitHub Packages):
-  ```bash
-  sudo docker login ghcr.io -u ackervekenbm
-  ```
-  `sudo docker logout ghcr.io` returns to anonymous pulls. Keep any token's
-  expiry ≤ 1 year, and never paste it anywhere public — a classic token can
-  reach everything your account can.
-- **Route A — prebuilt image (all via the OMV web UI, no building on the Pi).**
-  With omv-extras installed and Docker + the Compose plugin enabled, pick the
-  *Compose Files* and *Data* shared folders in **Services → Compose → Settings**,
-  then **Files → Create** a stack named `jukebox` (the Name is a label, not a
-  filename — the plugin writes `<name>/<name>.yml`):
-  ```yaml
-  services:
-    jukebox:
-      image: ghcr.io/ackervekenbm/jukebox:latest
-      ports:
-        - "8080:3000"
-      volumes:
-        - CHANGE_TO_COMPOSE_DATA_PATH/jukebox-data:/app/data
-      restart: unless-stopped
-  ```
-  Save → select it → **Up** (creates/starts the container; open
-  `http://<pi-ip>:8080`). To update after a merge: select → **Pull** → **Up**
-  (an unchanged image is a no-op; the data folder keeps the sync DB). **Pull**
-  works anonymously; if it returns an auth error, see the GHCR note above. The
-  app is plain HTTP: a normal phone refresh picks up the new build (the server
-  sends `Cache-Control: no-cache` for `index.html`); force-refresh once if a tab
-  looks stale.
-- **Route B — build on the Pi** (e.g. local variants):
-  ```bash
-  cd ~
-  git clone https://github.com/ackervekenbm/jukebox.git && cd jukebox
-  sudo docker compose up -d --build
-  ```
-  Update later with `git pull && sudo docker compose up -d --build`.
-- **Offline / iPhone over HTTP** — home-screen install works over plain HTTP via
-  the legacy `apple-*` meta tags; the service worker (and therefore offline
-  launch) needs HTTPS with a device-trusted cert. Options live in the README's
-  *Deployment* section.
+- **GHCR pull.** The package is public, so the OMV plugin's **Pull** works
+  anonymously. If a pull is ever denied, follow
+  `docs/deploy/openmediavault.md#if-a-pull-is-denied`; on this host the login
+  user is `ackervekenbm`.
+- **Route A — prebuilt image (production).** The stack is the one in
+  `docs/deploy/openmediavault.md`: stack name `jukebox`, port `8080`, data in
+  the *Data* shared folder. To update after a merge: **Services → Compose →
+  Files** → `jukebox` → **Pull** → **Up**.
+- **Route B — build on the Pi** (e.g. local variants): `docs/deploy/from-source-docker.md`.
+  It uses the repo's `docker-compose.yml`, which keeps its data in the named
+  volume `jukebox_jukebox-data`, **not** in Route A's bind folder. Switching
+  routes starts on an empty DB unless you copy `jukebox.db` across
+  (`docs/deploy/operations.md#moving-between-routes`).
+- **Offline / iPhone over HTTP**: home-screen install works over plain HTTP, but
+  offline launch needs HTTPS with a device-trusted cert. Options:
+  `docs/deploy/https-and-offline.md`.

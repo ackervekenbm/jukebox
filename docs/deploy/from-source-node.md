@@ -121,10 +121,23 @@ the database and exits (force-exit after 10s), so `systemctl restart` is clean.
 
 ## Updating
 
+Take a [backup](operations.md#backups) first, then stop the service before
+building:
+
 ```bash
+sudo systemctl stop jukebox
 sudo -u jukebox -H bash -c 'cd /opt/jukebox && git pull --ff-only && npm ci && npm run build'
-sudo systemctl restart jukebox
+sudo systemctl start jukebox
 ```
+
+The service has to be stopped because the build is destructive while it runs:
+`npm ci` deletes `node_modules`, `vite build` empties `dist/` and `tsup --clean`
+deletes `dist-server/`, so a running server would serve 404s for the whole
+build. If the build fails partway (type-check or lint run first), the tree is
+half-cleaned and the service can't start. Go back to the last good commit with
+`git checkout <previous-sha>` and run the same `npm ci && npm run build`. For an
+update with no downtime, build in a second checkout and point
+`WorkingDirectory` at it.
 
 Build as the service user (`jukebox`), not as root: a root-owned
 `dist-server/` still runs, but the next update as `jukebox` fails on permissions.
@@ -140,8 +153,7 @@ need `npm ci` again before the next `npm run build`.
 
 ## Shipping a tarball
 
-There is no published package, but you can make your own artifact from a build.
-On a matching platform:
+There is no published package, but you can make your own artifact from a build:
 
 ```bash
 npm ci && npm run build
@@ -152,19 +164,24 @@ tar -czf jukebox-$(git rev-parse --short HEAD).tar.gz \
 On the target then:
 
 ```bash
-tar -xzf jukebox-*.tar.gz -C /opt/jukebox
-cd /opt/jukebox && npm ci --omit=dev
-NODE_ENV=production HOST=127.0.0.1 DATA_DIR=/var/lib/jukebox npm start
+sudo -u jukebox -H bash -c 'tar -xzf jukebox-*.tar.gz -C /opt/jukebox && cd /opt/jukebox && npm ci --omit=dev'
+sudo systemctl start jukebox      # the unit above
 ```
 
+Extract and install as the service user, and start through the unit rather than
+by hand: starting it as root would create a root-owned
+`/var/lib/jukebox/jukebox.db` that the `jukebox` unit then can't open.
+
 `npm ci --omit=dev` still needs network access to a registry (or a warm npm
-cache) for `express`, `better-sqlite3`, `zod` and friends; it needs **no
-toolchain**, because installs are script-free and the sqlite binary ships inside
-the package. `better-sqlite3` is native, so the tarball is per-platform (the
-package ships prebuilds for linux/darwin/win32 on x64/arm64, and musl variants).
-If `/opt/jukebox` belongs to the `jukebox` service user, do the extract and
-`npm ci` as that user (`sudo -u jukebox -H …`) so the next build doesn't trip
-over root-owned files.
+cache) for `express`, `better-sqlite3`, `zod` and friends. It needs **no
+toolchain**, because installs are script-free and `better-sqlite3` ships
+prebuilt binaries for every platform it supports in the one package (linux,
+including musl, darwin and win32, on x64 and arm64). The tarball itself is only
+JavaScript, so it isn't tied to the build machine. The target only needs Node 22+
+on a 64-bit x64 or arm64 OS.
+
+A tarball build shows `development build` in Settings unless you set `COMMIT_SHA`
+and `BUILD_TIME` when running `npm run build`.
 
 ## Next
 

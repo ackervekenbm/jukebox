@@ -11,7 +11,7 @@ ghcr.io/ackervekenbm/jukebox
 
 | Tag | What it is |
 | --- | --- |
-| `:latest` | Multi-arch index (linux/amd64 + linux/arm64), tracks `main` |
+| `:latest` | Multi-arch index (linux/amd64 + linux/arm64), built from `main` |
 | `:<sha7>` | Multi-arch index for one commit, e.g. `:351e79b` |
 | `:latest-amd64`, `:latest-arm64` | Single-architecture images |
 | `:<full-sha>-amd64`, `:<full-sha>-arm64` | Single-architecture, per commit |
@@ -67,15 +67,20 @@ services:
     container_name: jukebox
     ports:
       - "8080:3000"
-    environment:
-      DATA_DIR: /app/data
     volumes:
       - jukebox-data:/app/data
     restart: unless-stopped
 
 volumes:
   jukebox-data:
+    name: jukebox-data    # same volume as the docker run command above
 ```
+
+`name:` stops compose from prefixing the volume with the project directory, so
+this file and the `docker run` command use the same `jukebox-data` volume. To
+switch from `docker run` to compose, remove the old container first
+(`docker rm -f jukebox`); the data stays in the volume. Without `name:`, compose
+would create `<dir>_jukebox-data` and start empty.
 
 ```bash
 docker compose up -d
@@ -87,8 +92,12 @@ docker compose logs -f jukebox
 `:latest` is convenient but not reproducible. Pin the commit you verified:
 
 ```yaml
-    image: ghcr.io/ackervekenbm/jukebox:351e79b    # short SHA of a main commit
+    image: ghcr.io/ackervekenbm/jukebox:351e79b    # a commit that has an image tag
 ```
+
+Not every `main` commit has a tag. Docs-only merges build no image, so pick a SHA
+that is listed on the
+[package page](https://github.com/ackervekenbm/jukebox/pkgs/container/jukebox).
 
 Rolling back is the same edit with an older SHA, then `docker compose up -d`
 (the data volume is untouched, so the cabinet layout survives either way). For a
@@ -102,8 +111,19 @@ docker image inspect ghcr.io/ackervekenbm/jukebox:latest \
 
 ## Update
 
+With compose:
+
 ```bash
-docker compose pull && docker compose up -d     # or: docker pull <image> + recreate
+docker compose pull && docker compose up -d
+```
+
+With `docker run`, pull and recreate with the same flags:
+
+```bash
+docker pull ghcr.io/ackervekenbm/jukebox:latest
+docker rm -f jukebox
+docker run -d --name jukebox -p 8080:3000 -v jukebox-data:/app/data \
+  --restart unless-stopped ghcr.io/ackervekenbm/jukebox:latest
 ```
 
 Only the container is replaced; `jukebox-data` (the SQLite database) stays. Then
