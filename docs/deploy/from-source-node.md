@@ -41,7 +41,9 @@ npm start              # = node dist-server/index.js
   point `CLIENT_DIST` at the right directory).
 - **`HOST` defaults to `127.0.0.1`** — that is deliberate. Behind a reverse proxy
   on the same machine, leave it. To reach the app directly from other devices on
-  the LAN, set `HOST=0.0.0.0`.
+  the LAN, set `HOST=0.0.0.0`, which listens on every interface. Jukebox has no
+  login, so do that only on a trusted network
+  ([why](README.md#keep-it-on-your-lan-or-tailnet)).
 - `DATA_DIR` is created if missing and must be writable; it holds `jukebox.db`
   (plus `-wal`/`-shm` while running).
 - If the data directory can't be opened (permissions, wrong ownership,
@@ -163,9 +165,16 @@ tar -czf jukebox-$(git rev-parse --short HEAD).tar.gz \
 On the target then:
 
 ```bash
-sudo -u jukebox -H bash -c 'tar -xzf jukebox-*.tar.gz -C /opt/jukebox && cd /opt/jukebox && npm ci --omit=dev'
+TARBALL=jukebox-1a2b3c4.tar.gz    # the file you copied over
+sudo -u jukebox tar -xzf - -C /opt/jukebox < "$TARBALL"
+sudo -u jukebox -H bash -c 'cd /opt/jukebox && npm ci --omit=dev'
 sudo systemctl start jukebox      # the unit above
 ```
+
+This needs the service user, `/opt/jukebox` and the unit from
+[the systemd section](#systemd-unit) first. Your own shell opens the tarball
+(`< "$TARBALL"`), so it works even though the `jukebox` user can't read your home
+folder.
 
 Extract and install as the service user, and start through the unit rather than
 by hand: starting it as root would create a root-owned

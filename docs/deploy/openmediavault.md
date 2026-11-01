@@ -68,20 +68,26 @@ across once:
 
 ```bash
 sudo docker volume ls | grep -i jukebox                 # find the old volume
+OLD=jukebox_jukebox-data                                # the name you just saw
+DATA=/srv/dev-disk-by-uuid-XXXX/data/jukebox-data       # Data shared folder + /jukebox-data
 # Services → Compose → Files → jukebox → Down, then:
-sudo mkdir -p "<data folder>/jukebox-data"
-sudo docker run --rm -v jukebox_jukebox-data:/old:ro -v "<data folder>/jukebox-data":/new alpine \
-  sh -c 'test -s /old/jukebox.db && cp /old/jukebox.db* /new/ && rm -f /new/jukebox.db-shm'
+sudo docker volume inspect "$OLD" >/dev/null && sudo mkdir -p "$DATA" && \
+sudo docker run --rm -v "$OLD":/old:ro -v "$DATA":/new alpine:3.20 sh -c \
+  'test -s /old/jukebox.db && cp /old/jukebox.db /new/ && \
+   { [ ! -e /old/jukebox.db-wal ] || cp /old/jukebox.db-wal /new/; }'
 ```
 
-Then save the new file and press **Up**. Keep the old volume until the cabinet
-shows up on a device, then remove it with `sudo docker volume rm jukebox_jukebox-data`.
+`volume inspect` stops it if the name is wrong, so it can't create a new empty
+volume. To check that the old volume really holds your cabinet first, use
+[`jukebox_peek`](operations.md#check-what-a-database-holds). Then save the new
+file and press **Up**. Keep the old volume until the cabinet shows up on a
+device, then remove it with `sudo docker volume rm "$OLD"`.
 
 ## What that file does
 
 - **`CHANGE_TO_COMPOSE_DATA_PATH/jukebox-data`** — the plugin substitutes the
   *Data* shared folder from Settings every time it renders the file, so
-  `<data folder>/jukebox-data/jukebox.db` becomes the whole server-side state.
+  `<Data shared folder>/jukebox-data/jukebox.db` becomes the whole server-side state.
   That beats a named volume here: it is an ordinary folder you can see, browse
   and copy in OMV, and **Prune → Volume** cannot delete it.
 - **No `container_name`** — compose derives it from the stack and service, so it
@@ -127,7 +133,7 @@ login has to be redone. `sudo docker logout ghcr.io` returns to anonymous pulls.
 ## Where the data lives
 
 The bind mount lands in the *Data* shared folder, so the SQLite file is
-`<data folder>/jukebox-data/jukebox.db` (plus `-wal`/`-shm` while it runs). If
+`<Data shared folder>/jukebox-data/jukebox.db` (plus `-wal`/`-shm` while it runs). If
 you forgot which shared folder you picked:
 
 ```bash

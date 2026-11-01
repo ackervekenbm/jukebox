@@ -19,6 +19,10 @@ The app feature-detects the storage APIs (`navigator.storage`, `persist()`, the
 `caches` Cache API) and degrades quietly instead of breaking; a browser that
 refuses to register a service worker over HTTP just means no offline shell.
 
+Over plain HTTP your **Discogs token crosses the network unencrypted** on every
+request, because the app sends each Discogs call through its own `/discogs`
+proxy. That is fine on a home network you trust; anywhere else, use HTTPS.
+
 The certificate must be one the **device trusts**; a self-signed cert the phone
 rejects is no better than no cert.
 
@@ -38,7 +42,7 @@ depends on how you run it** — this is the single most common 502:
 | Route | Proxy upstream | Notes |
 | --- | --- | --- |
 | Bare Node ([from-source-node.md](from-source-node.md)) | `http://127.0.0.1:3000` | Leave `HOST` at its default `127.0.0.1` |
-| Docker ([docker-image.md](docker-image.md), [openmediavault.md](openmediavault.md)) | `http://127.0.0.1:8080` | `8080` is the published **host** port; `3000` exists only inside the container. Don't override the image's `HOST=0.0.0.0` |
+| Docker ([docker-image.md](docker-image.md), [openmediavault.md](openmediavault.md)) | `http://127.0.0.1:8080` | `8080` is the published **host** port; `3000` exists only inside the container. Don't override the image's `HOST=0.0.0.0`. Publish `127.0.0.1:8080:3000` so plain HTTP isn't also open on the LAN ([why](README.md#keep-it-on-your-lan-or-tailnet)) |
 | Proxy in another container | the compose service name, e.g. `http://jukebox:3000` | Put both on one Docker network; the `ports:` mapping can go if only the proxy needs to reach it |
 
 The snippets below use the bare-Node port; substitute per this table.
@@ -91,7 +95,11 @@ change `listen 443 ssl;` to `listen 80;`.
 
 ### Caddy
 
-For a public domain, Caddy gets a Let's Encrypt certificate on its own:
+For a public domain, Caddy gets a Let's Encrypt certificate on its own. That
+needs ports 80/443 reachable from the internet, which exposes the app; Jukebox
+has no login, so only do this
+[deliberately](README.md#keep-it-on-your-lan-or-tailnet). For home use, prefer
+the DNS-01 or Tailscale options below.
 
 ```caddyfile
 jukebox.example.com {
@@ -128,14 +136,38 @@ From least to most setup:
 
 ### mkcert
 
+**1. Make `jukebox.lan` resolve on every device.** A phone can't edit a hosts
+file, so the name has to come from your network's DNS. Add a local DNS record
+`jukebox.lan` → the server's LAN IP in your router (often under *DNS*, *Local
+DNS* or *Hostnames*), in Pi-hole (**Local DNS → DNS Records**) or in dnsmasq
+(`address=/jukebox.lan/192.168.1.10`). Check from a laptop with
+`nslookup jukebox.lan`. If your router can't do this, use DuckDNS or Tailscale
+below instead.
+
+**2. Create the certificate** (Debian/Raspberry Pi OS:
+`sudo apt install mkcert libnss3-tools`):
+
 ```bash
-mkcert -install                       # create/trust a local CA on the server
-mkcert jukebox.lan                    # → jukebox.lan.pem + jukebox.lan-key.pem
+mkcert -install                       # create/trust a local CA for your user
+mkcert jukebox.lan                    # → jukebox.lan.pem + jukebox.lan-key.pem in this folder
 ```
 
-Point the proxy at those two files. On each phone/laptop, install the CA.
-`mkcert -CAROOT` shows the folder: send only `rootCA.pem`. The `rootCA-key.pem`
-next to it must never leave the server.
+**3. Put the files where the proxy can read them.** mkcert writes the key
+readable only by you, but Caddy runs as user `caddy`:
+
+```bash
+sudo install -m 644 jukebox.lan.pem /etc/ssl/jukebox.lan.pem
+sudo install -o root -g caddy -m 640 jukebox.lan-key.pem /etc/ssl/jukebox.lan-key.pem   # nginx: -g root -m 600
+```
+
+Then reload the proxy (`sudo systemctl reload caddy`, or `nginx`).
+
+**4. Trust the CA on each phone and laptop.** `mkcert -CAROOT` shows the folder:
+send only `rootCA.pem` (AirDrop or mail it to the device). The `rootCA-key.pem`
+next to it must never leave the machine and should stay readable only by you:
+whoever holds it can create a trusted certificate for **any** website on every
+device that trusts this CA. Remove the CA from your devices when you stop using
+it.
 
 - **iOS:** open the file on the device, then **Settings → Profile Downloaded →
   Install**. Then go to **Settings → General → About → Certificate Trust
@@ -175,8 +207,9 @@ example.duckdns.org {
 `DUCKDNS_TOKEN` has to be in Caddy's own environment, for example an
 `Environment=DUCKDNS_TOKEN=…` line in a systemd override for `caddy.service`.
 
-Then point the DuckDNS record at the LAN IP for local use (or the public IP if you
-actually expose it — the DNS-01 challenge doesn't require that). Many routers and
+Then point the DuckDNS record at the server's **LAN IP**. The DNS-01 challenge
+doesn't need the app to be reachable from outside, so don't point it at your
+public IP ([why](README.md#keep-it-on-your-lan-or-tailnet)). Many routers and
 resolvers block public DNS answers that point to a private address (DNS-rebinding
 protection, e.g. on FRITZ!Box, OpenWrt/dnsmasq, pfSense/Unbound). If the phone
 can't resolve the name, allow the domain in that protection.
@@ -194,6 +227,8 @@ once):
 sudo tailscale serve --bg 8080   # proxy to http://127.0.0.1:8080
 sudo tailscale serve status
 ```
+
+Use `serve`, **never `funnel`**: Funnel publishes the app to the whole internet.
 
 The certificate puts the `<host>.<tailnet>.ts.net` name in public Certificate
 Transparency logs. Nothing on the tailnet becomes reachable because of that, but

@@ -55,6 +55,26 @@ there is no compile fallback either. On a Raspberry Pi, `uname -m` must say
 `Cannot find module …/better_sqlite3.node`. Install the 64-bit Raspberry Pi OS
 image.
 
+## Keep it on your LAN or tailnet
+
+**Jukebox has no login.** Run it on your home network or your tailnet only: no
+port forwarding, no Tailscale Funnel, no VPS without a firewall in front. If it
+is reachable from the internet:
+
+- anyone can use its `/discogs` proxy, and Discogs sees those requests coming
+  from your IP and your User-Agent;
+- any Discogs account holder can store a cabinet document (up to 256 KB) on
+  your server;
+- nothing is rate-limited.
+
+Docker publishes `-p 8080:3000` on **every** network interface, and its firewall
+rules bypass ufw and firewalld. When a reverse proxy on the same host is the only
+thing that should reach the app, publish it on loopback only:
+`-p 127.0.0.1:8080:3000` (in compose, `"127.0.0.1:8080:3000"`). Bare Node already
+listens on `127.0.0.1` by default; `HOST=0.0.0.0` opens it to every interface.
+
+## Common mistakes
+
 Three mistakes are worth stating up front because all are easy and all look like
 app bugs:
 

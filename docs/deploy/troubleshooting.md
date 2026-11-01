@@ -104,9 +104,10 @@ under a different project name, silently creates a *new* empty volume:
 docker volume ls | grep -i jukebox
 ```
 
-If you see two, your data is in the older one. Check which one holds a real
-database with `docker run --rm -v <volume>:/data alpine ls -l /data/jukebox.db`.
-Then either copy the DB across
+If you see two, check which one holds your cabinet with
+[`jukebox_peek`](operations.md#check-what-a-database-holds) on each. Only checking
+that `jukebox.db` exists isn't enough: the app creates an empty one in the new
+volume as soon as it starts. Then either copy the DB across
 ([operations.md](operations.md#moving-between-routes)) or pin compose to the
 volume that **already has the data**:
 

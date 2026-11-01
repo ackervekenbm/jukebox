@@ -37,9 +37,9 @@ Browse your personal **Discogs collection** on any device — grouped by artist 
 
 ## Where your data lives
 
-- Your **token stays in your browser** (localStorage). It's sent to Discogs — and to your own server only when it verifies a sync request — and nowhere else. Anyone with access to your device could extract it — regenerate it anytime at <https://www.discogs.com/settings/developers>.
-- The **collection, tracklists, cached years and pick history live in your browser** (IndexedDB). Saved views, the listen log and settings are localStorage. Browser data is the source of truth; nothing else stores your collection.
-- The server keeps a small **SQLite database in its data directory** (a Docker volume or a folder, depending on how you run it) that stores only your **record cabinet layout** (shelf names and capacities) so it can sync across devices ([#55](https://github.com/ackervekenbm/jukebox/issues/55)). The collection itself never leaves your browser.
+- Your **token is stored in your browser** (localStorage). Every Discogs request goes through your own Jukebox server, which forwards the token to Discogs; the server doesn't store or log it, and keeps only a hash of it for ten minutes to check sync requests. Over plain HTTP the token crosses your network unencrypted on each request, so [use HTTPS](docs/deploy/https-and-offline.md) if you don't trust the network. Anyone with access to your device could extract it — regenerate it anytime at <https://www.discogs.com/settings/developers>.
+- The **collection, tracklists, cached years and pick history live in your browser** (IndexedDB). Saved views, the listen log and settings are localStorage. Browser data is the source of truth for all of it.
+- The server keeps a small **SQLite database in its data directory** (a Docker volume or a folder, depending on how you run it) with your **record cabinet layout**, keyed by your Discogs username, so it can sync across devices ([#55](https://github.com/ackervekenbm/jukebox/issues/55)). The layout includes which release sits on which shelf, so the database and its backups do contain the release ids in your collection. Titles, artists, covers and tracklists stay in your browser.
 - **"Clear everything"** in settings removes the cached collection, your saved views, the listen log, the picker preference, the cabinet layout and stored credentials from your device.
 
 ## Deployment
