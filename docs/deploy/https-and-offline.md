@@ -25,8 +25,8 @@ Over plain HTTP the app just does without them; nothing breaks.
 Two more things to know before you switch:
 
 - **Over plain HTTP your Discogs token crosses the network unencrypted** on every
-  request, because every Discogs call goes through the app's own `/discogs`
-  proxy. That is fine on a home network you trust; anywhere else, use HTTPS.
+  Discogs API request, because each one goes through the app's own `/discogs`
+  proxy. (Cover art loads straight from Discogs' image servers, with no token.) That is fine on a home network you trust; anywhere else, use HTTPS.
 - **Switching to HTTPS starts the app fresh on each device.** `http://host:8080`
   and `https://jukebox.lan` are different sites to the browser, so the stored
   token, settings, saved views and cached collection stay behind on the old
@@ -83,11 +83,14 @@ change it to `127.0.0.1:3000`.
 
 ### Caddy
 
-Install it from your distribution or <https://caddyserver.com/docs/install>. A
-`jukebox.lan` name needs an explicit `tls` line: Caddy only uses its own
-certificate authority automatically for `localhost`, IP addresses and the
-`.local`, `.internal` and `.home.arpa` names, and for any other name it tries
-Let's Encrypt, which fails on a private network. `/etc/caddy/Caddyfile`:
+Install it from your distribution or <https://caddyserver.com/docs/install>.
+**Get the certificate files first** ([mkcert steps 1–3](#mkcert-your-own-local-ca)),
+otherwise the reload below fails with "no such file". A `jukebox.lan` name needs
+an explicit `tls` line: Caddy only uses its own certificate authority
+automatically for `localhost`, IP addresses and the `.local`, `.internal` and
+`.home.arpa` names, and for any other name it tries Let's Encrypt, which fails on
+a private network. Replace the contents of `/etc/caddy/Caddyfile` (the packaged
+one only serves a placeholder page) with:
 
 ```caddyfile
 jukebox.lan {
@@ -108,6 +111,9 @@ default ([why](README.md#keep-it-on-your-lan-or-tailnet)); DuckDNS below gets a
 public certificate without it.
 
 ### nginx
+
+Like Caddy, it needs the certificate files first
+([mkcert steps 1–3](#mkcert-your-own-local-ca)).
 
 ```nginx
 server {
@@ -147,12 +153,13 @@ certificate, with no proxy and no DNS work.
    (<https://tailscale.com/download/linux>, `sudo tailscale up`) and on each
    phone and laptop (App Store, Play Store, or the download page), signed in to
    the same account.
-2. In the [admin console](https://login.tailscale.com/admin/dns), under **DNS**,
-   turn on **MagicDNS** and **HTTPS Certificates**. Without them `serve` can't
-   get a certificate.
-3. On the server, put the app behind `tailscale serve`. This needs a recent
-   Tailscale with the `--bg` option, and `sudo` on Linux (or
-   `tailscale set --operator=$USER` once):
+2. Open the [DNS page of the admin console](https://login.tailscale.com/admin/dns)
+   and turn on **MagicDNS** (it gives every device a name like
+   `<host>.<tailnet>.ts.net`) and, further down the same page, **HTTPS
+   Certificates**. Without both, `serve` can't get a certificate.
+3. On the server, put the app behind `tailscale serve`. This needs Tailscale 1.52
+   or newer, and `sudo` on Linux (or `sudo tailscale set --operator=$USER` once,
+   to drop the `sudo` afterwards):
 
    ```bash
    sudo tailscale serve --bg 8080   # the app's port: 8080 for Docker, 3000 for bare Node
@@ -160,7 +167,10 @@ certificate, with no proxy and no DNS work.
    ```
 
 The app is then at `https://<host>.<tailnet>.ts.net` for every device on your
-tailnet, as long as the Tailscale app on that device is connected.
+tailnet, as long as the Tailscale app on that device is connected (also for the
+first load on a phone). The plain-HTTP port is no longer needed from other
+devices, so publish it on loopback only
+([Docker](docker-image.md#run-it), [OMV](openmediavault.md#what-that-file-does)).
 
 Use `serve`, **never `funnel`**: Funnel publishes the app to the whole internet.
 One thing to know: every certificate issued is listed in public Certificate
@@ -175,33 +185,55 @@ creating a DNS record (the *DNS-01 challenge*), so no inbound ports are needed,
 and it works even when your internet provider gives you no public IP of your own
 (CGNAT).
 
+This section assumes Caddy installed from its Debian/Ubuntu package, running as
+a systemd service. For Caddy in Docker, see the note after step 4.
+
+**0. Get a DuckDNS name and token.** Sign in at <https://www.duckdns.org>, add a
+subdomain (e.g. `yourname`), and set its IP to the server's **LAN** address,
+not your public one: the challenge doesn't need the app to be reachable from
+outside ([why](README.md#keep-it-on-your-lan-or-tailnet)). Your token is shown
+at the top of the page.
+
 **1. A Caddy build with the DuckDNS module.** Stock Caddy can't do the DNS
-challenge. Any of these gives you one:
+challenge. Download one from <https://caddyserver.com/download> with
+`caddy-dns/duckdns` ticked (pick your platform, e.g. `linux arm64` for a Pi), or
+build it with [xcaddy](https://github.com/caddyserver/xcaddy), which needs Go:
+`xcaddy build --with github.com/caddy-dns/duckdns`. Then install it **next to**
+the packaged binary, the way Caddy's docs describe, so an `apt upgrade` doesn't
+silently put the stock one back (which would break certificate renewal two
+months later):
 
-- `xcaddy build --with github.com/caddy-dns/duckdns`, then replace the `caddy`
-  binary with the result;
-- in Docker, a `caddy:builder` stage running that `xcaddy build`, copied into a
-  `caddy` image;
-- a custom download from <https://caddyserver.com/download> with
-  `caddy-dns/duckdns` ticked.
+```bash
+sudo dpkg-divert --divert /usr/bin/caddy.default --rename /usr/bin/caddy
+sudo install -m 755 ./caddy /usr/bin/caddy.custom          # the binary you downloaded or built
+sudo update-alternatives --install /usr/bin/caddy caddy /usr/bin/caddy.default 10
+sudo update-alternatives --install /usr/bin/caddy caddy /usr/bin/caddy.custom 50
+caddy list-modules | grep duckdns                          # should print dns.providers.duckdns
+```
 
-`caddy add-package github.com/caddy-dns/duckdns` also exists, but it swaps the
-installed binary in place, and the next apt/dnf upgrade puts the stock one back.
+`caddy add-package github.com/caddy-dns/duckdns` also exists, but it overwrites
+the packaged binary in place, which the next upgrade undoes.
 
-**2. Give Caddy the token in a root-only file.** An `Environment=` line would be
-readable by any local user through `systemctl show`. Anyone with the token can
-repoint your DuckDNS name:
+**2. Give Caddy the token in a root-only file.** Anyone with the token can
+repoint your DuckDNS name. An `Environment=` line would be readable by any local
+user through `systemctl show`, and the packaged unit starts Caddy with
+`--environ`, which prints its whole environment to the journal. The drop-in
+below loads the token from a file and starts Caddy without `--environ`:
 
 ```bash
 sudo install -m 600 /dev/null /etc/caddy/duckdns.env
 read -rsp 'DuckDNS token: ' T; echo; printf 'DUCKDNS_TOKEN=%s\n' "$T" | sudo tee /etc/caddy/duckdns.env >/dev/null; unset T
 sudo mkdir -p /etc/systemd/system/caddy.service.d
-printf '[Service]\nEnvironmentFile=/etc/caddy/duckdns.env\n' | \
+printf '%s\n' '[Service]' 'EnvironmentFile=/etc/caddy/duckdns.env' 'ExecStart=' \
+  'ExecStart=/usr/bin/caddy run --config /etc/caddy/Caddyfile' | \
   sudo tee /etc/systemd/system/caddy.service.d/duckdns.conf >/dev/null
 sudo systemctl daemon-reload
 ```
 
-**3. The Caddyfile:**
+`read -rsp` is bash; the empty `ExecStart=` clears the packaged command before
+the new one replaces it.
+
+**3. The Caddyfile** (replace the contents of `/etc/caddy/Caddyfile`):
 
 ```caddyfile
 yourname.duckdns.org {
@@ -212,14 +244,20 @@ yourname.duckdns.org {
 }
 ```
 
-Then `sudo systemctl restart caddy`.
+Then `sudo systemctl restart caddy`, and check for the certificate with
+`sudo journalctl -u caddy -n 50` ("certificate obtained successfully").
 
-**4. Point the DuckDNS name at the server's LAN IP** (on duckdns.org). Not your
-public IP: the challenge doesn't need the app to be reachable from outside
-([why](README.md#keep-it-on-your-lan-or-tailnet)). Many routers and DNS
-resolvers refuse public names that point to a private address (*DNS-rebinding
+**4. Make sure the phone can resolve the name.** Many routers and DNS resolvers
+refuse public names that point to a private address (*DNS-rebinding
 protection*, e.g. on FRITZ!Box, OpenWrt/dnsmasq, pfSense/Unbound). If the phone
-can't resolve the name, allow the domain in that protection.
+can't resolve `yourname.duckdns.org`, allow the domain in that protection.
+
+**Caddy in Docker instead:** build the image with a `caddy:builder` stage running
+the `xcaddy build` above, copied into a `caddy` image. Give it the token with
+`env_file: duckdns.env` in its compose service (a 0600 file next to the compose
+file), mount the Caddyfile, and put Caddy and Jukebox on one Docker network.
+The upstream is then `jukebox:3000` instead of `127.0.0.1:8080`, and Jukebox
+needs no `ports:` at all.
 
 ## mkcert: your own local CA
 
@@ -233,7 +271,8 @@ file, so the name has to come from your network's DNS. Add a local DNS record
 DNS* or *Hostnames*), in Pi-hole (**Local DNS → DNS Records**) or in dnsmasq
 (`address=/jukebox.lan/192.168.1.10`). Check from a laptop with
 `nslookup jukebox.lan`. If your router can't do this, use Tailscale or DuckDNS
-instead.
+instead. On Android, a custom **Private DNS** setting (e.g. `dns.google`)
+bypasses your router; set it to *Automatic* or *Off* on that phone.
 
 **2. Create the certificate** (Debian/Raspberry Pi OS:
 `sudo apt install mkcert libnss3-tools`):
@@ -251,26 +290,31 @@ sudo install -m 644 jukebox.lan.pem /etc/ssl/jukebox.lan.pem
 sudo install -o root -g caddy -m 640 jukebox.lan-key.pem /etc/ssl/jukebox.lan-key.pem   # nginx: -g root -m 600
 ```
 
-Then reload the proxy (`sudo systemctl reload caddy`, or `nginx`).
+**4. Configure the proxy** with those files: the [Caddy](#caddy) or
+[nginx](#nginx) section above, then reload it (`sudo systemctl reload caddy`, or
+`nginx`).
 
-**4. Protect the CA key.** `mkcert -CAROOT` shows the CA's folder. The
-`rootCA-key.pem` in it must stay on this machine, readable only by you
-(`chmod 600`). Whoever holds it can create a trusted certificate for **any**
-website (your bank included) on every device that trusts this CA.
+**5. Protect the CA key.** `mkcert -CAROOT` shows the CA's folder. mkcert
+creates the `rootCA-key.pem` in it readable only by you (mode 400); keep it that
+way, and keep it on this machine. Whoever holds it can create a trusted
+certificate for **any** website (your bank included) on every device that trusts
+this CA.
 
-**5. Trust the CA on each phone and laptop.** Send them only `rootCA.pem`, e.g.
+**6. Trust the CA on each phone and laptop.** Send them only `rootCA.pem`, e.g.
 by AirDrop or mail, and remove it from the devices when you stop using it.
 
 - **iOS:** open the file on the device, then **Settings → Profile Downloaded →
   Install**. Then go to **Settings → General → About → Certificate Trust
   Settings** and turn on full trust for it. Without that last step iOS still
   refuses the certificate.
-- **Android:** **Settings → Security → Encryption & credentials → Install a
-  certificate → CA certificate** (the menu names vary by vendor). Chrome trusts
-  user-installed CAs for websites, so the service worker works. Firefox for
-  Android ignores them unless you enable that in its settings. Installing the
-  app from a site with a user-installed CA is less dependable than with a public
-  certificate, so on Android Tailscale or DuckDNS is the smoother choice.
+- **Android:** e.g. on a Pixel, **Settings → Security & privacy → More security
+  settings → Encryption & credentials → Install a certificate → CA certificate**
+  (the menu names vary by vendor; search Settings for "CA certificate"). Android
+  only allows this with a screen lock set. Chrome trusts user-installed CAs for
+  websites, so the service worker works. Firefox for Android ignores them unless
+  you enable that in its settings. Installing the app from a site with a
+  user-installed CA is less dependable than with a public certificate, so on
+  Android Tailscale or DuckDNS is the smoother choice.
 
 ## Verifying offline launch
 
@@ -278,17 +322,20 @@ Test on the phone itself. The server's own browser proves nothing: `localhost`
 already counts as secure there.
 
 1. On the phone, open the app at its HTTPS address and add it to the home
-   screen.
+   screen: on iOS, Safari → **Share** → **Add to Home Screen**; on Android,
+   Chrome → menu (⋮) → **Add to Home screen** or **Install app**.
 2. Open it **from the home screen** and let the collection load completely. On
    iOS a home-screen app has its own storage, separate from Safari, so data
    loaded in Safari doesn't count.
-3. Turn on airplane mode, close the app completely and launch it from the home
-   screen. It should open with the cached collection. Cabinet sync can't reach
+3. Close the app completely (swipe it away in the app switcher), open it
+   again, and close it once more, so the service worker has taken over. Then
+   turn on airplane mode and launch it from the home screen. It should open with the cached collection. Cabinet sync can't reach
    the server while offline; that is expected.
 
 If step 3 fails, look closer (optional). In a desktop browser, open the developer
-console. For an iPhone you need a Mac: turn on **Settings → Safari → Advanced →
-Web Inspector** on the phone, connect it, and use Safari's **Develop** menu on the
+console. For an iPhone you need a Mac: turn on **Settings → Apps → Safari →
+Advanced → Web Inspector** on the phone (before iOS 18: Settings → Safari →
+Advanced), connect it, and use Safari's **Develop** menu on the
 Mac. Both of these should be `true`:
 
 ```js

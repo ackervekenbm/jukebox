@@ -8,12 +8,14 @@ this when the host already runs Node and you'd rather not add Docker.
 ## What you need
 
 - **Node 22 or newer** (`package.json` engines) and `git`. Check with `node -v`.
-  Debian 12 and Raspberry Pi OS (bookworm) ship Node 18 in `apt`, which is too
-  old. Install 22 from [NodeSource](https://github.com/nodesource/distributions)
-  instead (read the script before you pipe it to a shell):
+  The Node in Debian's and Raspberry Pi OS's own `apt` is too old (18 on
+  bookworm, 20 on trixie). Install a current LTS release, 24, from
+  [NodeSource](https://github.com/nodesource/distributions) instead. Node 22
+  also works, but its support ends in April 2027. The script is downloaded first
+  so you can read it before running it:
 
   ```bash
-  curl -fsSL https://deb.nodesource.com/setup_22.x -o nodesource_setup.sh
+  curl -fsSL https://deb.nodesource.com/setup_24.x -o nodesource_setup.sh
   sudo bash nodesource_setup.sh
   sudo apt install -y nodejs git
   ```
@@ -39,7 +41,7 @@ holds npm's download cache.
 **1. Create the service user:**
 
 ```bash
-sudo useradd --system --create-home --home-dir /var/cache/jukebox \
+sudo useradd --system --user-group --create-home --home-dir /var/cache/jukebox \
   --shell /usr/sbin/nologin jukebox
 sudo install -d -o jukebox -g jukebox /opt/jukebox
 ```
@@ -101,19 +103,36 @@ curl -fsS http://127.0.0.1:3000/api/health     # {"ok":true,"db":true}
 ```
 
 The server logs `[jukebox] http://127.0.0.1:3000 (client + API)` on boot
-(`journalctl -u jukebox`). It serves the client **and** the API; there is no
-separate static server step.
+(`sudo journalctl -u jukebox`). It serves the web app **and** the API; there is
+no separate static server step.
+
+**5. Reach it from your other devices.** The service listens on `127.0.0.1`
+only, so `http://<server-ip>:3000` from a phone is refused until you pick one of
+these:
+
+- **Tailscale** (also gives you HTTPS): `sudo tailscale serve --bg 3000`, see
+  [https-and-offline.md](https-and-offline.md#tailscale).
+- **A reverse proxy** on this machine (Caddy or nginx), with `127.0.0.1:3000` as
+  its upstream: [https-and-offline.md](https-and-offline.md#reverse-proxy).
+- **Directly on the LAN**, over plain HTTP. Jukebox has no login, so only on a
+  network you trust ([why](README.md#keep-it-on-your-lan-or-tailnet)):
+
+  ```bash
+  sudo mkdir -p /etc/systemd/system/jukebox.service.d
+  printf '[Service]\nEnvironment=HOST=0.0.0.0\n' | \
+    sudo tee /etc/systemd/system/jukebox.service.d/lan.conf >/dev/null
+  sudo systemctl daemon-reload && sudo systemctl restart jukebox
+  ```
+
+  Then open `http://<server-ip>:3000`.
 
 ### What the unit relies on
 
 - **`WorkingDirectory=/opt/jukebox`** is where the default `CLIENT_DIST=./dist`
   resolves from. If you install somewhere else, change it and `DATA_DIR`
   together.
-- **`HOST=127.0.0.1`** is deliberate: a reverse proxy on the same machine reaches
-  it, nothing else does. To reach the app directly from other devices, set
-  `HOST=0.0.0.0`, which listens on every interface. Jukebox has no login, so do
-  that only on a trusted network
-  ([why](README.md#keep-it-on-your-lan-or-tailnet)).
+- **`HOST=127.0.0.1`** is deliberate: only a proxy or Tailscale on the same
+  machine reaches it ([step 5](#install-as-a-service) for the alternatives).
 - **`/usr/bin/node`** is where NodeSource installs Node. With `nvm`/`fnm`, Node
   lives under a home directory that `ProtectHome=yes` hides from the service:
   install Node system-wide, or drop `ProtectHome=yes` and point `ExecStart` at
@@ -139,8 +158,9 @@ sudo systemctl start jukebox
 The service has to be stopped because the build is destructive while it runs:
 `npm ci` deletes `node_modules`, `vite build` empties `dist/` and `tsup --clean`
 deletes `dist-server/`, so a running server would answer with 404s. `git switch
-main` makes the update work after a rollback too, which leaves the checkout on a
-detached commit. For an update with no downtime, build in a second checkout and
+main` makes the update work after a rollback too: a rollback leaves the
+checkout *detached* (on a fixed commit instead of a branch), and `git pull` only
+works on a branch. For an update with no downtime, build in a second checkout and
 point `WorkingDirectory` at it.
 
 Always build as the service user, never as root: a root-owned `dist-server/`
@@ -153,11 +173,12 @@ same way:
 
 ```bash
 sudo systemctl stop jukebox
-sudo -u jukebox -H bash -c "cd /opt/jukebox && git checkout $PREV && npm ci && npm run build"
+sudo -u jukebox -H bash -c "cd /opt/jukebox && git checkout ${PREV:?set PREV first} && npm ci && npm run build"
 sudo systemctl start jukebox
 ```
 
-If the shell with `PREV` is gone, `sudo -u jukebox bash -c 'cd /opt/jukebox && git reflog'`
+`${PREV:?…}` stops the command if `PREV` isn't set, instead of quietly rebuilding
+the current commit. If the shell with `PREV` is gone, `sudo -u jukebox bash -c 'cd /opt/jukebox && git reflog'`
 lists the commits the checkout has been on. The next [update](#updating) returns
 to `main`. The data is unaffected either way: the schema is one table created with
 `CREATE TABLE IF NOT EXISTS`, and nothing migrates destructively.
@@ -180,22 +201,34 @@ next update's `npm ci` puts them back.
 ## Shipping a tarball
 
 There is no published package, but you can build on a faster machine and ship
-the result. The tarball only contains JavaScript and the package manifests, so
-it isn't tied to the build machine's platform:
+the result to the Pi. The tarball only contains JavaScript and the package
+manifests, so it isn't tied to the build machine's platform.
+
+**On the build machine**, in a clone of the repository. With Node 22+ and git
+installed there:
 
 ```bash
-# on the build machine, in a checkout
 npm ci
 COMMIT_SHA=$(git rev-parse HEAD) BUILD_TIME=$(git log -1 --format=%cI) npm run build
 tar -czf jukebox-$(git rev-parse --short HEAD).tar.gz \
   dist dist-server package.json package-lock.json .npmrc
 ```
 
-The `COMMIT_SHA`/`BUILD_TIME` variables stamp the build line in Settings;
-without them it reads `development build`.
+Or, on a machine with only Docker and git, build inside a Node container (same
+`tar` line afterwards):
 
-On the target, set up steps 1 and 3 of [Install as a service](#install-as-a-service)
-(the user and the unit), then:
+```bash
+docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/w -w /w \
+  -e COMMIT_SHA=$(git rev-parse HEAD) -e BUILD_TIME=$(git log -1 --format=%cI) \
+  node:24 sh -c 'npm ci && npm run build'
+```
+
+`COMMIT_SHA` and `BUILD_TIME` stamp the build line in Settings; without them it
+reads `development build`. Copy the tarball over, e.g.
+`scp jukebox-*.tar.gz pi:`.
+
+**On the Pi, the first time:** set up steps 1 and 3 of
+[Install as a service](#install-as-a-service) (the user and the unit), then:
 
 ```bash
 TARBALL=jukebox-1a2b3c4.tar.gz    # the file you copied over
@@ -215,9 +248,28 @@ Start it through the unit, not by hand as root: a root-run process creates its
 database as root (in `DATA_DIR`, or `./data` by default), and the `jukebox`
 service then can't open it.
 
-To update a tarball install, extract the new tarball over the old one with the
-service stopped, then run `npm ci --omit=dev` again. To roll back, extract the
-older tarball the same way.
+**Updating, or switching an existing checkout install to tarballs:** move the
+current install aside instead of extracting over it, so no old files are left
+behind and the previous version stays ready for a rollback. The database is in
+`/var/lib/jukebox`, so it isn't touched:
+
+```bash
+TARBALL=jukebox-5d6e7f8.tar.gz    # the new one
+sudo systemctl stop jukebox
+sudo rm -rf /opt/jukebox.prev && sudo mv /opt/jukebox /opt/jukebox.prev
+sudo install -d -o jukebox -g jukebox /opt/jukebox
+sudo -u jukebox tar -xzf - -C /opt/jukebox < "$TARBALL"
+sudo -u jukebox -H bash -c 'cd /opt/jukebox && npm ci --omit=dev'
+sudo systemctl start jukebox
+```
+
+To roll back, swap the folders back:
+
+```bash
+sudo systemctl stop jukebox
+sudo mv /opt/jukebox /opt/jukebox.bad && sudo mv /opt/jukebox.prev /opt/jukebox
+sudo systemctl start jukebox
+```
 
 ## Trying it without systemd
 

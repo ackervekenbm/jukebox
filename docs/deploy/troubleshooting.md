@@ -21,7 +21,7 @@ Bare Node:
 ```bash
 systemctl status jukebox                    # active? restart loop?
 curl -fsS http://127.0.0.1:3000/api/health
-journalctl -u jukebox -n 50
+sudo journalctl -u jukebox -n 50
 ```
 
 If health is good, the server is fine and the problem is in front of it (proxy,
@@ -49,7 +49,7 @@ config, wrong port).
 | Cabinet sync fails with 409 | Another device saved first; normally fixes itself | A 409 that keeps coming back is worth an issue |
 | Cabinet sync fails with 413 | The cabinet document is over the server's 256 KB limit | [Below](#cabinet-sync-fails-with-413) |
 | The app won't open offline | Plain HTTP, or a certificate the device doesn't trust | [https-and-offline.md](https-and-offline.md) |
-| Certificate warning on the phone | Your CA isn't trusted on that device | Install and trust it ([mkcert step 5](https-and-offline.md#mkcert-your-own-local-ca)); iOS needs the extra *Certificate Trust Settings* step |
+| Certificate warning on the phone | Your CA isn't trusted on that device | Install and trust it ([mkcert step 6](https-and-offline.md#mkcert-your-own-local-ca)); iOS needs the extra *Certificate Trust Settings* step |
 | Works on one device but not another | Browser data is per device | [Below](#it-works-on-my-phone-but-not-my-laptop) |
 
 ## The cabinet looks empty
@@ -65,7 +65,7 @@ creates it the moment it starts. Find where your old data went:
 volume. The `docker run` command and the compose file in
 [docker-image.md](docker-image.md) both use `jukebox-data`; the repo's own
 `docker-compose.yml` uses `<folder>_jukebox-data`. List them and look inside each
-with [`jukebox_peek`](operations.md#check-what-a-database-holds):
+with [`jukebox_peek`](operations.md#load-the-helpers):
 
 ```bash
 docker volume ls | grep -i jukebox
@@ -101,10 +101,19 @@ the device is signed in with another username (or a token for another account),
 it shows that account's cabinet, which may be empty. Check the username in
 Settings.
 
+**A different address.** Browser data is per address, so a device that opens
+the app at a new address (HTTP → HTTPS, a new host name, `:3000` → `:8080`)
+starts fresh there, without your token. Enter the token again in Settings; the
+cabinet then loads from the server. If it doesn't, one of the causes above
+applies.
+
 ## The container restarts in a loop
 
-The database is opened at start-up, so a data directory the process can't write
-to stops it before it listens. You get `Restarting` in `docker ps -a`, not a 500
+First read the log (below). If it says `exec format error`, the host runs a
+32-bit OS: see [64-bit only](README.md#the-contract-every-route-shares).
+Otherwise it is almost always the data directory. The database is opened at
+start-up, so a data directory the process can't write to stops it before it
+listens. You get `Restarting` in `docker ps -a`, not a 500
 from `/api/health`:
 
 ```bash
@@ -142,7 +151,7 @@ If the server does run the new build and a device keeps getting the old one, a
 unchanged, so look for the proxy's own signs:
 
 ```bash
-curl -sI https://jukebox.lan/sw.js | grep -iE 'cache-control|^age|x-cache|cf-cache-status'
+curl -sI https://your-https-address/sw.js | grep -iE 'cache-control|^age|x-cache|cf-cache-status|etag|last-modified'
 # want: no Age header, no X-Cache: HIT, no cf-cache-status: HIT
 curl -sI http://127.0.0.1:8080/sw.js | grep -iE 'etag|last-modified'   # 3000 for bare Node
 ```

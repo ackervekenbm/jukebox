@@ -32,11 +32,12 @@ With compose, set them under `environment:`; with systemd, `Environment=` lines.
 
 ## Which build is running?
 
-- **From a checkout:** `sudo -u jukebox bash -c 'cd /opt/jukebox && git log -1 --format="%h %ci"'`.
-  Run it as the user that owns the checkout; as anyone else, git refuses with
-  "detected dubious ownership".
-- **Image:** compare the tag you run with `main`, or read the digest of what you
-  pulled: `docker image inspect ghcr.io/ackervekenbm/jukebox:latest --format '{{index .RepoDigests 0}}'`
+- **Bare-Node checkout:** `sudo -u jukebox bash -c 'cd /opt/jukebox && git log -1 --format="%h %ci"'`.
+  Run git as the user that owns the checkout; as anyone else it refuses with
+  "detected dubious ownership". In a Docker checkout of your own, plain
+  `git log -1` works.
+- **Image:** compare the tag you run with `main`, or read the *digest* (the
+  image's unique content hash) of what you pulled: `docker image inspect ghcr.io/ackervekenbm/jukebox:latest --format '{{index .RepoDigests 0}}'`
   (`RepoDigests` is populated for pulled images; a locally built image may have
   none).
 - **In the app:** Settings shows a build line with the commit and its date — the
@@ -61,10 +62,10 @@ Two consequences worth remembering:
 - The volume is **not** a backup of your collection. Your collection only exists
   in your browsers. ("Clear everything" on every device means re-fetching from
   Discogs.)
-- Sync is **local-wins**: the browser is the source of truth and the server copy
-  is the cross-device echo. A `PUT` that loses a race gets a `409` with the newer
-  document and rebases onto its own local copy. So restoring an *older* server
-  DB can be overwritten by any device that still has newer local data.
+- Each browser keeps its own copy of the cabinet and syncs it to the server.
+  When two devices edit at once, the one saving its edits wins (*local wins*).
+  A device with cabinet edits it hasn't synced yet pushes them when it next
+  opens the cabinet, even over a [restored](#restore) server copy.
 
 ## Health and monitoring
 
@@ -100,53 +101,64 @@ next to an index file, `jukebox.db-shm`. Copying `jukebox.db` alone while the ap
 runs can miss those writes, so a backup either uses SQLite's own `.backup`
 command (hot, app running) or copies the files with the app stopped (cold).
 
+The commands on this page are for **bash** (the default shell on Debian and
+Raspberry Pi OS).
+
 ### Find your data first
 
 Where the database lives depends on the route. **Get this right before running
 anything below:** Docker silently creates an empty volume for a name that
 doesn't exist, so a wrong name gives you an empty backup or a restore the app
-never sees. Check the name with [`jukebox_peek`](#check-what-a-database-holds)
-before you rely on it.
+never sees. The commands below check the name before they use it, and
+[`jukebox_peek`](#load-the-helpers) shows what a database holds.
 
 | Route | Data location | Container |
 | --- | --- | --- |
 | `docker run` / the compose file in [docker-image.md](docker-image.md) | volume `jukebox-data` (pinned with `name:`) | `jukebox` |
-| The repo's `docker-compose.yml` ([from-source-docker.md](from-source-docker.md)) | volume `<dir>_jukebox-data`, e.g. `jukebox_jukebox-data` for a checkout in `jukebox/` | `jukebox` |
+| The repo's `docker-compose.yml` ([from-source-docker.md](from-source-docker.md)) | volume `<folder>_jukebox-data`, e.g. `jukebox_jukebox-data` for a checkout in `jukebox/` | `jukebox` |
 | [OpenMediaVault](openmediavault.md) | host folder `jukebox-data` inside the *Data* shared folder (bind mount, no volume), e.g. `/srv/dev-disk-by-uuid-XXXX/data/jukebox-data` | `jukebox-jukebox-1` |
 | Bare Node ([from-source-node.md](from-source-node.md)) | `DATA_DIR`, `/var/lib/jukebox` in the example unit | systemd unit `jukebox` |
 
 ### Set the names
 
-Paste the lines for your route into the shell you will run the commands in. Every
-block below uses these variables, and a new shell (for a restore days later)
-needs them again.
+Paste **only the block for your route** into the shell you will run the commands
+in. A new shell (for a restore days later) needs it again.
+
+Docker volume routes (`docker run`, either compose file):
 
 ```bash
-# Docker volume routes
 docker volume ls | grep -i jukebox    # pick the name from this list
 VOL=jukebox-data                      # or jukebox_jukebox-data
 CT=jukebox
+DOCKER=docker                         # DOCKER="sudo docker" if you run docker with sudo
+```
 
-# OMV: the absolute path of the Data shared folder (Storage → Shared Folders)
+OpenMediaVault (`DATA` is the absolute path of the *Data* shared folder, from
+**Storage → Shared Folders**, plus `/jukebox-data`):
+
+```bash
 DATA=/srv/dev-disk-by-uuid-XXXX/data/jukebox-data
 CT=jukebox-jukebox-1
 DOCKER="sudo docker"
+```
 
-# Bare Node
+Bare Node:
+
+```bash
 DATA=/var/lib/jukebox
 ```
 
-### Check what a database holds
+### Load the helpers
 
-The app creates `jukebox.db` the moment it starts, so "the file exists" proves
-nothing: a volume the app started on by mistake has one too. Look inside instead.
-This helper prints one line per Discogs account (`username|revision|saved_at`),
-and prints **nothing** for an empty database:
+Paste this once per shell too. It defines three helpers the rest of the page
+uses:
 
 ```bash
-jukebox_peek() {   # $1: a volume name, or an absolute folder
+# jukebox_peek: what a database holds, via Docker. $1 is a volume name or an
+# absolute folder. Prints one line per Discogs account, nothing if it is empty.
+jukebox_peek() {
   case $1 in
-    /*) ;;
+    /*) [ -d "$1" ] || { echo "no such folder: $1" >&2; return 1; } ;;
     *) ${DOCKER:-docker} volume inspect "$1" >/dev/null || return 1 ;;  # never create a volume
   esac
   ${DOCKER:-docker} run --rm -v "$1":/d:ro alpine:3.24 sh -c \
@@ -154,19 +166,34 @@ jukebox_peek() {   # $1: a volume name, or an absolute folder
      sqlite3 /tmp/jukebox.db "select username, revision, saved_at from cabinet_docs"'
 }
 
-jukebox_peek "$VOL"       # or: jukebox_peek "$DATA"
+# jukebox_peek_local: the same without Docker (needs: sudo apt install sqlite3).
+# $1 is a folder. It reads a copy, so it never writes into a backup.
+jukebox_peek_local() {
+  sudo sh -c 'set -e; test -s "$1/jukebox.db"; t=$(mktemp -d); trap "rm -rf $t" EXIT
+    cp "$1"/jukebox.db* "$t"/
+    sqlite3 "$t/jukebox.db" "select username, revision, saved_at from cabinet_docs"' _ "$1"
+}
+
+# DBCOPY: copies the database set from folder $1 to folder $2. It checks both
+# first, so a wrong or empty name stops it before anything is deleted, and it
+# replaces jukebox.db and jukebox.db-wal in $2 together. A -shm is never copied.
+DBCOPY='set -e; s=$1; t=$2; test -s "$s/jukebox.db"; test -d "$t"
+  rm -f "$t/jukebox.db" "$t/jukebox.db-wal" "$t/jukebox.db-shm"
+  cp "$s/jukebox.db" "$t/"; [ ! -e "$s/jukebox.db-wal" ] || cp "$s/jukebox.db-wal" "$t/"'
 ```
 
-It needs network access for `apk add`. On bare Node, with the `sqlite3` CLI
-(`sudo apt install sqlite3`):
-`sudo -u jukebox sqlite3 "$DATA/jukebox.db" 'select username, revision, saved_at from cabinet_docs'`.
+Then look at your live data. It should list your Discogs username:
+
+```bash
+jukebox_peek "${VOL:-$DATA}"          # bare Node without Docker: jukebox_peek_local "$DATA"
+```
 
 **Stop if it errors or prints nothing.** You are looking at the wrong volume or
 folder, or one with no cabinet saved yet.
 
 ### Where backups go
 
-Every backup is its own **timestamped directory**, so two backups never mix:
+Every backup is its own **timestamped folder**, so two backups never mix:
 
 ```bash
 sudo install -d -m 755 /var/backups/jukebox
@@ -175,114 +202,150 @@ sudo install -d -m 700 "$BK"
 ```
 
 It holds `jukebox.db` and, for a cold copy taken after an unclean stop, possibly
-`jukebox.db-wal`. Restore puts both back together, so committed data in a
-leftover `-wal` isn't lost. A `-shm` file is never backed up or restored; SQLite
-rebuilds it. Backups hold your Discogs username and your
-cabinet layout, which includes the release ids in your collection, so the
-directory is readable by root only.
+`jukebox.db-wal`; restore puts both back together. Backups hold your Discogs
+username and your cabinet layout, which includes the release ids in your
+collection, so the folder is readable by root only.
 
 ### Hot backup (app running)
 
-```bash
-# Docker volume or OMV folder (use "$DATA" in place of "$VOL" on OMV)
-${DOCKER:-docker} run --rm -v "$VOL":/data -v "$BK":/backup alpine:3.24 sh -c \
-  'apk add -q --no-cache sqlite && sqlite3 /data/jukebox.db ".backup /backup/jukebox.db"'
+Docker volume:
 
-# Bare Node (needs `sudo apt install sqlite3`): as the service user, so it can't
-# leave root-owned -wal/-shm files behind
+```bash
+$DOCKER volume inspect "$VOL" >/dev/null && \
+$DOCKER run --rm -v "$VOL":/data -v "$BK":/backup alpine:3.24 sh -c \
+  'test -s /data/jukebox.db && apk add -q --no-cache sqlite && sqlite3 /data/jukebox.db ".backup /backup/jukebox.db"'
+```
+
+OpenMediaVault:
+
+```bash
+$DOCKER run --rm -v "$DATA":/data -v "$BK":/backup alpine:3.24 sh -c \
+  'test -s /data/jukebox.db && apk add -q --no-cache sqlite && sqlite3 /data/jukebox.db ".backup /backup/jukebox.db"'
+```
+
+Bare Node (needs `sudo apt install sqlite3`). It runs as the service user, so it
+can't leave root-owned `-wal`/`-shm` files in the live data:
+
+```bash
 sudo chown jukebox "$BK"
 sudo -u jukebox sqlite3 "$DATA/jukebox.db" ".backup '$BK/jukebox.db'"
 sudo chown root "$BK"
 ```
 
-The Docker variant needs network access for `apk add`; if the box is offline,
-take a cold backup. Check the result with `jukebox_peek "$BK"`. Without Docker,
-use `sudo sqlite3 "file:$BK/jukebox.db?immutable=1" 'select username, revision, saved_at from cabinet_docs'`;
-`immutable=1` opens it without writing anything into the backup.
+The Docker variants need network access for `apk add`; if the box is offline,
+take a cold backup. Check the result with `jukebox_peek "$BK"` (or
+`jukebox_peek_local "$BK"`).
 
 ### Cold backup (app stopped, no sqlite CLI)
 
-```bash
-# Docker volume
-docker stop "$CT"
-docker run --rm -v "$VOL":/data:ro -v "$BK":/backup alpine:3.24 sh -c \
-  'cp /data/jukebox.db /backup/ && { [ ! -e /data/jukebox.db-wal ] || cp /data/jukebox.db-wal /backup/; }'
-docker start "$CT"
+Docker volume:
 
-# OMV folder or bare Node (a root shell expands the glob, so it works on any folder mode)
-sudo docker stop "$CT"            # bare Node: sudo systemctl stop jukebox
-sudo sh -c 'cp "$1"/jukebox.db "$2"/ && { [ ! -e "$1"/jukebox.db-wal ] || cp "$1"/jukebox.db-wal "$2"/; }' _ "$DATA" "$BK"
-sudo docker start "$CT"           # bare Node: sudo systemctl start jukebox
+```bash
+$DOCKER volume inspect "$VOL" >/dev/null && $DOCKER stop "$CT" && \
+$DOCKER run --rm -v "$VOL":/data:ro -v "$BK":/backup alpine:3.24 sh -c "$DBCOPY" _ /data /backup
+$DOCKER start "$CT"
 ```
 
-Use `docker stop`/`docker start` (or `systemctl stop`/`start`). If you prefer
-`docker compose down`, bring it back with `docker compose up -d`, since `down`
-removes the container. **Never `down -v`:** it deletes the volume.
+OpenMediaVault:
+
+```bash
+$DOCKER stop "$CT" && sudo sh -c "$DBCOPY" _ "$DATA" "$BK"
+$DOCKER start "$CT"
+```
+
+Bare Node:
+
+```bash
+sudo systemctl stop jukebox && sudo sh -c "$DBCOPY" _ "$DATA" "$BK"
+sudo systemctl start jukebox
+```
+
+The last line starts the app again even if the copy failed. If you prefer
+`docker compose down` to `docker stop`, bring it back with `docker compose up -d`,
+since `down` removes the container. **Never `down -v`:** it deletes the volume.
 
 ### Restore
 
-1. Set the names for the route you restore **into**
-   ([above](#set-the-names)), then pick the backup:
+1. In the shell you restore from, [set the names](#set-the-names) for the route
+   you restore **into** and [load the helpers](#load-the-helpers). Then pick the
+   backup and look inside it:
 
    ```bash
    sudo ls /var/backups/jukebox
    BK=/var/backups/jukebox/2026-11-01-031500    # the one to restore
-   jukebox_peek "$BK"                            # must list your account
-   # without Docker: sudo sqlite3 "file:$BK/jukebox.db?immutable=1" 'select username, revision, saved_at from cabinet_docs'
+   jukebox_peek "$BK"                            # or: jukebox_peek_local "$BK"
    ```
 
-2. Stop the app and replace the database. The same script does the work on every
-   route: it checks the backup first and only then deletes the current files, in
-   one root shell, so a wrong `BK` stops it before anything is removed. It copies
-   `jukebox.db` and, if present, `jukebox.db-wal`, never a `-shm`:
+   It must list your Discogs username.
+
+2. Stop the app and copy the backup in. `DBCOPY` checks the backup and the
+   target before it deletes anything:
+
+   Docker volume (the container runs as root, so no ownership change is needed):
 
    ```bash
-   RESTORE='set -e; b=$1; d=$2; test -s "$b/jukebox.db"
-     rm -f "$d/jukebox.db" "$d/jukebox.db-wal" "$d/jukebox.db-shm"
-     cp "$b/jukebox.db" "$d/"; [ ! -e "$b/jukebox.db-wal" ] || cp "$b/jukebox.db-wal" "$d/"'
+   $DOCKER volume inspect "$VOL" >/dev/null && $DOCKER stop "$CT" && \
+   $DOCKER run --rm -v "$VOL":/data -v "$BK":/backup:ro alpine:3.24 sh -c "$DBCOPY" _ /backup /data
+   $DOCKER start "$CT"
+   ```
 
-   # Docker volume (the container runs as root)
-   docker stop "$CT"
-   docker run --rm -v "$VOL":/data -v "$BK":/backup:ro alpine:3.24 sh -c "$RESTORE" _ /backup /data
-   docker start "$CT"
+   OpenMediaVault:
 
-   # OMV folder
-   sudo docker stop "$CT"
-   sudo sh -c "$RESTORE" _ "$BK" "$DATA"
-   sudo docker start "$CT"
+   ```bash
+   $DOCKER stop "$CT" && sudo sh -c "$DBCOPY" _ "$BK" "$DATA"
+   $DOCKER start "$CT"
+   ```
 
-   # Bare Node: the files must belong to the service user, or the unit crash-loops
-   sudo systemctl stop jukebox
-   sudo sh -c "$RESTORE"' && chown jukebox:jukebox "$d"/jukebox.db*' _ "$BK" "$DATA"
+   Bare Node (the files must belong to the service user, or the unit crash-loops):
+
+   ```bash
+   sudo systemctl stop jukebox && \
+   sudo sh -c "$DBCOPY"' && chown jukebox:jukebox "$2"/jukebox.db*' _ "$BK" "$DATA"
    sudo systemctl start jukebox
    ```
 
-3. Confirm with `jukebox_peek` on the live data, `/api/health`, and the app.
+3. Check the live data again with `jukebox_peek "${VOL:-$DATA}"` (or
+   `jukebox_peek_local "$DATA"`) and `/api/health`.
+
+4. Open the cabinet on each device. A device takes the restored layout from the
+   server when it next opens the cabinet, **unless** it has cabinet edits it never
+   managed to sync: those win and are pushed over the restored copy. To make a
+   restore stick everywhere, open the cabinet on such a device only after the
+   restore, and undo the edits there if you don't want them.
 
 Keep the compose file or systemd unit in your backups too: they're the rest of the
 deployment.
 
 ## Moving between routes
 
-The only server-side state is `jukebox.db` (plus its `-wal`/`-shm` siblings), so
-switching from bare Node to the image, or to another machine, is:
+The only server-side state is `jukebox.db`, so moving to another route or machine
+means carrying that file across:
 
-1. [set the names](#set-the-names) for the **old** route, and stop it;
-2. take a cold backup of it with the commands above, and note its `BK`;
-3. start the new deployment once, so it creates its data dir/volume;
-4. [set the names](#set-the-names) for the **new** route, stop it and run its
-   **Restore** command with that `BK`. Restore clears a stale `-wal`, and its
-   `chown` is what keeps the image (root) and bare Node (`jukebox`) from
-   crash-looping on ownership;
-5. start it again, check it with `jukebox_peek`, `/api/health` and the app.
+1. [Set the names](#set-the-names) and [load the helpers](#load-the-helpers) for
+   the **old** route, and take a [cold backup](#cold-backup-app-stopped-no-sqlite-cli)
+   (note its `BK`). Leave the old deployment stopped, and keep it from starting
+   again: `sudo systemctl disable --now jukebox` for bare Node, or
+   `docker rm -f <container>` for Docker (the data volume stays).
+2. Install the new route, following its guide (for Docker:
+   [install Docker](https://docs.docker.com/engine/install/) first). Start it
+   once, so it creates its data folder or volume.
+3. Set the names for the **new** route and run its [restore](#restore) with that
+   `BK`. Restore clears a stale `-wal` and sets the ownership each route needs
+   (root for Docker, `jukebox` for bare Node).
+4. Check it with `jukebox_peek`, `/api/health` and the app.
+5. Update whatever points at the app. The port usually changes (bare Node
+   listens on `3000`, the Docker examples on `8080`): fix the reverse-proxy
+   upstream ([table](https-and-offline.md#reverse-proxy)) or rerun
+   `tailscale serve --bg <port>`, or you get a 502.
 
-This applies to switching between Docker routes too. The three Docker routes
-keep data in three different places (the table above), so moving from the
-`docker run` quickstart to the repo's compose file, or from either to the OMV
-bind folder, starts on an empty database unless you carry `jukebox.db` across.
+The three Docker routes keep data in three different places (the table above),
+so this applies when moving between them too: from the `docker run` quickstart to
+the repo's compose file, or from either to the OMV folder.
 
-Browser data does not move with it — that is per device and per browser profile.
-Only the cabinet layout comes across, via the database.
+Browser data doesn't move: it is per device and per address. If the address the
+devices use changes (a new host name, or `:3000` → `:8080`), every device starts
+fresh there: enter the token again and re-add the home-screen icon. The cabinet
+comes back from the server.
 
 ## Updating
 
@@ -304,8 +367,9 @@ devices pick up a new build by themselves:
 
 - **Browser tab:** reload. If it still shows the old version, reload once more
   (the new service worker takes over on the next load) or force-refresh.
-- **Home-screen app:** close it completely and open it again. It can't
-  force-refresh.
+- **Home-screen app:** close it completely (swipe it away in the app switcher)
+  and open it again; if it still shows the old version, do that once more. It
+  can't force-refresh.
 
 Settings shows a build line with the commit each device is running, which is the
 quickest way to tell a client that hasn't updated from a deploy that didn't land

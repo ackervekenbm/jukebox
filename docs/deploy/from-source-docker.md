@@ -20,31 +20,11 @@ cd jukebox
 docker compose up -d --build
 ```
 
-That uses the repository's [`docker-compose.yml`](../../docker-compose.yml):
-
-```yaml
-services:
-  jukebox:
-    build: .
-    image: jukebox:latest
-    container_name: jukebox
-    ports:
-      - "8080:3000"
-    environment:
-      DATA_DIR: /app/data
-    volumes:
-      - jukebox-data:/app/data
-    # Cap the container log: an uncapped json-file log can fill the disk.
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    restart: unless-stopped
-
-volumes:
-  jukebox-data:
-```
+That uses the repository's [`docker-compose.yml`](../../docker-compose.yml). It
+builds the image from the checkout and tags it `jukebox:latest`, names the
+container `jukebox`, publishes `8080:3000`, keeps the data in the named volume
+`jukebox-data` (mounted at `/app/data`), caps the container log and restarts the
+container unless you stop it. Edit that file for the variations below.
 
 Open <http://localhost:8080>, then check it:
 
@@ -110,9 +90,10 @@ emulation. To build on an amd64 machine instead:
 
 1. **Docker Engine on Linux only:** teach the kernel to run arm64 programs
    through QEMU emulation. Docker Desktop already can, so skip this step there.
-   Either install your distribution's packages (Debian/Ubuntu:
-   `sudo apt install qemu-user-static binfmt-support`), which also survive a
-   reboot, or run Docker's helper image:
+   Either install your distribution's packages, which also survive a reboot
+   (Debian 13 and newer: `sudo apt install qemu-user-binfmt`; older Debian and
+   Ubuntu: `sudo apt install qemu-user-static binfmt-support`), or run Docker's
+   helper image:
 
    ```bash
    docker run --privileged --rm tonistiigi/binfmt:qemu-v10.2.3 --install arm64

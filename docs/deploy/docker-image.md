@@ -11,8 +11,13 @@ ghcr.io/ackervekenbm/jukebox
 
 ## What you need
 
-- Docker Engine or Docker Desktop. The Compose v2 plugin (`docker compose`) is
-  only needed for the compose variant.
+- Docker Engine or Docker Desktop
+  ([install](https://docs.docker.com/engine/install/)). The Compose v2 plugin
+  (`docker compose`) is only needed for the compose variant.
+- The commands here run `docker` as your own user, which needs membership in the
+  `docker` group (`sudo usermod -aG docker $USER`, then log in again; that group
+  is equivalent to root on this machine). Otherwise put `sudo` in front of each
+  `docker` command.
 - A 64-bit `amd64` or `arm64` host. On a Raspberry Pi that means the 64-bit OS
   ([why](README.md#the-contract-every-route-shares)).
 - No source, Node or login: the image is public.
@@ -38,7 +43,7 @@ and gets no tag of its own.
 docker run -d --name jukebox \
   -p 8080:3000 \
   -v jukebox-data:/app/data \
-  --log-opt max-size=10m --log-opt max-file=3 \
+  --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
   --restart unless-stopped \
   ghcr.io/ackervekenbm/jukebox:latest
 ```
@@ -52,11 +57,13 @@ Open <http://localhost:8080>, or `http://<server-ip>:8080` from another device.
 - Port `3000` is fixed inside the image, because the healthcheck probes it. To
   serve on another port, change the **host** side of the mapping (`80:3000`),
   not `PORT`.
-- `-p 8080:3000` listens on every network interface. With a reverse proxy on the
-  same host, use `-p 127.0.0.1:8080:3000` so only the proxy can reach it
-  ([why](README.md#keep-it-on-your-lan-or-tailnet)).
-- The `--log-opt` flags cap the container log at 30 MB. Without them it grows
-  until the disk is full, and a full disk is how SQLite starts failing.
+- `-p 8080:3000` listens on every network interface. With a reverse proxy or
+  Tailscale on the same host, use `-p 127.0.0.1:8080:3000` so only they can reach
+  it ([why](README.md#keep-it-on-your-lan-or-tailnet)). A port mapping can't be
+  changed on a running container: `docker rm -f jukebox`, then run the command
+  again with the new `-p` (the data volume stays).
+- The `--log-*` flags cap the container log at 30 MB. Without them it grows until
+  the disk is full, and a full disk is how SQLite starts failing.
 
 ## Or with compose
 
@@ -115,7 +122,7 @@ With `docker run`, pull and recreate with the same flags:
 docker pull ghcr.io/ackervekenbm/jukebox:latest
 docker rm -f jukebox
 docker run -d --name jukebox -p 8080:3000 -v jukebox-data:/app/data \
-  --log-opt max-size=10m --log-opt max-file=3 \
+  --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
   --restart unless-stopped ghcr.io/ackervekenbm/jukebox:latest
 ```
 
@@ -149,9 +156,12 @@ docker image inspect ghcr.io/ackervekenbm/jukebox:latest \
 ## If a pull is denied
 
 The image is public, so pulls normally need no login. A `denied` or
-`unauthorized` error usually means the host has stale GitHub credentials stored:
+`unauthorized` error usually means stale GitHub credentials are stored for the
+user that runs `docker`. Credentials are per user, so clear both your own and
+root's (OMV and other `sudo docker` setups use root's):
 
 ```bash
+docker logout ghcr.io
 sudo docker logout ghcr.io
 ```
 
@@ -159,20 +169,22 @@ Try the pull again. If you really need a login (a private fork, or the package
 was made private), use a GitHub **classic** personal access token with only the
 `read:packages` scope (<https://github.com/settings/tokens> → *Tokens
 (classic)*; fine-grained tokens don't work with GitHub Packages). Give it a short
-expiry, e.g. 30 days. Type it in rather than putting it on the command line, so
-it stays out of your shell history:
+expiry, e.g. 30 days. Run the login, the pull and the logout as the **same**
+user: as yourself, or all with `sudo` (as on OMV). The token is typed in, not put
+on the command line, so it stays out of your shell history (bash):
 
 ```bash
 read -rsp 'GitHub token: ' GHCR_TOKEN; echo
 GH_USER=your-github-username
-printf '%s' "$GHCR_TOKEN" | sudo docker login ghcr.io -u "$GH_USER" --password-stdin
+printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
 unset GHCR_TOKEN
-# pull, then:
-sudo docker logout ghcr.io
+docker pull ghcr.io/ackervekenbm/jukebox:latest    # or: docker compose pull
+docker logout ghcr.io
 ```
 
-`docker login` stores the token in `/root/.docker/config.json`, base64-encoded
-but not encrypted, which is why logging out again after the pull is worth it.
+`docker login` stores the token in that user's `~/.docker/config.json`,
+base64-encoded but not encrypted, which is why logging out again after the pull
+is worth it.
 
 ## Behind a proxy / with HTTPS
 
