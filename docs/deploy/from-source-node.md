@@ -6,12 +6,9 @@ this when the host already runs Node and you'd rather not add Docker.
 ## What you need
 
 - **Node 22 or newer** (`package.json` engines) and `git`.
-- **A 64-bit OS** (`x64` or `arm64`; on a Pi, `uname -m` must say `aarch64`,
-  not `armv7l`). `better-sqlite3` ships prebuilds for those only — there is no
-  `armv7` binary, and because installs are script-free (`.npmrc` →
-  `ignore-scripts`) there is no compile fallback. On 32-bit Raspberry Pi OS the
-  build still succeeds, but `npm start` dies with
-  `Cannot find module …/better-sqlite3/build/Release/better_sqlite3.node`.
+- **A 64-bit OS** (`x64` or `arm64`; on a Pi, `uname -m` must say `aarch64`).
+  On 32-bit the build succeeds but `npm start` fails; see
+  [64-bit only](README.md#the-contract-every-route-shares).
 - No C compiler, Python or `make`: nothing is compiled at install time, so a
   minimal host is enough.
 - Optional: a reverse proxy for a hostname/TLS - see
@@ -75,6 +72,9 @@ Environment=NODE_ENV=production
 Environment=HOST=127.0.0.1
 Environment=PORT=3000
 Environment=DATA_DIR=/var/lib/jukebox
+# Creates /var/lib/jukebox owned by User= and keeps it writable under
+# ProtectSystem=strict below.
+StateDirectory=jukebox
 ExecStart=/usr/bin/node dist-server/index.js
 Restart=on-failure
 RestartSec=5
@@ -84,7 +84,6 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/var/lib/jukebox
 
 [Install]
 WantedBy=multi-user.target
@@ -97,8 +96,8 @@ in the unit hides from the service: either install Node system-wide, or drop
 
 ```bash
 sudo useradd --system --home /opt/jukebox --shell /usr/sbin/nologin jukebox
-sudo mkdir -p /opt/jukebox /var/lib/jukebox
-sudo chown -R jukebox: /opt/jukebox /var/lib/jukebox
+sudo mkdir -p /opt/jukebox
+sudo chown -R jukebox: /opt/jukebox     # /var/lib/jukebox comes from StateDirectory=
 
 # Clone and build as the service user, so the tree it reads at runtime is the
 # one it wrote (a root-owned checkout breaks `npm run build` and later updates).
@@ -188,3 +187,5 @@ and `BUILD_TIME` when running `npm run build`.
 - Reverse proxy and TLS: [https-and-offline.md](https-and-offline.md)
 - Backup the data directory, monitor the health endpoint:
   [operations.md](operations.md)
+- When something breaks: [troubleshooting.md](troubleshooting.md)
+- Back to the overview: [docs/deploy/README.md](README.md)

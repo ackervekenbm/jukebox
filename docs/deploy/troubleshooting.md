@@ -1,5 +1,11 @@
 # Troubleshooting
 
+Part of the [deployment guides](README.md).
+
+The commands here use the container name `jukebox` (the `docker run` route and
+both compose files). On [OpenMediaVault](openmediavault.md) it is
+`jukebox-jukebox-1`, and commands need `sudo`.
+
 First 60 seconds, in this order:
 
 ```bash
@@ -127,14 +133,8 @@ layout just looks empty. Point it back, or copy `jukebox.db` across.
 
 ## Port 80/443 is taken
 
-Common on OpenMediaVault (its web UI owns them). Map the container to something
-else instead of fighting it — the image listens on `3000` and its `HEALTHCHECK`
-probes that port:
-
-```yaml
-    ports:
-      - "8080:3000"
-```
+Publish a different host port instead (`"8080:3000"`); only the left-hand side
+is yours. Common on OpenMediaVault, see [openmediavault.md](openmediavault.md).
 
 ## Collection loading stalls or retries
 

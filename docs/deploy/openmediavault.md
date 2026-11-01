@@ -15,9 +15,8 @@ fixed: only the host side is yours.
 - **`openmediavault-compose`** installed (**System → Plugins**). It installs the
   Docker engine too. **Services → Compose** then has, among others, the
   *Settings*, *Files*, *Services* and *Schedule* tabs used below.
-- **A 64-bit OS.** The image is published for `amd64`/`arm64` only, so 32-bit
-  Raspberry Pi OS fails with `exec format error`; `better-sqlite3` has no `armv7`
-  prebuild either. Use the 64-bit Raspberry Pi OS image.
+- **A 64-bit OS**, i.e. the 64-bit Raspberry Pi OS image
+  ([why](README.md#the-contract-every-route-shares)).
 - **Two shared folders**, set before the first compose file
   (**Services → Compose → Settings**):
   - **Compose Files** — where the plugin stores its compose files (it makes a

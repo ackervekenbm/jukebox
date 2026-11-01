@@ -7,6 +7,14 @@ path and the one to prefer for a home server.
 ghcr.io/ackervekenbm/jukebox
 ```
 
+## What you need
+
+- Docker Engine or Docker Desktop. The Compose v2 plugin is only needed for the
+  compose variant.
+- A 64-bit `amd64` or `arm64` host. On a Raspberry Pi that means the 64-bit OS
+  ([why](README.md#the-contract-every-route-shares)).
+- No source, Node or login: the image is public.
+
 ## Tags
 
 | Tag | What it is |
@@ -17,10 +25,9 @@ ghcr.io/ackervekenbm/jukebox
 | `:<full-sha>-amd64`, `:<full-sha>-arm64` | Single-architecture, per commit |
 
 `:latest` resolves to the right architecture per host, so the same compose file
-works on an x86 box and on a Raspberry Pi. Only `amd64` and `arm64` are built: a
-Pi needs a 64-bit OS (32-bit Raspberry Pi OS fails with `exec format error`).
-Images are only rebuilt when app paths change on `main` (`src/**`, `Dockerfile`,
-`package.json`, …) — a docs-only merge leaves the current `:latest` in place.
+works on an x86 box and on a Raspberry Pi. Images are only built from `main`,
+and only when app paths change (`src/**`, `Dockerfile`, `package.json`, …): a
+docs-only merge leaves the current `:latest` in place.
 
 ## Pull
 
@@ -49,11 +56,10 @@ docker run -d --name jukebox \
   ghcr.io/ackervekenbm/jukebox:latest
 ```
 
-→ <http://localhost:8080>. The image has a built-in `HEALTHCHECK` that polls
-`/api/health`, so `docker ps` shows `healthy` once the process answers and its
-database handle is alive. It is a liveness check, not a write test: an
-unwritable `/app/data` makes the container **exit during start-up** instead
-(see [troubleshooting.md](troubleshooting.md#the-container-restarts-in-a-loop)).
+→ <http://localhost:8080>. `docker ps` shows `healthy` once the built-in
+`HEALTHCHECK` passes ([what it checks](operations.md#health-and-monitoring)). An
+unwritable `/app/data` makes the container exit at start-up instead
+([troubleshooting.md](troubleshooting.md#the-container-restarts-in-a-loop)).
 
 Port `3000` is fixed inside the image — the healthcheck probes it. To serve on
 port `80`, change the **host** side of the mapping (`80:3000`), not `PORT`.
@@ -142,3 +148,4 @@ three self-hosting certificate options.
 - [operations.md](operations.md) — env vars, backups, health monitoring, log rotation
 - [troubleshooting.md](troubleshooting.md) — arch mismatch, `db:false`, `denied` pulls
 - [openmediavault.md](openmediavault.md) — the same image, via the OMV plugin
+- Back to the overview: [docs/deploy/README.md](README.md)

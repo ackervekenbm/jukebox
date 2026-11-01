@@ -7,6 +7,7 @@ Build the image yourself from a git clone. Same image as the published one
 
 - Docker Engine (or Docker Desktop) with the Compose v2 plugin.
 - `git`.
+- A 64-bit host ([prerequisites](README.md#the-contract-every-route-shares)).
 - No Node, no toolchain on the host: the build happens inside the image.
 
 ## Run it
@@ -69,17 +70,39 @@ The directory must be writable by the container (the image runs as root by
 default, so this usually just works; a `userns-remap` setup needs adjusting).
 
 **Building for a Raspberry Pi from an amd64 machine** — build on the Pi natively
-if you can; it is much faster and needs no emulation. To cross-build, register
-QEMU once, then build:
+if you can; it is much faster and needs no emulation. To cross-build:
 
-```bash
-docker run --privileged --rm tonistiigi/binfmt --install arm64
-docker buildx build --platform linux/arm64 -t jukebox:arm64 --load .
-```
+1. On Docker Engine (Linux), register QEMU for arm64. The registration doesn't
+   survive a reboot, so repeat it after one. Docker Desktop already includes
+   it, so skip this step there.
 
-Without the binfmt step the build fails inside `RUN npm ci` with
-`exec format error`, and a Pi running 32-bit Raspberry Pi OS cannot run the arm64
-image at all — the image is `amd64`/`arm64` only.
+   ```bash
+   docker run --privileged --rm tonistiigi/binfmt --install arm64
+   ```
+
+   Without it the build fails inside `RUN npm ci` with `exec format error`.
+
+2. Build under the tag the compose file uses, `jukebox:latest`:
+
+   ```bash
+   docker buildx build --platform linux/arm64 -t jukebox:latest --load .
+   ```
+
+3. Copy the image to the Pi (or push it to a registry, below):
+
+   ```bash
+   docker save jukebox:latest | gzip | ssh pi 'gunzip | sudo docker load'
+   ```
+
+4. On the Pi, start it **without** `--build`, so compose uses the loaded image
+   instead of building natively:
+
+   ```bash
+   docker compose up -d      # in a checkout of the same commit, for the compose file
+   ```
+
+The Pi needs a 64-bit OS
+([prerequisites](README.md#the-contract-every-route-shares)).
 
 **A real version line** — Settings shows the commit and its date from the
 `COMMIT_SHA`/`BUILD_TIME` build args; `docker compose up -d --build` passes
@@ -128,3 +151,5 @@ seconds; `--build` alone does not pull newer base images — add
 
 - TLS / offline launch: [https-and-offline.md](https-and-offline.md)
 - Backups, updates, monitoring: [operations.md](operations.md)
+- When something breaks: [troubleshooting.md](troubleshooting.md)
+- Back to the overview: [docs/deploy/README.md](README.md)

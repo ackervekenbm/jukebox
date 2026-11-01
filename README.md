@@ -23,7 +23,7 @@ Browse your personal **Discogs collection** on any device — grouped by artist 
 ## What you need
 
 - A free **Discogs personal access token** — create one at <https://www.discogs.com/settings/developers>.
-- That's it. There's no account, no sign-up and nothing to install — the app runs in your browser and your data stays there (see [Where your data lives](#where-your-data-lives)).
+- That's it. There's no account, no sign-up and nothing to install on your devices — the app runs in your browser and your data stays there (see [Where your data lives](#where-your-data-lives)).
 
 ## How it works
 
@@ -39,18 +39,18 @@ Browse your personal **Discogs collection** on any device — grouped by artist 
 
 - Your **token stays in your browser** (localStorage). It's sent to Discogs — and to your own server only when it verifies a sync request — and nowhere else. Anyone with access to your device could extract it — regenerate it anytime at <https://www.discogs.com/settings/developers>.
 - The **collection, tracklists, cached years and pick history live in your browser** (IndexedDB). Saved views, the listen log and settings are localStorage. Browser data is the source of truth; nothing else stores your collection.
-- The container keeps a small **SQLite database in a Docker volume** that stores only your **record cabinet layout** (shelf names and capacities) so it can sync across devices ([#55](https://github.com/ackervekenbm/jukebox/issues/55)). The collection itself never leaves your browser.
+- The server keeps a small **SQLite database in its data directory** (a Docker volume or a folder, depending on how you run it) that stores only your **record cabinet layout** (shelf names and capacities) so it can sync across devices ([#55](https://github.com/ackervekenbm/jukebox/issues/55)). The collection itself never leaves your browser.
 - **"Clear everything"** in settings removes the cached collection, your saved views, the listen log, the picker preference, the cabinet layout and stored credentials from your device.
 
 ## Deployment
 
-Jukebox is **one Node process**: it serves the built client, the `/api` sync store and the same-origin `/discogs` proxy. It runs anywhere Node 22+ or Docker does.
+Jukebox is **one Node process**: it serves the built client, the `/api` sync store and the same-origin `/discogs` proxy. It runs anywhere Node 22+ or Docker does, on a 64-bit OS.
 
 | Route | Good for |
 | --- | --- |
 | [Prebuilt Docker image](docs/deploy/docker-image.md) | Anything with Docker — multi-arch (`amd64`/`arm64`), no build, easy updates and rollback |
 | [Docker, built from a checkout](docs/deploy/from-source-docker.md) | You want to patch it yourself, or can't pull an image |
-| [Bare Node](docs/deploy/from-source-node.md) | A host that already runs Node 22 (systemd + optional reverse proxy) |
+| [Bare Node](docs/deploy/from-source-node.md) | A host that already runs Node 22+ (systemd + optional reverse proxy) |
 | [OpenMediaVault](docs/deploy/openmediavault.md) | The OMV Compose plugin (ports 80/443 are OMV's, so 8080) |
 
 Prerequisites, the shared port/environment contract, TLS and offline launch, backups, updates, rollback and troubleshooting live in **[docs/deploy/](docs/deploy/README.md)**.

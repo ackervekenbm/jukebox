@@ -16,9 +16,9 @@ layout so it can follow you between devices.
 
 | Route | Guide | Good for | Needs |
 | --- | --- | --- | --- |
-| **Prebuilt image** | [docker-image.md](docker-image.md) | Anything with Docker. Public image, multi-arch (`amd64` + `arm64`), no build step, easy updates and rollback | Docker |
-| **Build from a checkout (Docker)** | [from-source-docker.md](from-source-docker.md) | A variant you patch yourself, or a host that shouldn't pull an image | Docker, git |
-| **Bare Node** | [from-source-node.md](from-source-node.md) | A box that already runs Node 22 (systemd + optional reverse proxy) | Node 22+, git, 64-bit OS |
+| **Prebuilt image** | [docker-image.md](docker-image.md) | Anything with Docker. Public image, multi-arch (`amd64` + `arm64`), no build step, easy updates and rollback | Docker, 64-bit OS |
+| **Build from a checkout (Docker)** | [from-source-docker.md](from-source-docker.md) | A variant you patch yourself, or a host that shouldn't pull an image | Docker, git, 64-bit OS |
+| **Bare Node** | [from-source-node.md](from-source-node.md) | A box that already runs Node 22+ (systemd + optional reverse proxy) | Node 22+, git, 64-bit OS |
 | **OpenMediaVault** | [openmediavault.md](openmediavault.md) | The OMV Compose plugin (this is what the maintainer runs) | OMV + Docker/Compose plugins, 64-bit OS |
 
 Cross-cutting, whichever route you pick:
@@ -42,10 +42,18 @@ Cross-cutting, whichever route you pick:
 | Listens on | `HOST` — `127.0.0.1` for bare Node, `0.0.0.0` in the image; `PORT` `3000` |
 | Persistent data | `DATA_DIR` (default `./data`, image uses `/app/data`) — holds `jukebox.db` |
 | Client build | `CLIENT_DIST` (default `./dist`) |
-| Health | `GET /api/health` → `200 {"ok":true,"db":true}`, `500 {"ok":false,"db":false}` — a liveness read on the open DB handle, not a write test; an unusable data dir stops the process at start-up instead |
+| Health | `GET /api/health` → `200 {"ok":true,"db":true}`, a liveness check; details in [operations.md](operations.md#health-and-monitoring) |
 | Sync API | `GET`/`PUT /api/sync/cabinet` — Discogs token required; a `PUT` needs a valid document and a matching `If-Match` (`400` invalid document or malformed header, `428` missing `If-Match`, `409` conflict, `413` body over 256 KB) |
 | Discogs proxy | `GET`/`HEAD /discogs/*` (`405` otherwise); forwards `retry-after` and `x-discogs-*` |
-| Prerequisites | Node **22+** (image ships it) on **64-bit** `x64`/`arm64` — no `armv7` prebuild; no C toolchain, installs are script-free (`.npmrc`) |
+| Prerequisites | Node **22+** (the image ships it) on a **64-bit** `x64`/`arm64` OS; no C toolchain, installs are script-free (`.npmrc`). See below |
+
+**64-bit only.** The image is published for `amd64` and `arm64` only, and
+`better-sqlite3` ships no `armv7` prebuild. Because installs are script-free
+there is no compile fallback either. On a Raspberry Pi, `uname -m` must say
+`aarch64`, not `armv7l`. On 32-bit Raspberry Pi OS the image fails with
+`exec format error`, and a source checkout builds but dies at start-up with
+`Cannot find module …/better_sqlite3.node`. Install the 64-bit Raspberry Pi OS
+image.
 
 Three mistakes are worth stating up front because all are easy and all look like
 app bugs:

@@ -1,5 +1,7 @@
 # Operations
 
+Part of the [deployment guides](README.md).
+
 Running it is the easy part. This page is what to know afterwards: configuration,
 what's actually stored where, health, version checks, backups, updates, rollback
 and logs.
@@ -39,17 +41,10 @@ With compose, set them under `environment:`; with systemd, `Environment=` lines.
   date is the commit date the build was stamped with, not a wall-clock build
   time. A local build without those stamps reads `development build` and shows
   no date. It is the quickest "did my deploy actually land?" check, and the
-  fastest way to separate a server problem from a stale service worker.
-
-A local `docker compose build` needs the same args the CI build passes, otherwise
-that line reads `development build`:
-
-```bash
-docker compose build \
-  --build-arg COMMIT_SHA=$(git rev-parse HEAD) \
-  --build-arg BUILD_TIME=$(git log -1 --format=%cI)
-docker compose up -d
-```
+  fastest way to separate a server problem from a stale service worker. To stamp
+  a local Docker build, see
+  [from-source-docker.md](from-source-docker.md#variations) ("A real version
+  line").
 
 ## What lives where
 
@@ -76,34 +71,24 @@ curl -fsS http://127.0.0.1:8080/api/health     # Docker: the published host port
 curl -fsS http://127.0.0.1:3000/api/health     # bare Node
 ```
 
-`/api/health` runs `SELECT 1` on the open SQLite handle — a constant expression
-that reads no table and no file. It answers exactly one question: *does this
-process still hold a usable database connection?*
+`/api/health` runs `SELECT 1` on the open database handle. It is a **liveness**
+check, not a data-integrity one:
 
-- `200 {"ok":true,"db":true}` — the handle prepared and executed the statement.
-- `500 {"ok":false,"db":false}` — the handle itself is unusable (already closed,
-  or SQLite refused the statement). That is rare while serving; you see it around
-  shutdown or after a fatal driver error.
+- `200 {"ok":true,"db":true}`: the process holds a usable database connection.
+- `500 {"ok":false,"db":false}`: the handle is unusable. This is rare while
+  serving; you see it around shutdown or after a fatal driver error.
+- It does **not** catch a full disk or a deleted or corrupt database file. Those
+  show up on the next write as a 500 from `PUT /api/sync/cabinet` ("Could not
+  save the cabinet") while health still says 200, so watch free space
+  separately.
+- An unwritable `DATA_DIR` stops the process **before it listens**, so health
+  never answers. Look for a container stuck in `Restarting` (`docker ps -a`) or
+  a failed `systemctl status jukebox`, and read the log for the SQLite error.
 
-Because `SELECT 1` never reads a page, health does **not** catch a full disk, a
-deleted or replaced database file, or a corrupt page. Those surface on the next
-write — `PUT /api/sync/cabinet` returns a 500 and the app says "Could not save
-the cabinet" — while `/api/health` keeps answering 200. Treat it as a *liveness*
-check, not a data-integrity one, and watch free space separately.
-
-A bad `DATA_DIR` never shows up here either. The database is opened, switched to
-WAL and its table created (`CREATE TABLE IF NOT EXISTS`) during start-up, so a data directory the process cannot create
-or write to (read-only mount, wrong ownership, unwritable parent) kills the
-process **before it starts listening** — `/api/health` never answers. In that
-case look for a container stuck in `Restarting` (`docker ps -a`) or
-`systemctl status jukebox`, then read the log for the SQLite error (`unable to
-open database file`, `attempt to write a readonly database`).
-
-The image bakes the endpoint into a `HEALTHCHECK` (`--interval=30s`,
-`--timeout=3s`, 3 retries by default), so `docker ps` reports
-`healthy`/`unhealthy`. A Docker **restart policy does not act on health status** —
-for restarts on a hung process, point an external monitor (Uptime Kuma, etc.) at
-`/api/health`.
+The image's `HEALTHCHECK` polls the endpoint every 30 s, so `docker ps` shows
+`healthy`/`unhealthy`. A Docker **restart policy does not act on health
+status**: to restart a hung process, point an external monitor (Uptime Kuma,
+etc.) at `/api/health`.
 
 ## Backups
 
@@ -293,11 +278,11 @@ a rejected token is a plain 401 and is not logged), uncaught 5xx
 (`[server]`) and shutdown. It does **not** log requests, tokens or collection
 data — tokens are only used in-memory to resolve the Discogs username.
 
-### Log rotation
+## Log rotation and disk space
 
-Docker's default `json-file` driver grows without bound. On a small box that
-eventually fills the disk — and a full disk is how SQLite starts failing (writes
-return 500 while `/api/health` may still say 200). Cap it in compose:
+Docker's default `json-file` log driver grows without bound. On a small box that
+eventually fills the disk, and a full disk is how SQLite starts failing (writes
+return 500 while `/api/health` still says 200). Cap it in compose:
 
 ```yaml
     logging:
@@ -311,14 +296,8 @@ With `docker run`, pass `--log-opt max-size=10m --log-opt max-file=3`. Bare Node
 under systemd writes to the journal, which has its own caps
 (`journalctl --disk-usage`; `SystemMaxUse=` in `journald.conf`).
 
-## Disk and housekeeping
-
-- The SQLite DB stays in the low megabytes; WAL files come and go with activity.
-- If the disk does fill: writes fail (cabinet sync returns 500, while
-  `/api/health` may still say 200). Free space, then restart the
-  container/process so SQLite can reopen cleanly.
-- Old images accumulate on the host. `docker image prune` (or
-  `docker image prune -a` after confirming nothing needs rolling back) reclaims
-  space.
-- Browser-side growth (tracklist cache) is the app's own concern — Settings shows
-  storage usage and offers *Clear everything* per device.
+The database itself stays in the low megabytes. If the disk does fill, free
+space and then restart the container or process so SQLite reopens cleanly. Old
+images also pile up: `docker image prune` reclaims them (add `-a` once nothing
+needs rolling back). Browser-side storage is per device; Settings shows usage
+and offers *Clear everything*.
