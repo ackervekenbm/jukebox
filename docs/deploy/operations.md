@@ -115,6 +115,12 @@ docker volume ls | grep -i jukebox     # usually <dir-name>_jukebox-data
 VOL=jukebox-data                       # the name you just saw
 ```
 
+If you mounted a **bind directory** instead (the
+[OMV route](openmediavault.md) does), there is no volume to name: the DB is a
+plain host file at `<Data shared folder>/jukebox-data/jukebox.db`. Stop the
+container and copy the folder — `sudo cp -a …/jukebox-data /var/backups/jukebox-$(date +%F)`
+— and skip the `VOL` plumbing below.
+
 **Docker (hot):**
 
 ```bash
@@ -161,6 +167,12 @@ docker stop jukebox
 docker run --rm -v "$VOL":/data -v "$PWD":/backup alpine \
   sh -c 'rm -f /data/jukebox.db* && cp /backup/jukebox-2026-11-01.db /data/jukebox.db && chown 0:0 /data/jukebox.db'
 docker start jukebox
+
+# Docker with a bind directory (OMV route): a host path, container jukebox-jukebox-1
+docker stop jukebox-jukebox-1
+sudo rm -f <data folder>/jukebox-data/jukebox.db*
+sudo cp jukebox-2026-11-01.db <data folder>/jukebox-data/jukebox.db
+docker start jukebox-jukebox-1
 
 # Bare Node: into DATA_DIR
 sudo systemctl stop jukebox

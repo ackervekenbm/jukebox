@@ -51,7 +51,7 @@ Jukebox is **one Node process**: it serves the built client, the `/api` sync sto
 | [Prebuilt Docker image](docs/deploy/docker-image.md) | Anything with Docker — multi-arch (`amd64`/`arm64`), no build, easy updates and rollback |
 | [Docker, built from a checkout](docs/deploy/from-source-docker.md) | You want to patch it yourself, or can't pull an image |
 | [Bare Node](docs/deploy/from-source-node.md) | A host that already runs Node 22 (systemd + optional reverse proxy) |
-| [OpenMediaVault](docs/deploy/openmediavault.md) | The OMV Compose plugin (ports 80/443 are OMV's, so 8080) |
+| [OpenMediaVault](docs/deploy/openmediavault.md) | The OMV Compose plugin (ports 80/443 are OMV's own UI, so the app gets another one, e.g. 8181) |
 
 Prerequisites, the shared port/environment contract, TLS and offline launch, backups, updates, rollback and troubleshooting live in **[docs/deploy/](docs/deploy/README.md)**.
 

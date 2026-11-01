@@ -153,11 +153,12 @@ variable, image tag, the Dockerfile or a workflow changes, update
 `docs/deploy/` too (and the README pointer).
 
 The production host is a Raspberry Pi running **OpenMediaVault**. OMV's web UI
-owns ports 80/443, so the app is exposed on host port **8080**. One container,
+owns ports 80/443, so the app is exposed on host port **8181**. One container,
 one node process: it serves the static build, the API and the `/discogs` proxy.
-The container has a named volume for its SQLite DB (`/app/data`) — today that
-holds only the (empty) cabinet-sync table, but the deployment is no longer
-stateless, so treat the volume as persistent user data.
+The SQLite DB lives in `/app/data`, bind-mounted into the Compose plugin's *Data*
+shared folder (`CHANGE_TO_COMPOSE_DATA_PATH/jukebox-data`) — today that holds
+only the (empty) cabinet-sync table, but the deployment is no longer stateless,
+so treat that folder as persistent user data.
 
 The image ships `amd64` and `arm64` only, and `better-sqlite3` has no `armv7`
 prebuild (installs are script-free, so there is no compile fallback): a 32-bit
@@ -184,28 +185,26 @@ matrix and the Dockerfile.
   expiry ≤ 1 year, and never paste it anywhere public — a classic token can
   reach everything your account can.
 - **Route A — prebuilt image (all via the OMV web UI, no building on the Pi).**
-  With omv-extras installed and Docker + the Compose plugin enabled
-  (Services → Compose): create a compose file `jukebox.yml`:
+  With omv-extras installed and Docker + the Compose plugin enabled, pick the
+  *Compose Files* and *Data* shared folders in **Services → Compose → Settings**,
+  then **Files → Create** a stack named `jukebox` (the Name is a label, not a
+  filename — the plugin writes `<name>/<name>.yml`):
   ```yaml
   services:
     jukebox:
       image: ghcr.io/ackervekenbm/jukebox:latest
-      container_name: jukebox
       ports:
-        - "8080:3000"
+        - "8181:3000"
       volumes:
-        - jukebox-data:/app/data
+        - CHANGE_TO_COMPOSE_DATA_PATH/jukebox-data:/app/data
       restart: unless-stopped
-
-  volumes:
-    jukebox-data:
   ```
   Save → select it → **Up** (creates/starts the container; open
-  `http://<pi-ip>:8080`). To update after a merge: select → **Pull** → **Up**
-  (an unchanged image is a no-op; the volume keeps the sync DB). **Pull** works
-  anonymously; if it returns an auth error, see the GHCR note above. The app is
-  plain HTTP: a normal phone refresh picks up the new build (the server sends
-  `Cache-Control: no-cache` for `index.html`); force-refresh once if a tab
+  `http://<pi-ip>:8181`). To update after a merge: select → **Pull** → **Up**
+  (an unchanged image is a no-op; the data folder keeps the sync DB). **Pull**
+  works anonymously; if it returns an auth error, see the GHCR note above. The
+  app is plain HTTP: a normal phone refresh picks up the new build (the server
+  sends `Cache-Control: no-cache` for `index.html`); force-refresh once if a tab
   looks stale.
 - **Route B — build on the Pi** (e.g. local variants):
   ```bash

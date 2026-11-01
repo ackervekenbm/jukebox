@@ -100,6 +100,13 @@ volumes:
     name: jukebox-data
 ```
 
+**Bind directory (OMV route).** The same trap has a different shape: the path is
+whatever the *Data* shared folder in **Services → Compose → Settings** resolves
+to. Change that setting, or the `CHANGE_TO_COMPOSE_DATA_PATH` line, and the
+container starts on a new empty folder — `/api/health` still returns
+`{"ok":true,"db":true}`, because a fresh database is a valid one. The cabinet
+layout just looks empty. Point it back, or copy `jukebox.db` across.
+
 ## Port 80/443 is taken
 
 Common on OpenMediaVault (its web UI owns them). Map the container to something

@@ -1,23 +1,93 @@
 # OpenMediaVault (Compose plugin)
 
-The reference deployment: a Raspberry Pi running OpenMediaVault with the Docker
-and Compose plugins, serving the app on host port **8080**. Everything happens in
-the OMV web UI.
+The reference deployment: a Raspberry Pi running **OpenMediaVault** with
+omv-extras and the **Compose** plugin, on a 64-bit OS. One container, managed
+entirely from the OMV web UI.
 
-## Why port 8080
-
-OMV's own web UI owns **80** and **443**. The container listens on `3000` (and
-its `HEALTHCHECK` probes that port), so map it to something free — the examples
-use `8080`. These are host-side choices; leave the container port alone.
+OMV's own web UI owns ports **80** and **443**, so the app is published on a
+different host port — **8181** below (any free port works; the generic examples
+elsewhere in these docs use `8080`). The container's own port, `3000`, is fixed:
+only the host side is yours.
 
 ## Prerequisites
 
-- **omv-extras** installed — it adds the Docker repository to OMV.
-- The **`openmediavault-compose`** plugin installed and enabled: **Services →
-  Compose** shows the *Files* and *Services* tabs once it is.
+- **omv-extras** installed, and the docker repo enabled in **System →
+  omv-extras**.
+- **`openmediavault-compose`** installed (**System → Plugins**). It installs the
+  Docker engine too; **Services → Compose** gains the *Settings*, *Files*,
+  *Services* and *Schedule* tabs.
 - **A 64-bit OS.** The image is published for `amd64`/`arm64` only, so 32-bit
   Raspberry Pi OS fails with `exec format error`; `better-sqlite3` has no `armv7`
   prebuild either. Use the 64-bit Raspberry Pi OS image.
+- **Two shared folders**, set before the first compose file
+  (**Services → Compose → Settings**):
+  - **Compose Files** — where the plugin stores its compose files (it makes a
+    subfolder per stack). Saving fails with *"Please set shared folder for file
+    storage."* until this is set.
+  - **Data** — the folder this deployment's real data lives in. The compose file
+    below refers to it as `CHANGE_TO_COMPOSE_DATA_PATH`, so saving fails with
+    *"Please set shared folder for data on the Settings tab."* until this is set.
+
+## Create the stack
+
+1. **Services → Compose → Files → Create** (the `+` button).
+2. **Name**: `jukebox`. This is a label for the stack, not a filename — the
+   plugin creates a folder of that name inside the *Compose Files* shared folder
+   and writes `jukebox/jukebox.yml` into it. (Typing `jukebox.yml` in the Name
+   field would give you `jukebox.yml/jukebox.yml.yml`.)
+3. **Description**: optional, e.g. `Discogs jukebox`.
+4. **File**: paste
+
+   ```yaml
+   services:
+     jukebox:
+       image: ghcr.io/ackervekenbm/jukebox:latest
+       ports:
+         - "8181:3000"
+       volumes:
+         - CHANGE_TO_COMPOSE_DATA_PATH/jukebox-data:/app/data
+       restart: unless-stopped
+   ```
+
+5. Leave **Environment** empty — the image's defaults (`PORT=3000`,
+   `DATA_DIR=/app/data`, `HOST=0.0.0.0`) are the ones you want.
+6. **Save**.
+7. Select the entry → **Check** if you want compose to validate the file, then
+   **Up**. That pulls the image and starts the container.
+8. Open `http://<pi-ip>:8181`.
+
+Verify: **Services → Compose → Services** lists the container as running, and
+`http://<pi-ip>:8181/api/health` returns `{"ok":true,"db":true}`.
+
+## What that file does
+
+- **`CHANGE_TO_COMPOSE_DATA_PATH/jukebox-data`** — the plugin substitutes the
+  *Data* shared folder from Settings every time it renders the file, so
+  `<data folder>/jukebox-data/jukebox.db` becomes the whole server-side state.
+  That beats a named volume here: it is an ordinary folder you can see, browse
+  and copy in OMV, and **Prune → Volume** cannot delete it.
+- **No `container_name`** — compose derives it from the stack and service, so it
+  is `jukebox-jukebox-1`; the plugin's **Logs** button doesn't care. Add
+  `container_name: jukebox` if you want the short name in `docker logs`.
+- **Port `8181`** — host side only. Change the left-hand number if that port is
+  taken; never the right-hand one.
+- **Pin instead of tracking `:latest`** — replace the image with
+  `ghcr.io/ackervekenbm/jukebox:<sha7>` for a reproducible deploy. Editing that
+  line in the UI and pressing **Up** is also the rollback procedure
+  ([docker-image.md](docker-image.md#pin-a-version-roll-back)).
+
+## Updating
+
+**Services → Compose → Files** → select `jukebox` → **Pull**, then **Up**.
+
+- **Pull** fetches `:latest`; if the image hasn't changed it's a no-op.
+- **Up** recreates the container when the image did change. The data folder is
+  untouched, so the cabinet sync data survives.
+- Old images stay on disk; **Prune → Image** removes the ones nothing uses.
+
+Phone/browser side: a plain reload picks up the new build (the server sends
+`no-cache` for `index.html` and `sw.js`). Force-refresh once if a stale service
+worker still serves the old shell.
 
 ## If a pull is denied
 
@@ -35,67 +105,27 @@ sudo docker login ghcr.io -u <your-github-username>
 Keep the token's expiry ≤ 1 year; when it lapses **Pull** fails again and the
 login has to be redone. `sudo docker logout ghcr.io` returns to anonymous pulls.
 
-## Create the stack (web UI)
-
-1. **Services → Compose → Files → Add**.
-2. Name it `jukebox.yml`.
-3. Paste:
-
-   ```yaml
-   services:
-     jukebox:
-       image: ghcr.io/ackervekenbm/jukebox:latest
-       container_name: jukebox
-       ports:
-         - "8080:3000"
-       environment:
-         DATA_DIR: /app/data
-       volumes:
-         - jukebox-data:/app/data
-       restart: unless-stopped
-
-   volumes:
-     jukebox-data:
-   ```
-
-4. **Save**.
-5. Select the file → **Up**. This pulls the image and starts the container.
-6. Open `http://<pi-ip>:8080`.
-
-Verify: **Services → Compose → Services** shows the container as running, and
-`http://<pi-ip>:8080/api/health` returns `{"ok":true,"db":true}`.
-
-> **Pin instead of tracking `:latest`** — replace the image with
-> `ghcr.io/ackervekenbm/jukebox:<sha7>` for a reproducible deploy. Changing that
-> line in the UI and hitting **Up** is also the rollback procedure
-> ([docker-image.md](docker-image.md#pin-a-version-roll-back)).
-
-## Updating
-
-**Services → Compose → Files** → select `jukebox.yml` → **Pull**, then **Up**.
-
-- **Pull** fetches `:latest`; if the image hasn't changed it's a no-op.
-- **Up** recreates the container when the image did change. The named volume is
-  kept, so the cabinet sync data survives.
-- If **Pull** fails with an authentication error, see
-  [If a pull is denied](#if-a-pull-is-denied).
-
-Phone/browser side: a plain reload picks up the new build (the server sends
-`no-cache` for `index.html` and `sw.js`). Force-refresh once if a stale service
-worker still serves the old shell.
-
 ## Where the data lives
 
-The named volume holds the only server-side state (`jukebox.db`). Find it on
-disk with:
+The bind mount lands in the *Data* shared folder, so the SQLite file is
+`<data folder>/jukebox-data/jukebox.db` (plus `-wal`/`-shm` while it runs). If
+you forgot which shared folder you picked:
 
 ```bash
-docker volume ls | grep jukebox
-docker volume inspect <volume> --format '{{.Mountpoint}}'
+docker inspect jukebox-jukebox-1 --format '{{range .Mounts}}{{.Source}}{{end}}'
 ```
 
-Backups, restore steps and the "stop the container first" caveat are in
-[operations.md](operations.md#backups).
+That folder is the only server-side state, so treat it as user data:
+
+- **The plugin's own backup** — **Services → Compose → Schedule** → create a job
+  with *Backup* enabled. It stops the containers, copies to the shared folder set
+  in *Settings → Backup* (bind-mount volumes included, unless marked
+  `# SKIP_BACKUP` or over the size limit), restarts them, and keeps **one** copy
+  that the next run overwrites. Versioned backups need a separate OMV rsync job
+  or snapshot.
+- **A manual copy** needs the container stopped first, otherwise you can catch a
+  half-written WAL file. The commands and the restore steps are shared with the
+  other routes in [operations.md](operations.md#backups).
 
 ## iPhone / home screen on plain HTTP
 
@@ -108,28 +138,31 @@ and the certificate must be trusted by the device. Options for that on an OMV bo
 
 ## CLI fallback
 
-If you prefer SSH over the UI, the plugin keeps its compose files under an
-OMV-managed directory. Find yours first:
+If you prefer SSH over the UI, use the file the plugin wrote. Its location is
+`<Compose Files folder>/<stack name>/<stack name>.yml`:
 
 ```bash
-sudo ls -l /srv/*/compose/*.yml
-# e.g. /srv/dev-disk-by-uuid-…/compose/jukebox.yml
+sudo find /srv -path '*/jukebox/jukebox.yml' -print
+# e.g. /srv/dev-disk-by-uuid-…/compose/jukebox/jukebox.yml
 ```
 
 Then use that path:
 
 ```bash
-COMPOSE_FILE=/srv/dev-disk-by-uuid-XXXX/compose/jukebox.yml   # your path
+COMPOSE_FILE=/srv/dev-disk-by-uuid-XXXX/compose/jukebox/jukebox.yml   # your path
 sudo docker compose -f "$COMPOSE_FILE" pull
 sudo docker compose -f "$COMPOSE_FILE" up -d
 ```
 
-Mixing CLI and UI is fine — they operate on the same compose file — but pick one
-as your habit so the UI's **Up/Pull** doesn't surprise you.
+Mixing CLI and UI is fine — they operate on the same file — but pick one as your
+habit so the UI's **Up/Pull** doesn't surprise you. That file is *generated* from
+the stack body (the placeholder is already expanded in it) and rewritten on the
+next **Save**, so keep deliberate edits in the UI.
 
 ## Next
 
 - [https-and-offline.md](https-and-offline.md) — TLS and offline launch
-- [operations.md](operations.md) - backups, health, env vars, log rotation (cap
+- [operations.md](operations.md) — backups, health, env vars, log rotation (cap
   the container's json-file log — a full disk is how SQLite starts failing)
-- [troubleshooting.md](troubleshooting.md) — when `Up` starts but nothing answers
+- [troubleshooting.md](troubleshooting.md) — when **Up** starts but nothing
+  answers

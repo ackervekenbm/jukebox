@@ -19,7 +19,7 @@ layout so it can follow you between devices.
 | **Prebuilt image** | [docker-image.md](docker-image.md) | Anything with Docker. Public image, multi-arch (`amd64` + `arm64`), no build step, easy updates and rollback | Docker |
 | **Build from a checkout (Docker)** | [from-source-docker.md](from-source-docker.md) | A variant you patch yourself, or a host that shouldn't pull an image | Docker, git |
 | **Bare Node** | [from-source-node.md](from-source-node.md) | A box that already runs Node 22 (systemd + optional reverse proxy) | Node 22+, git, 64-bit OS |
-| **OpenMediaVault** | [openmediavault.md](openmediavault.md) | The OMV Compose plugin (this is what the maintainer runs) | OMV + Docker/Compose plugins |
+| **OpenMediaVault** | [openmediavault.md](openmediavault.md) | The OMV Compose plugin (this is what the maintainer runs) | OMV + Docker/Compose plugins, 64-bit OS |
 
 Cross-cutting, whichever route you pick:
 
@@ -38,7 +38,7 @@ Cross-cutting, whichever route you pick:
 
 | Item | Value |
 | --- | --- |
-| Container port | `3000` (host side is yours — examples use `8080`); fixed in the image |
+| Container port | `3000`, fixed in the image; the published host port is your choice (`8080` in most examples, `8181` on the OMV route — OMV owns `80`/`443`) |
 | Listens on | `HOST` — `127.0.0.1` for bare Node, `0.0.0.0` in the image; `PORT` `3000` |
 | Persistent data | `DATA_DIR` (default `./data`, image uses `/app/data`) — holds `jukebox.db` |
 | Client build | `CLIENT_DIST` (default `./dist`) |
