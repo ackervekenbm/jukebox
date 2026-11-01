@@ -23,7 +23,7 @@ Browse your personal **Discogs collection** on any device — grouped by artist 
 ## What you need
 
 - A free **Discogs personal access token** — create one at <https://www.discogs.com/settings/developers>.
-- That's it. There's no account, no sign-up and nothing to install — the app runs in your browser and your data stays there (see [Where your data lives](#where-your-data-lives)).
+- That's it. There's no account, no sign-up and nothing to install on your devices — the app runs in your browser and your data stays there (see [Where your data lives](#where-your-data-lives)).
 
 ## How it works
 
@@ -37,50 +37,41 @@ Browse your personal **Discogs collection** on any device — grouped by artist 
 
 ## Where your data lives
 
-- Your **token stays in your browser** (localStorage). It's sent to Discogs — and to your own server only when it verifies a sync request — and nowhere else. Anyone with access to your device could extract it — regenerate it anytime at <https://www.discogs.com/settings/developers>.
-- The **collection, tracklists, cached years and pick history live in your browser** (IndexedDB). Saved views, the listen log and settings are localStorage. Browser data is the source of truth; nothing else stores your collection.
-- The container keeps a small **SQLite database in a Docker volume** that stores only your **record cabinet layout** (shelf names and capacities) so it can sync across devices ([#55](../../issues/55)). The collection itself never leaves your browser.
+- Your **token is stored in your browser** (localStorage). Every Discogs API request goes through your own Jukebox server (cover art loads straight from Discogs, without the token), which forwards the token to Discogs; the server doesn't store or log it, and keeps only a hash of it for ten minutes to check sync requests. Over plain HTTP the token crosses your network unencrypted on each request, so [use HTTPS](docs/deploy/https-and-offline.md) if you don't trust the network. Anyone with access to your device could extract it — regenerate it anytime at <https://www.discogs.com/settings/developers>.
+- The **collection, tracklists, cached years and pick history live in your browser** (IndexedDB). Saved views, the listen log and settings are localStorage. Browser data is the source of truth for all of it.
+- The server keeps a small **SQLite database in its data directory** (a Docker volume or a folder, depending on how you run it) with your **record cabinet layout**, keyed by your Discogs username, so it can sync across devices ([#55](https://github.com/ackervekenbm/jukebox/issues/55)). The layout includes which release sits on which shelf, so the database and its backups do contain the release ids in your collection. Titles, artists, covers and tracklists stay in your browser.
 - **"Clear everything"** in settings removes the cached collection, your saved views, the listen log, the picker preference, the cabinet layout and stored credentials from your device.
 
-## Deployment (production)
+## Deployment
 
-The container is a single Node process serving the static frontend, the API and the `/discogs` proxy. Every push to `main` builds a multi-arch image for **amd64 and arm64** and publishes one tag: `ghcr.io/ackervekenbm/jukebox:latest`.
+Jukebox is **one Node process**: it serves the built client, the `/api` sync store and the same-origin `/discogs` proxy. It runs anywhere Node 22+ or Docker does, on a 64-bit OS.
 
-**Pull and run** on any machine with Docker (arm64 runs natively on a Raspberry Pi):
+| Route | Good for |
+| --- | --- |
+| [Prebuilt Docker image](docs/deploy/docker-image.md) | Anything with Docker — multi-arch (`amd64`/`arm64`), no build, easy updates and rollback |
+| [Docker, built from a checkout](docs/deploy/from-source-docker.md) | You want to patch it yourself, or can't pull an image |
+| [Bare Node](docs/deploy/from-source-node.md) | A host that already runs Node 22+ (systemd + optional reverse proxy) |
+| [OpenMediaVault](docs/deploy/openmediavault.md) | The OMV Compose plugin (ports 80/443 are OMV's, so 8080) |
 
-```yaml
-services:
-  jukebox:
-    image: ghcr.io/ackervekenbm/jukebox:latest
-    ports:
-      - "8080:3000"
-    volumes:
-      - jukebox-data:/app/data
-    restart: unless-stopped
+Prerequisites, the shared port/environment contract, TLS and offline launch, backups, updates, rollback and troubleshooting live in **[docs/deploy/](docs/deploy/README.md)**.
 
-volumes:
-  jukebox-data:
-```
-
-**Or build from source:**
+Quickest start, on any machine with Docker:
 
 ```bash
-docker compose up --build    # serves on http://localhost:8080
+docker run -d --name jukebox -p 8080:3000 -v jukebox-data:/app/data \
+  --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
+  --restart unless-stopped ghcr.io/ackervekenbm/jukebox:latest
 ```
 
-Notes for self-hosting:
+The image is public (no `docker login` needed) and built for `amd64`/`arm64`
+only — a Pi needs a 64-bit OS.
 
-- The volume at `/app/data` holds the app's small SQLite database (the cross-device sync store landing with the cabinet organizer). **Keep the volume** when redeploys happen — it's the one piece of server-side state; everything else lives in the browser, so `docker compose pull && docker compose up -d` is lossless for your collection data.
-- The server **proxies `/discogs` → `api.discogs.com`**. If you serve the static files some other way, you must replicate that proxy or API calls will run into Discogs' CORS/rate-limit wall (see the note under *How it works*).
-- **Offline launch needs HTTPS.** Over plain HTTP, iOS adds the app to the home screen fine (it honors the legacy `apple-*` meta tags) and the app runs as long as the server is up — but the service worker that allows launching with the server down only registers in a secure context, and the certificate must be one the device trusts. From least to most setup:
+Then open <http://localhost:8080>. Four things hold for every route:
 
-  | Approach | What's needed | Notes |
-  | --- | --- | --- |
-  | **mkcert — your own local CA** | Install your CA profile once on each device | Fully self-hosted and offline; no external party involved |
-  | **Domain + Let's Encrypt** (DuckDNS + Caddy/nginx) | A free domain and a TLS reverse proxy; use the **DNS-01** challenge so no ports need to be opened | Public CA, so devices trust it with zero setup |
-  | **Tailscale** | Tailscale on the server and your devices | Free, auto-renewing Let's Encrypt certs on your private tailnet via `tailscale serve` |
-
-> The maintainer runs this at home on an OpenMediaVault box — the detailed step-by-step ops runbook lives in `AGENTS.md`.
+- **Keep it on your LAN or tailnet.** Jukebox has no login, so don't expose it to the internet ([why](docs/deploy/README.md#keep-it-on-your-lan-or-tailnet)).
+- **Keep the data directory** (`/app/data` in the image). It holds the only server-side state, a small SQLite database with the cabinet layout. Everything else lives in your browser: collection, tracklists, saved views and settings. Updating is lossless as long as the new container or process uses the same data. Each route keeps it in a different place, so check [where yours is](docs/deploy/operations.md#find-your-data-first) before you back up or switch routes.
+- **Serve it through the app's server.** The browser must reach Discogs through the same-origin `/discogs` proxy; serving `dist/` from a plain static server makes collection fetches fail with CORS/rate-limit noise (see the note under *How it works*).
+- **Offline launch needs HTTPS.** Over plain HTTP the app works and installs to the home screen on iOS, but the service worker that lets it open with the server down only runs over HTTPS, with a certificate the device trusts. See [HTTPS & offline](docs/deploy/https-and-offline.md) for Tailscale, Let's Encrypt via DuckDNS, and mkcert.
 
 ## Development
 
@@ -120,6 +111,7 @@ npm run build && npm test
 
 ```
 ├── Dockerfile / docker-compose.yml                  # containerized hosting (one Node process)
+├── docs/deploy/                                     # deployment guides: one file per route + operations
 ├── .github/
 │   ├── workflows/
 │   │   ├── ci.yml             # PR checks (type-check + lint + build + tests)
