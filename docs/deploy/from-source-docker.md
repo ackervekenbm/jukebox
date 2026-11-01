@@ -68,11 +68,27 @@ the host:
 The directory must be writable by the container (the image runs as root by
 default, so this usually just works; a `userns-remap` setup needs adjusting).
 
-**Building for a Raspberry Pi from an amd64 machine** — the Pi can build
-natively, which is faster; cross-build only if you must:
+**Building for a Raspberry Pi from an amd64 machine** — build on the Pi natively
+if you can; it is much faster and needs no emulation. To cross-build, register
+QEMU once, then build:
 
 ```bash
+docker run --privileged --rm tonistiigi/binfmt --install arm64
 docker buildx build --platform linux/arm64 -t jukebox:arm64 --load .
+```
+
+Without the binfmt step the build fails inside `RUN npm ci` with
+`exec format error`, and a Pi running 32-bit Raspberry Pi OS cannot run the arm64
+image at all — the image is `amd64`/`arm64` only.
+
+**A real version line** — Settings shows the commit and build time from the
+`COMMIT_SHA`/`BUILD_TIME` build args; `docker compose up -d --build` passes
+neither, so a local build reads `dev`. Stamp it:
+
+```bash
+docker compose build \
+  --build-arg COMMIT_SHA=$(git rev-parse HEAD) \
+  --build-arg BUILD_TIME=$(git log -1 --format=%cI)
 ```
 
 **Your own registry** — tag and push after the build:

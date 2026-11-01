@@ -159,6 +159,12 @@ The container has a named volume for its SQLite DB (`/app/data`) — today that
 holds only the (empty) cabinet-sync table, but the deployment is no longer
 stateless, so treat the volume as persistent user data.
 
+The image ships `amd64` and `arm64` only, and `better-sqlite3` has no `armv7`
+prebuild (installs are script-free, so there is no compile fallback): a 32-bit
+Raspberry Pi OS can neither run the image nor build the server. Keep that
+prerequisite, and the docs' port/env/tag tables, in sync with the workflow matrix
+and the Dockerfile.
+
 - Every `main` push with app paths re-builds the multi-arch image and pushes
   `ghcr.io/ackervekenbm/jukebox:latest` (see `.github/workflows/docker-build.yml`).
   PRs touching the same paths run a **smoke job** first: build the image, boot

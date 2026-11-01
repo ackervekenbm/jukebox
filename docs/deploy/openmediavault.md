@@ -12,9 +12,12 @@ container always listens on `3000`.
 
 ## Prerequisites
 
-- **omv-extras** installed (it provides the Docker + Compose plugin packages).
-- Docker and Compose plugins enabled: **Services → Compose** shows a *Files* and
-  *Services* tab once they are.
+- **omv-extras** installed — it adds the Docker repository to OMV.
+- The **`openmediavault-compose`** plugin installed and enabled: **Services →
+  Compose** shows the *Files* and *Services* tabs once it is.
+- **A 64-bit OS.** The image is published for `amd64`/`arm64` only, so 32-bit
+  Raspberry Pi OS fails with `exec format error`; `better-sqlite3` has no `armv7`
+  prebuild either. Use the 64-bit Raspberry Pi OS image.
 
 ## One-time: log in to GHCR over SSH
 
@@ -101,12 +104,20 @@ and the certificate must be trusted by the device. Options for that on an OMV bo
 
 ## CLI fallback
 
-If you prefer SSH over the UI, the plugin stores its compose files under the
-OMV-managed compose directory (`/srv/<disk>/compose/…` on most installs):
+If you prefer SSH over the UI, the plugin keeps its compose files under an
+OMV-managed directory. Find yours first:
 
 ```bash
-sudo docker compose -f /srv/…/compose/jukebox.yml up -d
-sudo docker compose -f /srv/…/compose/jukebox.yml pull
+sudo ls -l /srv/*/compose/*.yml
+# e.g. /srv/dev-disk-by-uuid-…/compose/jukebox.yml
+```
+
+Then use that path:
+
+```bash
+COMPOSE_FILE=/srv/dev-disk-by-uuid-XXXX/compose/jukebox.yml   # your path
+sudo docker compose -f "$COMPOSE_FILE" pull
+sudo docker compose -f "$COMPOSE_FILE" up -d
 ```
 
 Mixing CLI and UI is fine — they operate on the same compose file — but pick one
@@ -115,5 +126,6 @@ as your habit so the UI's **Up/Pull** doesn't surprise you.
 ## Next
 
 - [https-and-offline.md](https-and-offline.md) — TLS and offline launch
-- [operations.md](operations.md) — backups, health, env vars
+- [operations.md](operations.md) - backups, health, env vars, log rotation (cap
+  the container's json-file log — a full disk is how SQLite starts failing)
 - [troubleshooting.md](troubleshooting.md) — when `Up` starts but nothing answers

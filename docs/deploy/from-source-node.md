@@ -6,9 +6,13 @@ this when the host already runs Node and you'd rather not add Docker.
 ## What you need
 
 - **Node 22 or newer** (`package.json` engines) and `git`.
-- No C compiler, Python or `make`: dependency installs are script-free
-  (`.npmrc` → `ignore-scripts`), and `better-sqlite3` uses its shipped prebuild.
-- Optional: a reverse proxy for a hostname/TLS — see
+- **A 64-bit OS** (`x64` or `arm64`). `better-sqlite3` ships prebuilds for those
+  only — there is no `armv7` binary, and because installs are script-free
+  (`.npmrc` → `ignore-scripts`) there is no compile fallback. On 32-bit
+  Raspberry Pi OS `npm start` fails with `Could not locate the bindings file`.
+- No C compiler, Python or `make`: nothing is compiled at install time, so a
+  minimal host is enough.
+- Optional: a reverse proxy for a hostname/TLS - see
   [https-and-offline.md](https-and-offline.md). For direct LAN access you can
   skip it, but then the process must listen on more than loopback (below).
 
@@ -41,6 +45,10 @@ npm start              # = node dist-server/index.js
   the LAN, set `HOST=0.0.0.0`.
 - `DATA_DIR` is created if missing and must be writable; it holds `jukebox.db`
   (plus `-wal`/`-shm` while running).
+- If the data directory can't be opened (permissions, read-only mount) the
+  process **exits during start-up** instead of answering 500 — `systemctl status`
+  and the journal show the SQLite error. `/api/health` will never respond in that
+  state.
 
 ## systemd unit
 
@@ -65,17 +73,39 @@ ExecStart=/usr/bin/node dist-server/index.js
 Restart=on-failure
 RestartSec=5
 
+# Optional hardening: the app only reads /opt/jukebox and writes DATA_DIR.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/jukebox
+
 [Install]
 WantedBy=multi-user.target
 ```
 
+`ExecStart` assumes Node is at `/usr/bin/node` (distro package or NodeSource). If
+you installed it with `nvm`/`fnm`, use that interpreter's absolute path and set
+`PATH` accordingly — systemd does not read your shell profile.
+
 ```bash
 sudo useradd --system --home /opt/jukebox --shell /usr/sbin/nologin jukebox
-sudo mkdir -p /var/lib/jukebox && sudo chown jukebox: /var/lib/jukebox
+sudo mkdir -p /opt/jukebox /var/lib/jukebox
+sudo chown -R jukebox: /opt/jukebox /var/lib/jukebox
+
+# Clone and build as the service user, so the tree it reads at runtime is the
+# one it wrote (a root-owned checkout breaks `npm run build` and later updates).
+sudo -u jukebox git clone https://github.com/ackervekenbm/jukebox.git /opt/jukebox
+sudo -u jukebox bash -c 'cd /opt/jukebox && npm ci && npm run build'
+
 sudo systemctl daemon-reload
 sudo systemctl enable --now jukebox
 curl -fsS http://127.0.0.1:3000/api/health     # {"ok":true,"db":true}
 ```
+
+`WorkingDirectory=/opt/jukebox` is where `CLIENT_DIST`'s default `./dist`
+resolves from, and it is why the checkout has to live there. `DATA_DIR` is set
+explicitly in the unit; if you install somewhere else, change both.
 
 The process handles `SIGTERM`/`SIGINT`: it stops accepting connections, closes
 the database and exits (force-exit after 10s), so `systemctl restart` is clean.
@@ -83,12 +113,12 @@ the database and exits (force-exit after 10s), so `systemctl restart` is clean.
 ## Updating
 
 ```bash
-cd /opt/jukebox
-git pull --ff-only
-npm ci
-npm run build
+sudo -u jukebox bash -c 'cd /opt/jukebox && git pull --ff-only && npm ci && npm run build'
 sudo systemctl restart jukebox
 ```
+
+Build as the service user (`jukebox`), not as root: a root-owned
+`dist-server/` still runs, but the next update as `jukebox` fails on permissions.
 
 To keep only what the runtime needs after building:
 

@@ -10,7 +10,7 @@ with the server down.
 | --- | --- | --- |
 | Browsing, search, filters, cabinet | ✅ | ✅ |
 | IndexedDB / localStorage caching | ✅ | ✅ |
-| Install to home screen (iOS) | ✅ via legacy `apple-*` meta tags | ✅ |
+| Install to home screen (iOS) | ✅ via the legacy `apple-*` tags in `index.html` (`apple-touch-icon`, `apple-mobile-web-app-*`) | ✅ |
 | Service worker → **offline launch** | ❌ never registers | ✅ |
 | `navigator.storage.persist()` (protection from eviction) | ❌ | ✅ |
 
@@ -23,13 +23,17 @@ rejects is no better than no cert.
 
 ## Topology
 
-Keep the Node process where it is (loopback) and terminate TLS in front of it:
+Keep the app where it is and terminate TLS in front of it. **The upstream target
+depends on how you run it** — this is the single most common 502:
 
-```
-phone/laptop ──HTTPS──▶ Caddy/nginx ──HTTP──▶ jukebox (127.0.0.1:3000)
-```
+| Route | Proxy upstream | Notes |
+| --- | --- | --- |
+| Bare Node ([from-source-node.md](from-source-node.md)) | `http://127.0.0.1:3000` | Leave `HOST` at its default `127.0.0.1` |
+| Docker ([docker-image.md](docker-image.md), [openmediavault.md](openmediavault.md)) | `http://127.0.0.1:8080` | `8080` is the published **host** port; `3000` exists only inside the container. Don't override the image's `HOST=0.0.0.0` |
+| Proxy in another container | the compose service name, e.g. `http://jukebox:3000` | Put both on one Docker network; the `ports:` mapping can go if only the proxy needs to reach it |
 
-- Leave `HOST` at its default `127.0.0.1` — only the proxy needs to reach it.
+The snippets below use the bare-Node port; substitute per this table.
+
 - Proxy **everything** (`/`, `/api/*`, `/discogs/*`) to that one upstream. Don't
   split static files off to the proxy's own file server: `/discogs` is the
   reason the browser can talk to Discogs at all.
@@ -37,24 +41,43 @@ phone/laptop ──HTTPS──▶ Caddy/nginx ──HTTP──▶ jukebox (127.0
   `Cache-Control: no-cache` for both; some proxies ignore that for `.js`. A
   cached service worker means devices keep the old shell until its cache is
   cleared.
+- **Mount it at a hostname or port, not a subpath.** The build targets the domain
+  root (`base: '/'`, manifest `start_url`/`scope` `/`, service-worker scope `/`),
+  so `https://host/jukebox/` serves the shell but every `/assets/*` request 404s.
+- `/discogs` calls can take up to `DISCOGS_TIMEOUT_MS` (30s by default); keep the
+  proxy's read timeout above that.
 
-### nginx (plain HTTP, and TLS with your own cert)
+### nginx
+
+TLS with your own certificate (mkcert, corporate CA, whatever you have):
 
 ```nginx
 server {
     listen 80;
     server_name jukebox.lan;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name jukebox.lan;
+
+    ssl_certificate     /etc/ssl/jukebox.lan.pem;
+    ssl_certificate_key /etc/ssl/jukebox.lan-key.pem;
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:3000;   # see the table above
+        proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;             # above DISCOGS_TIMEOUT_MS
     }
 }
 ```
 
-For TLS add `listen 443 ssl;`, `ssl_certificate …` and `ssl_certificate_key …`.
+For plain HTTP only, drop the redirect block and the two `ssl_*` lines, and
+change `listen 443 ssl;` to `listen 80;`.
 
 ### Caddy
 
@@ -120,8 +143,10 @@ tailscale serve --bg 8080        # proxy to http://127.0.0.1:8080
 tailscale serve status
 ```
 
-The app is then reachable at `https://<host>.<tailnet>.ts.net` from any device on
-the tailnet, which is a secure context — service worker included.
+`8080` here is whatever the app is published on — the container's host port, or
+`3000` for bare Node. The app is then reachable at
+`https://<host>.<tailnet>.ts.net` from any device on the tailnet, which is a
+secure context — service worker included.
 
 ## Verifying offline launch
 
@@ -131,8 +156,8 @@ the tailnet, which is a secure context — service worker included.
    launch from the home screen. It should open the cached shell with the cached
    collection; the cabinet sync obviously can't resolve while offline.
 
-Optional: check persistent storage in the console — `await navigator.storage.persisted()`
-after the app has requested it.
+Optional: check persistent storage in the console —
+`await navigator.storage.persisted()` after the app has requested it.
 
 ## Next
 
