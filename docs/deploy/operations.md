@@ -152,10 +152,11 @@ sudo systemctl start jukebox
 **Restore:** stop the app, remove the current `jukebox.db`, `-wal` and `-shm`,
 then put the backup in place *with the right owner* — a plain root copy leaves
 the file root-owned and bare Node then crash-loops. Docker runs as root, the
-systemd unit runs as `jukebox`. Run this from the directory that holds the backup:
+systemd unit runs as `jukebox`. Run this from the directory that holds the
+backup, with `jukebox-2026-11-01.db` replaced by your file:
 
 ```bash
-# Docker: into the named volume
+# Docker: into the named volume (VOL still set from above)
 docker stop jukebox
 docker run --rm -v "$VOL":/data -v "$PWD":/backup alpine \
   sh -c 'rm -f /data/jukebox.db* && cp /backup/jukebox-2026-11-01.db /data/jukebox.db && chown 0:0 /data/jukebox.db'
@@ -180,8 +181,9 @@ switching from bare Node to the image, or to another machine, is:
 2. take a backup with the commands above (or copy `jukebox.db*` while stopped);
 3. start the new deployment once, so it creates its data dir/volume;
 4. stop it and load the backup with the **Restore** command for the new route —
-   that step clears a stale `-wal`, and its `chown`/`install -o` is what keeps the
-   image (root) and bare Node (`jukebox`) from crash-looping on ownership;
+   re-set `VOL` first if the new route is the image. That step clears a stale
+   `-wal`, and its `chown`/`install -o` is what keeps the image (root) and bare
+   Node (`jukebox`) from crash-looping on ownership;
 5. start it again, check `/api/health` and open the app.
 
 Browser data does not move with it — that is per device and per browser profile.
