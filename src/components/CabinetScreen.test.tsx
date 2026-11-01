@@ -140,14 +140,28 @@ describe('CabinetScreen', () => {
     expect(actions.setSeparateSizeClasses).toHaveBeenCalledWith(false)
   })
 
-  it('lists records that fit nowhere without a slot', () => {
+  it('lists records that fit nowhere in a collapsible section shaped like a shelf', () => {
     setState([1])
     renderScreen()
 
-    expect(screen.getByText('Second')).toBeInTheDocument()
-
     const warnings = screen.getByRole('list', { name: 'Cabinet warnings' })
     expect(within(warnings).getByText('1 without a slot')).toBeInTheDocument()
+
+    // Collapsed by default, like the shelves, with the count in its header.
+    const toggle = screen.getByRole('button', { name: /Without a shelf/ })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(toggle).toHaveTextContent('1 records')
+    expect(screen.queryByText('Second')).not.toBeInTheDocument()
+
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    const body = document.getElementById('cabinet-unplaced')
+    expect(body).toHaveClass('cabinet-slot-body')
+    expect(within(body!).getByText('Second')).toBeInTheDocument()
+    expect(within(body!).getByText(/add a shelf or raise a capacity/)).toBeInTheDocument()
+
+    fireEvent.click(toggle)
+    expect(screen.queryByText('Second')).not.toBeInTheDocument()
   })
 
   it('shows when a release takes two spaces', () => {

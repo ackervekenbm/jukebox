@@ -17,6 +17,9 @@ const STATUS_TEXT: Record<CabinetStatus, string> = {
   error: 'Could not sync',
 }
 
+/** Expansion key for the "Without a shelf" section; shelf ids look like `slot-1`. */
+const UNPLACED_ID = 'unplaced'
+
 const SORTS = [
   { id: 'artist', label: 'Artist' },
   { id: 'title', label: 'Title' },
@@ -49,6 +52,7 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
 
   const placed = Object.keys(plan.placements).length
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+  const unplacedExpanded = expanded.has(UNPLACED_ID)
   const [adding, setAdding] = useState(false)
   const [newCapacity, setNewCapacity] = useState('75')
 
@@ -280,17 +284,36 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
                 </section>
               )
             })}
-          </div>
 
-          {plan.unplaced.length > 0 && (
-            <section className="cabinet-slot cabinet-unplaced">
-              <h3>Without a shelf</h3>
-              <p className="cabinet-hint">
-                These do not fit anywhere yet — add a shelf or raise a capacity.
-              </p>
-              <ul className="cabinet-records">{plan.unplaced.map((record) => recordRow(record))}</ul>
-            </section>
-          )}
+            {plan.unplaced.length > 0 && (
+              <section className="cabinet-slot cabinet-unplaced">
+                <button
+                  type="button"
+                  className="cabinet-slot-head cabinet-slot-toggle"
+                  onClick={() => toggleExpanded(UNPLACED_ID)}
+                  aria-expanded={unplacedExpanded}
+                  aria-controls="cabinet-unplaced"
+                >
+                  <span className="cabinet-slot-toggle-label">Without a shelf</span>
+                  <span className="cabinet-slot-count" title="Records without a shelf">
+                    {plan.unplaced.length.toLocaleString()} records
+                  </span>
+                  <span className="cabinet-slot-chevron">{unplacedExpanded ? '▾' : '▸'}</span>
+                </button>
+
+                {unplacedExpanded && (
+                  <div id="cabinet-unplaced" className="cabinet-slot-body">
+                    <p className="cabinet-hint">
+                      These do not fit anywhere yet — add a shelf or raise a capacity.
+                    </p>
+                    <ul className="cabinet-records">
+                      {plan.unplaced.map((record) => recordRow(record))}
+                    </ul>
+                  </div>
+                )}
+              </section>
+            )}
+          </div>
         </div>
       </div>
     </div>
