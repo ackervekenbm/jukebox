@@ -364,17 +364,24 @@ export function planCabinet(input: CabinetPlanInput): CabinetPlan {
     if (mixed.length > 0) conflicts.push({ type: 'size-mix', count: mixed.length })
   }
 
-  const artistSlots = new Map<string, Set<string>>()
+  // With sizes kept apart, an artist's 12" and 7"/10" records are separate runs
+  // by design; only a run that itself crosses shelves is a split.
+  const runSlots = new Map<string, { artist: string; slots: Set<string> }>()
   for (const [key, slotId] of placements) {
     const display = byKey.get(key)
     if (!display) continue
-    const seen = artistSlots.get(display.artistName) ?? new Set<string>()
-    seen.add(slotId)
-    artistSlots.set(display.artistName, seen)
+    const run = options.separateSizeClasses
+      ? `${display.artistName}\u0000${sizeOf.get(key) ?? 'other'}`
+      : display.artistName
+    const entry = runSlots.get(run) ?? { artist: display.artistName, slots: new Set<string>() }
+    entry.slots.add(slotId)
+    runSlots.set(run, entry)
   }
-  for (const [artist, seen] of artistSlots) {
-    if (seen.size > 1) conflicts.push({ type: 'artist-split', artist })
+  const splitArtists = new Set<string>()
+  for (const { artist, slots } of runSlots.values()) {
+    if (slots.size > 1) splitArtists.add(artist)
   }
+  for (const artist of splitArtists) conflicts.push({ type: 'artist-split', artist })
 
   if (unplaced.length > 0) conflicts.push({ type: 'unplaced', count: unplaced.length })
 

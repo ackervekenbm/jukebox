@@ -93,7 +93,10 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   12" and anything else — CD, cassette, file — is "other"); that mode orders the size groups by their
   earliest record so the cabinet still starts with the earliest artist. It
   counts a gatefold sleeve as two capacity spaces and reports size-mix /
-  artist-split / unplaced conflicts. Layout is fully automatic — there are no
+  artist-split / unplaced conflicts. Both respect the size separation: mixing
+  is only flagged when sizes are kept apart, and then an artist's 12" and
+  7"/10" runs count separately, so only a run that itself crosses shelves is a
+  split. Layout is fully automatic — there are no
   manual pins.
 - Record cabinet — `src/hooks/useCabinet.ts` orchestrates it: storage-first
   load from IndexedDB, debounced `PUT /api/sync/cabinet` when local changes are

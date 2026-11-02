@@ -360,6 +360,43 @@ describe('planCabinet', () => {
     expect(plan.conflicts).toContainEqual({ type: 'artist-split', artist: 'A' })
   })
 
+  it('does not call an artist split when only the kept-apart sizes divide them', () => {
+    const releases = [
+      fake({ artist: 'A', title: 'lp1', formatText: 'Vinyl · 12"' }),
+      fake({ artist: 'A', title: 'lp2', formatText: 'Vinyl · 12"' }),
+      fake({ artist: 'A', title: 'single', formatText: 'Vinyl · 7"' }),
+      fake({ artist: 'B', title: 'b', formatText: 'Vinyl · 7"' }),
+    ]
+    const options = { sort: 'chronological' as const, separateSizeClasses: true }
+    const plan = planCabinet({ releases, cabinet: cabinetWith([10, 10]), options })
+    expect(plan.slots.map((slot) => slot.sizeClass)).toEqual(['12-inch', 'small'])
+    expect(plan.conflicts).toEqual([])
+
+    // Without the separation the same layout question is a real split.
+    const together = planCabinet({
+      releases,
+      cabinet: cabinetWith([2, 2]),
+      options: { ...options, separateSizeClasses: false },
+    })
+    expect(together.conflicts).toContainEqual({ type: 'artist-split', artist: 'A' })
+  })
+
+  it('still reports an artist whose records of one size cross shelves', () => {
+    const releases = [
+      fake({ artist: 'A', title: 'lp1', formatText: 'Vinyl · 12"' }),
+      fake({ artist: 'A', title: 'lp2', formatText: 'Vinyl · 12"' }),
+      fake({ artist: 'A', title: 'lp3', formatText: 'Vinyl · 12"' }),
+      fake({ artist: 'A', title: 'single', formatText: 'Vinyl · 7"' }),
+    ]
+    const plan = planCabinet({
+      releases,
+      cabinet: cabinetWith([2, 2, 2]),
+      options: { sort: 'chronological', separateSizeClasses: true },
+    })
+    const splits = plan.conflicts.filter((conflict) => conflict.type === 'artist-split')
+    expect(splits).toEqual([{ type: 'artist-split', artist: 'A' }])
+  })
+
   it('counts a gatefold as two spaces against shelf capacity', () => {
     const releases = [
       fake({ id: 1, artist: 'A', title: 'gatefold', formatText: 'Vinyl · 12" · Gatefold' }),
