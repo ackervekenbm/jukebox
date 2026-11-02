@@ -82,10 +82,12 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   imported by both server (validation) and client (types only, so zod never
   enters the browser bundle).
 - `src/utils/cabinet.ts` — the shelf-layout engine (`planCabinet`): shelves
-  follow the selected artist/title/year order, keeping artists together. It
-  reuses the main view's sort rules (`compareReleases` / `sortYear` in
-  `src/utils/collection.ts`: original year, undated last, filing-name keys), so
-  change ordering there, never in a second copy.
+  sort exactly like the main view — always by artist (filing name), and inside
+  an artist by the main view's Year or A–Z order (`CabinetSortMode` is
+  `ArtistSortMode`), keeping artists together. It reuses the main view's sort
+  rules (`compareReleases` / `sortYear` in `src/utils/collection.ts`:
+  original year, undated last), so change ordering there, never in a second
+  copy. A record credited to several artists is filed once, under the first.
   Optionally it groups 12" and 7"/10" onto separate shelves (size class:
   an explicit inch size in the format text wins, otherwise vinyl formats are
   12" and anything else — CD, cassette, file — is "other"); that mode orders the size groups by their

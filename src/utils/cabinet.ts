@@ -2,7 +2,7 @@
 // Copyright (C) 2025-2026 ackervekenbm
 
 import type { Cabinet, Slot } from '../shared/cabinetDoc'
-import { compareReleases, compareYears, sortYear, type DisplayRelease } from './collection'
+import { compareReleases, type ArtistSortMode, type DisplayRelease } from './collection'
 import { compareSortKeys, makeSortKey } from './sortName'
 
 /** Physical size buckets the planner keeps apart where it can. */
@@ -63,17 +63,21 @@ export function spaceUnitsOf(display: DisplayRelease): number {
   return GATEFOLD_PATTERN.test(display.formatText) ? 2 : 1
 }
 
-export type CabinetSortMode = 'artist' | 'title' | 'year'
+/**
+ * The cabinet sorts exactly like the main view: always by artist, and inside an
+ * artist by year (`chronological`) or by title (`byName`).
+ */
+export type CabinetSortMode = ArtistSortMode
 
 export interface CabinetPlanOptions {
-  /** Ordering used to lay records out across and inside slots. */
+  /** Order inside each artist; artists themselves are always in filing order. */
   sort: CabinetSortMode
   /** Keep each size class in its own slot(s) where the space allows. */
   separateSizeClasses: boolean
 }
 
 export const DEFAULT_PLAN_OPTIONS: CabinetPlanOptions = {
-  sort: 'artist',
+  sort: 'chronological',
   separateSizeClasses: false,
 }
 
@@ -88,8 +92,8 @@ export interface PlannedRecord {
 export interface PlannedSlot {
   slot: Slot
   records: PlannedRecord[]
-  /** The single size class in the slot, or 'mixed' when it breaks the rule. */
-  sizeClass: SizeClass | 'mixed'
+  /** The single size class in the slot, 'mixed' when it breaks the rule, null when empty. */
+  sizeClass: SizeClass | 'mixed' | null
   /** Shelf space used by the records, in capacity units. */
   used: number
   /** How many capacity units the slot holds beyond its capacity. */
@@ -125,27 +129,20 @@ interface SortedRecord {
 }
 
 /**
- * Shelf order, built from the main view's sort rules: artists by their filing
- * name (articles and accents ignored), and inside an artist the main view's
- * year-then-title order, so a shelf reads like the artist's row on screen.
- * Years are the original (master) year, as in the main view.
+ * Shelf order: the main view's order, unchanged. Artists by their filing name
+ * (articles and accents ignored), and inside an artist the main view's Year or
+ * A–Z rule, so a shelf reads like the artist's row on screen.
  */
 function compareSortedRecords(
   a: SortedRecord,
   b: SortedRecord,
   sort: CabinetSortMode,
 ): number {
-  const artistOrder = compareSortKeys(a.artistKey, b.artistKey)
-  const keyOrder = a.display.key.localeCompare(b.display.key)
-
-  if (sort === 'title') {
-    return compareReleases(a.display, b.display, 'byName') || artistOrder || keyOrder
-  }
-  if (sort === 'year') {
-    const yearOrder = compareYears(sortYear(a.display), sortYear(b.display))
-    return yearOrder || artistOrder || compareReleases(a.display, b.display, 'byName') || keyOrder
-  }
-  return artistOrder || compareReleases(a.display, b.display, 'chronological') || keyOrder
+  return (
+    compareSortKeys(a.artistKey, b.artistKey) ||
+    compareReleases(a.display, b.display, sort) ||
+    a.display.key.localeCompare(b.display.key)
+  )
 }
 
 function sortKeyed(
@@ -345,7 +342,8 @@ export function planCabinet(input: CabinetPlanInput): CabinetPlan {
     return {
       slot,
       records: plannedRecords,
-      sizeClass: classes.size === 1 ? [...classes][0] : 'mixed',
+      // An empty shelf has no size, rather than a "mixed" one.
+      sizeClass: classes.size === 0 ? null : classes.size === 1 ? [...classes][0] : 'mixed',
       used,
       overCapacity: Math.max(0, used - slot.capacity),
     }

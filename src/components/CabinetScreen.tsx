@@ -20,10 +20,10 @@ const STATUS_TEXT: Record<CabinetStatus, string> = {
 /** Expansion key for the "Without a shelf" section; shelf ids look like `slot-1`. */
 const UNPLACED_ID = 'unplaced'
 
+// The main view's in-artist order, with its labels; artists always come first.
 const SORTS = [
-  { id: 'artist', label: 'Artist' },
-  { id: 'title', label: 'Title' },
-  { id: 'year', label: 'Year' },
+  { id: 'chronological', label: 'Year', title: 'Oldest to newest within each artist' },
+  { id: 'byName', label: 'A–Z', title: 'By album name within each artist' },
 ] as const
 
 interface CabinetScreenProps {
@@ -119,7 +119,7 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
           <div className="cabinet-tools">
             <div className="global-sort">
               <span className="global-sort-label">Sort</span>
-              <div className="sort-toggle" role="radiogroup" aria-label="Sort cabinet by">
+              <div className="sort-toggle" role="radiogroup" aria-label="Sort within each artist">
                 {SORTS.map((sort) => (
                   <button
                     key={sort.id}
@@ -128,6 +128,7 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
                     aria-checked={options.sort === sort.id}
                     className={options.sort === sort.id ? 'active' : ''}
                     onClick={() => setSort(sort.id)}
+                    title={sort.title}
                   >
                     {sort.label}
                   </button>
@@ -228,7 +229,7 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
                     <span className="cabinet-slot-count" title="Records on shelf">
                       {slot.records.length.toLocaleString()} records
                     </span>
-                    {slot.sizeClass !== 'mixed' && (
+                    {slot.sizeClass !== null && slot.sizeClass !== 'mixed' && (
                       <span className="cabinet-tag">{SIZE_CLASS_LABELS[slot.sizeClass]}</span>
                     )}
                     {slot.sizeClass === 'mixed' && <span className="cabinet-tag warn">Mixed sizes</span>}

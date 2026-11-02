@@ -125,28 +125,33 @@ describe('planCabinet sorting', () => {
   const eighties = fake({ id: 2, artist: 'The Band', title: 'Alpha', year: 1980 })
   const undated = { ...fake({ id: 3, artist: 'The Band', title: 'Mid', year: 0 }), originalYear: 0 }
   const other = fake({ id: 4, artist: 'Abba', title: 'Waterloo', year: 1974 })
-  const shelf = (sort: 'artist' | 'title' | 'year') =>
+  const shelf = (sort: 'chronological' | 'byName') =>
     planCabinet({
       releases: [undated, eighties, reissue, other],
       cabinet: cabinetWith([10]),
       options: { sort, separateSizeClasses: false },
     }).slots[0].records.map((record) => record.display.title)
 
-  it('files an artist the way the main view lists it', () => {
-    // "The Band" files under B, after Abba; inside it, the main view's order.
-    const mainView = [undated, eighties, reissue]
-      .sort((a, b) => compareReleases(a, b, 'chronological'))
-      .map((d) => d.title)
-    expect(shelf('artist')).toEqual(['Waterloo', ...mainView])
-    expect(mainView).toEqual(['Zulu', 'Alpha', 'Mid'])
+  const mainView = (sort: 'chronological' | 'byName') =>
+    [undated, eighties, reissue].sort((a, b) => compareReleases(a, b, sort)).map((d) => d.title)
+
+  it('files each artist the way the main view lists it, in Year order', () => {
+    // "The Band" files under B, after Abba; inside it, the main view's order:
+    // by original year (the reissue as 1971), undated last.
+    expect(mainView('chronological')).toEqual(['Zulu', 'Alpha', 'Mid'])
+    expect(shelf('chronological')).toEqual(['Waterloo', ...mainView('chronological')])
   })
 
-  it('sorts by original year, not pressing year, with undated records last', () => {
-    expect(shelf('year')).toEqual(['Zulu', 'Waterloo', 'Alpha', 'Mid'])
+  it('files each artist the way the main view lists it, in A–Z order', () => {
+    expect(mainView('byName')).toEqual(['Alpha', 'Mid', 'Zulu'])
+    expect(shelf('byName')).toEqual(['Waterloo', ...mainView('byName')])
   })
 
-  it('sorts by title like the main view\'s A–Z', () => {
-    expect(shelf('title')).toEqual(['Alpha', 'Mid', 'Waterloo', 'Zulu'])
+  it('always keeps artists together, whichever order is picked', () => {
+    // Even in A–Z, "Alpha" by The Band never jumps ahead of Abba's "Waterloo".
+    for (const sort of ['chronological', 'byName'] as const) {
+      expect(shelf(sort)[0]).toBe('Waterloo')
+    }
   })
 })
 
@@ -196,7 +201,7 @@ describe('planCabinet', () => {
     const plan = planCabinet({
       releases,
       cabinet: cabinetWith([10, 10]),
-      options: { sort: 'artist', separateSizeClasses: true },
+      options: { sort: 'chronological', separateSizeClasses: true },
     })
     expect(plan.slots[0].sizeClass).toBe('12-inch')
     expect(plan.slots[1].sizeClass).toBe('small')
@@ -257,7 +262,7 @@ describe('planCabinet', () => {
     const plan = planCabinet({
       releases,
       cabinet: cabinetWith([10, 10]),
-      options: { sort: 'artist', separateSizeClasses: true },
+      options: { sort: 'chronological', separateSizeClasses: true },
     })
     expect(plan.slots[0].sizeClass).toBe('small')
     expect(plan.slots[1].sizeClass).toBe('12-inch')
@@ -295,7 +300,7 @@ describe('planCabinet', () => {
     const plan = planCabinet({
       releases,
       cabinet: cabinetWith([10, 10]),
-      options: { sort: 'artist', separateSizeClasses: true },
+      options: { sort: 'chronological', separateSizeClasses: true },
     })
     expect(keysIn(plan.slots[0].records)).toEqual(['2-2'])
     expect(keysIn(plan.slots[1].records)).toEqual(['1-1'])
@@ -316,7 +321,7 @@ describe('planCabinet', () => {
     const plan = planCabinet({
       releases,
       cabinet: cabinetWith([10, 10]),
-      options: { sort: 'artist', separateSizeClasses: true },
+      options: { sort: 'chronological', separateSizeClasses: true },
     })
     expect(plan.unplaced).toEqual([])
     expect(plan.slots[0].records).toHaveLength(5)
@@ -372,7 +377,7 @@ describe('planCabinet', () => {
     const plan = planCabinet({
       releases,
       cabinet: cabinetWith([5, 5]),
-      options: { sort: 'title', separateSizeClasses: true },
+      options: { sort: 'byName', separateSizeClasses: true },
     })
     expect(keysIn(plan.slots[0].records)).toEqual(['2-2', '1-1'])
   })

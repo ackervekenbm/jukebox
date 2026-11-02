@@ -74,7 +74,7 @@ function setCabinet(cabinet: Cabinet, status = 'synced') {
   mock.state = {
     cabinets: [cabinet],
     cabinet,
-    options: { sort: 'artist', separateSizeClasses: true },
+    options: { sort: 'chronological', separateSizeClasses: true },
     plan: planCabinet({ releases, cabinet }),
     status,
     dirty: false,
@@ -133,6 +133,17 @@ describe('CabinetScreen', () => {
     expect(screen.queryByText('Old name')).not.toBeInTheDocument()
   })
 
+  it('tags an empty shelf with no size at all', () => {
+    // Two records over three shelves: the planner fills two, the third stays empty.
+    setState([75, 75, 75])
+    renderScreen()
+
+    const empty = screen.getByRole('button', { name: /Shelf 3/ })
+    expect(empty).toHaveTextContent('0 records')
+    expect(empty).not.toHaveTextContent('Mixed sizes')
+    expect(screen.getByRole('button', { name: /Shelf 1/ })).toHaveTextContent('12"')
+  })
+
   it('removes the last shelf too', () => {
     setState([75])
     renderScreen()
@@ -168,11 +179,18 @@ describe('CabinetScreen', () => {
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   })
 
-  it('changes the sort and the size separation', () => {
+  it('offers the main view\'s Year / A–Z order and the size separation', () => {
     renderScreen()
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Year' }))
-    expect(actions.setSort).toHaveBeenCalledWith('year')
+    const order = screen.getByRole('radiogroup', { name: 'Sort within each artist' })
+    expect(within(order).getAllByRole('radio').map((radio) => radio.textContent)).toEqual([
+      'Year',
+      'A–Z',
+    ])
+    expect(within(order).getByRole('radio', { name: 'Year' })).toHaveAttribute('aria-checked', 'true')
+
+    fireEvent.click(within(order).getByRole('radio', { name: 'A–Z' }))
+    expect(actions.setSort).toHaveBeenCalledWith('byName')
 
     fireEvent.click(screen.getByLabelText(/Keep 12"/))
     expect(actions.setSeparateSizeClasses).toHaveBeenCalledWith(false)
@@ -208,7 +226,7 @@ describe('CabinetScreen', () => {
     mock.state = {
       cabinets: [cabinet],
       cabinet,
-      options: { sort: 'artist', separateSizeClasses: true },
+      options: { sort: 'chronological', separateSizeClasses: true },
       plan: planCabinet({ releases: [gatefold, releases[1]], cabinet }),
       status: 'synced',
       dirty: false,
