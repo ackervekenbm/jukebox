@@ -2676,6 +2676,7 @@ button:disabled {
 }
 
 .cabinet-record-art {
+  align-self: flex-start;
   width: 34px;
   height: 34px;
   border-radius: 6px;
@@ -2707,7 +2708,19 @@ button:disabled {
   white-space: nowrap;
 }
 
+.cabinet-record-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
 .cabinet-record-year {
+  /* On the title's line, whatever chips the row has below. */
+  align-self: flex-start;
+  line-height: 1.5;
+  flex-shrink: 0;
   font-size: 0.76rem;
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;

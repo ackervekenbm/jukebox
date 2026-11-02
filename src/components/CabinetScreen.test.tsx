@@ -331,6 +331,12 @@ describe('CabinetScreen', () => {
     expect(toggle).toHaveAttribute('aria-pressed', 'true')
     expect(toggle).toHaveAttribute('title', expect.stringMatching(/found on Discogs/))
     expect(screen.getByText('2 spaces')).toHaveAttribute('title', 'Gatefold sleeve: takes 2 spaces')
+
+    // The chips sit under the artist, so every row ends on its year and the
+    // years line up whatever chips a record has.
+    const row = toggle.closest('li')!
+    expect(row.lastElementChild).toHaveClass('cabinet-record-year')
+    expect(toggle.closest('.cabinet-record-tags')?.parentElement).toHaveClass('cabinet-record-text')
   })
 
   it('reports the release-notes check while it runs', () => {
