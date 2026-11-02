@@ -2655,10 +2655,13 @@ button:disabled {
   color: var(--danger);
 }
 
+/* Art | title + artist | year on the title's line and the sleeve chips on the
+   artist's line, both right-aligned. */
 .cabinet-record {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 10px;
   padding: 6px 0;
   border-top: 1px solid var(--border);
 }
@@ -2676,7 +2679,7 @@ button:disabled {
 }
 
 .cabinet-record-art {
-  align-self: flex-start;
+  grid-row: 1 / span 2;
   width: 34px;
   height: 34px;
   border-radius: 6px;
@@ -2686,6 +2689,8 @@ button:disabled {
 }
 
 .cabinet-record-text {
+  grid-column: 2;
+  grid-row: 1 / span 2;
   flex: 1;
   min-width: 0;
   display: flex;
@@ -2709,18 +2714,20 @@ button:disabled {
 }
 
 .cabinet-record-tags {
+  grid-column: 3;
+  grid-row: 2;
   display: flex;
-  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: 6px;
-  margin-top: 4px;
 }
 
 .cabinet-record-year {
   /* On the title's line, whatever chips the row has below. */
-  align-self: flex-start;
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
   line-height: 1.5;
-  flex-shrink: 0;
   font-size: 0.76rem;
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;

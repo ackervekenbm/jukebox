@@ -123,30 +123,32 @@ export function CabinetScreen({
       <span className="cabinet-record-text">
         <span className="cabinet-record-title">{record.title}</span>
         <span className="cabinet-record-artist">{record.artistName}</span>
-        {/* Sleeve chips sit on their own line, so every row ends on its year. */}
-        {(sizeClassOf(record) !== 'other' || spaceUnitsOf(record, sleeves) > 1) && (
-          <span className="cabinet-record-tags">
-            {sizeClassOf(record) !== 'other' && (
-              <button
-                type="button"
-                className={`cabinet-sleeve-btn${isGatefold(record, sleeves) ? ' active' : ''}`}
-                aria-pressed={isGatefold(record, sleeves)}
-                aria-label={`Gatefold: ${record.title}`}
-                title={sleeveTitle(record)}
-                onClick={() => toggleGatefold(record)}
-              >
-                Gatefold
-              </button>
-            )}
-            {spaceUnitsOf(record, sleeves) > 1 && (
-              <span className="cabinet-record-space" title={spaceReason(record)}>
-                {spaceUnitsOf(record, sleeves)} spaces
-              </span>
-            )}
-          </span>
-        )}
       </span>
       {sortYear(record) > 0 && <span className="cabinet-record-year">{sortYear(record)}</span>}
+      {/* Sleeve chips sit right-aligned on the artist's line, under the year, so
+          the years line up whatever chips a record has; the Gatefold button
+          comes last so it lines up too. */}
+      {(sizeClassOf(record) !== 'other' || spaceUnitsOf(record, sleeves) > 1) && (
+        <span className="cabinet-record-tags">
+          {spaceUnitsOf(record, sleeves) > 1 && (
+            <span className="cabinet-record-space" title={spaceReason(record)}>
+              {spaceUnitsOf(record, sleeves)} spaces
+            </span>
+          )}
+          {sizeClassOf(record) !== 'other' && (
+            <button
+              type="button"
+              className={`cabinet-sleeve-btn${isGatefold(record, sleeves) ? ' active' : ''}`}
+              aria-pressed={isGatefold(record, sleeves)}
+              aria-label={`Gatefold: ${record.title}`}
+              title={sleeveTitle(record)}
+              onClick={() => toggleGatefold(record)}
+            >
+              Gatefold
+            </button>
+          )}
+        </span>
+      )}
     </li>
   )
 
