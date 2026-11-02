@@ -19,18 +19,14 @@ export const SIZE_CLASS_LABELS: Record<SizeClass, string> = {
 const INCH_PATTERN = /(\d+(?:[.,]\d+)?)\s*(?:"|″|”|inch|inches)/gi
 const GATEFOLD_PATTERN = /\bgate[- ]?fold/i
 
-function inchesOf(display: DisplayRelease): number | null {
+/** The largest size a piece of format text states, in inches. */
+function statedInches(text: string): number | null {
   let max: number | null = null
-  for (const text of [display.formatText, ...display.formatNames]) {
-    if (!text) continue
-    INCH_PATTERN.lastIndex = 0
-    let match: RegExpExecArray | null
-    while ((match = INCH_PATTERN.exec(text)) !== null) {
-      const inches = Number.parseFloat(match[1].replace(',', '.'))
-      if (Number.isFinite(inches) && inches > 0 && (max === null || inches > max)) {
-        max = inches
-      }
-    }
+  INCH_PATTERN.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = INCH_PATTERN.exec(text)) !== null) {
+    const inches = Number.parseFloat(match[1].replace(',', '.'))
+    if (Number.isFinite(inches) && inches > 0 && (max === null || inches > max)) max = inches
   }
   return max
 }
@@ -38,21 +34,32 @@ function inchesOf(display: DisplayRelease): number | null {
 /** Discogs format names for records cut on a disc, as opposed to CD, cassette or file. */
 const VINYL_FORMATS = new Set(['vinyl', 'lathe cut', 'acetate', 'flexi-disc', 'shellac'])
 
+const isVinylName = (name: string) => VINYL_FORMATS.has(name.trim().toLowerCase())
+
 function isVinyl(display: DisplayRelease): boolean {
-  return display.formatNames.some((name) => VINYL_FORMATS.has(name.trim().toLowerCase()))
+  return display.formatNames.some(isVinylName)
 }
 
 /**
- * The size bucket a release belongs to. Discogs usually leaves the size off an
- * LP ("Vinyl · LP · Album"), so vinyl counts as 12" unless the format states a
- * smaller size ("7\"", "10\""); with several sizes in one release the largest
- * wins. Only releases that aren't vinyl at all (CD, cassette, file) are "other",
- * so they get their own shelf instead of being filed with the records.
+ * The size bucket a release belongs to, judged per format in the release
+ * ("Vinyl · LP / Vinyl · 7\"" is two formats). Only vinyl formats count:
+ * a 3" CD or a 7" reel-to-reel tape is not a single. Discogs usually leaves the
+ * size off an LP ("Vinyl · LP · Album"), so a vinyl format counts as 12" unless
+ * it states a smaller size ("7\"", "10\""), and the largest vinyl format wins,
+ * so an LP with a bonus 7" is still a 12". Releases without any vinyl (CD,
+ * cassette, file) are "other" and get their own shelf.
  */
 export function sizeClassOf(display: DisplayRelease): SizeClass {
-  const inches = inchesOf(display)
-  if (inches !== null) return inches >= 12 ? '12-inch' : 'small'
-  return isVinyl(display) ? '12-inch' : 'other'
+  let largest: number | null = null
+  for (const part of display.formatText.split(' / ')) {
+    const name = part.split(' · ')[0] ?? ''
+    if (!isVinylName(name)) continue
+    const inches = statedInches(part) ?? 12
+    if (largest === null || inches > largest) largest = inches
+  }
+  // Format text can be missing; fall back to the format names alone.
+  if (largest === null) return isVinyl(display) ? '12-inch' : 'other'
+  return largest >= 12 ? '12-inch' : 'small'
 }
 
 /**
@@ -160,7 +167,12 @@ export interface PlannedSlot {
   overCapacity: number
 }
 
-export type CabinetConflictType = 'over-capacity' | 'size-mix' | 'artist-split' | 'unplaced'
+export type CabinetConflictType =
+  | 'over-capacity'
+  | 'size-mix'
+  | 'artist-split'
+  | 'out-of-order'
+  | 'unplaced'
 
 export interface CabinetConflict {
   type: CabinetConflictType
@@ -240,48 +252,37 @@ function hasRoomAfter(
   return false
 }
 
+interface Allocation {
+  placements: Map<string, string>
+  used: Map<string, number>
+  classOfSlot: Map<string, SizeClass>
+}
+
 /**
- * Places every record into a slot: class-grouped first, then in the requested
- * order, filling each slot to an even share of the collection before moving on.
- * Artists are kept together by walking the already artist-sorted list.
- *
- * Shelf capacity is measured in record spaces, so a gatefold consumes two. The
- * even-target pass can leave unused space in earlier slots (a size class that
- * ends early, or a target reached before the next class starts). A second pass
- * reuses that space before anything is called unplaced, so records are only
- * stranded when the cabinet is genuinely full.
+ * Walks an artist-sorted run of records over a run of shelves, filling each to
+ * an even share of the run before moving on. Artists are kept together: staying
+ * with the same artist may overshoot the even share, capacity is the hard
+ * limit. With `keepSizesApart`, a shelf that already holds one size only takes
+ * another when no later shelf has room (a tight cabinet reports a mix rather
+ * than stranding records). Returns the records that found no shelf.
  */
-function allocate(
-  sorted: SortedRecord[],
+function fillRun(
+  records: SortedRecord[],
   slots: Slot[],
+  state: Allocation,
   sizeOf: Map<string, SizeClass>,
   unitsOf: Map<string, number>,
-  separateSizeClasses: boolean,
-): { placements: Map<string, string>; unplaced: DisplayRelease[] } {
-  const placements = new Map<string, string>()
-  const unplaced: DisplayRelease[] = []
-  if (slots.length === 0) {
-    return { placements, unplaced: sorted.map((record) => record.display) }
-  }
-
-  const used = new Map<string, number>()
-  const classOfSlot = new Map<string, SizeClass>()
-  const totalUnits = sorted.reduce(
-    (total, record) => total + (unitsOf.get(record.display.key) ?? 1),
-    0,
-  )
-  const target = Math.ceil(totalUnits / slots.length)
+  keepSizesApart: boolean,
+): SortedRecord[] {
   const overflow: SortedRecord[] = []
+  if (slots.length === 0) return [...records]
+  const { placements, used, classOfSlot } = state
+  const runUnits = records.reduce((total, record) => total + (unitsOf.get(record.display.key) ?? 1), 0)
+  const target = Math.ceil(runUnits / slots.length)
   let current = 0
   let lastArtist: string | null = null
 
-  const place = (slot: Slot, record: SortedRecord, size: SizeClass, units: number) => {
-    placements.set(record.display.key, slot.id)
-    used.set(slot.id, (used.get(slot.id) ?? 0) + units)
-    if (!classOfSlot.has(slot.id)) classOfSlot.set(slot.id, size)
-  }
-
-  for (const record of sorted) {
+  for (const record of records) {
     const size = sizeOf.get(record.display.key) ?? 'other'
     const units = unitsOf.get(record.display.key) ?? 1
     const sameArtist = lastArtist !== null && record.artistKey === lastArtist
@@ -293,23 +294,11 @@ function allocate(
         continue
       }
       const slotClass = classOfSlot.get(slot.id)
-      // Size classes share a shelf only when no clean slot is left, so a tight
-      // cabinet reports a mix instead of stranding records as unplaced.
-      if (separateSizeClasses && space > 0 && slotClass !== size) {
-        if (hasRoomAfter(slots, used, current, units)) {
-          current++
-          continue
-        }
-        break
-      }
-      // Staying under the same artist is allowed to overshoot the even target
-      // (cohesion outranks distribution); capacity is the hard limit.
-      if (space >= target && !sameArtist) {
-        if (hasRoomAfter(slots, used, current, units)) {
-          current++
-          continue
-        }
-        break
+      const moveOn =
+        (keepSizesApart && space > 0 && slotClass !== size) || (space >= target && !sameArtist)
+      if (moveOn && hasRoomAfter(slots, used, current, units)) {
+        current++
+        continue
       }
       break
     }
@@ -317,30 +306,124 @@ function allocate(
       overflow.push(record)
       continue
     }
-
-    place(slots[current], record, size, units)
+    const slot = slots[current]
+    placements.set(record.display.key, slot.id)
+    used.set(slot.id, (used.get(slot.id) ?? 0) + units)
+    if (!classOfSlot.has(slot.id)) classOfSlot.set(slot.id, size)
     lastArtist = record.artistKey
   }
+  return overflow
+}
 
-  // The first pass walks forward only, so a class change or even target can
-  // leave room on an earlier shelf. Fill that room, preferring shelves that
-  // already hold the same size class, before reporting records as unplaced.
+const unitsIn = (records: SortedRecord[], unitsOf: Map<string, number>) =>
+  records.reduce((total, record) => total + (unitsOf.get(record.display.key) ?? 1), 0)
+
+/**
+ * How many consecutive shelves each size group gets when sizes are kept apart,
+ * or null when the shelves can't hold the groups apart at all. Every group gets
+ * at least the shelves it needs to fit; spare shelves go to the groups with the
+ * most records per shelf, so each group is spread about as evenly as the whole
+ * cabinet would be.
+ */
+function shelfShares(groups: SortedRecord[][], slots: Slot[], unitsOf: Map<string, number>): number[] | null {
+  const units = groups.map((group) => unitsIn(group, unitsOf))
+  const fits = (counts: number[]) => {
+    let start = 0
+    return counts.every((count, index) => {
+      const capacity = slots.slice(start, start + count).reduce((total, slot) => total + slot.capacity, 0)
+      start += count
+      return capacity >= units[index]
+    })
+  }
+
+  // The fewest shelves each group needs, taken in shelf order.
+  const minimum: number[] = []
+  let next = 0
+  for (const need of units) {
+    let capacity = 0
+    let count = 0
+    while (capacity < need && next < slots.length) {
+      capacity += slots[next++].capacity
+      count++
+    }
+    if (capacity < need) return null
+    minimum.push(Math.max(1, count))
+  }
+  const spare = slots.length - minimum.reduce((total, count) => total + count, 0)
+  if (spare < 0) return null
+
+  const shares = [...minimum]
+  for (let i = 0; i < spare; i++) {
+    let best = 0
+    for (let g = 1; g < shares.length; g++) {
+      if (units[g] / (shares[g] + 1) > units[best] / (shares[best] + 1)) best = g
+    }
+    shares[best]++
+  }
+  // Uneven shelf sizes can make the spread-out shares too tight; the minimum
+  // shares (with the spare shelves at the end) always fit.
+  if (fits(shares)) return shares
+  const padded = [...minimum]
+  padded[padded.length - 1] += spare
+  return fits(padded) ? padded : null
+}
+
+/**
+ * Places every record on a shelf in the main view's order, spreading the
+ * collection evenly. With sizes kept apart, each size group gets its own run of
+ * shelves (see `shelfShares`) and is spread evenly over that run; only when
+ * the shelves can't hold the groups apart does one walk over all shelves mix
+ * them where it must.
+ *
+ * Shelf capacity is measured in record spaces, so a gatefold consumes two.
+ * Keeping artists together can leave records with no room in their run; a last
+ * pass puts them in any space left (preferring a shelf of the same size) before
+ * calling them unplaced. Those back-filled records can land on an earlier
+ * shelf than their place in the order, which planCabinet reports.
+ */
+function allocate(
+  groups: SortedRecord[][],
+  slots: Slot[],
+  sizeOf: Map<string, SizeClass>,
+  unitsOf: Map<string, number>,
+  separateSizeClasses: boolean,
+): { placements: Map<string, string>; unplaced: DisplayRelease[] } {
+  const state: Allocation = { placements: new Map(), used: new Map(), classOfSlot: new Map() }
+  const all = groups.flat()
+  if (slots.length === 0) return { placements: state.placements, unplaced: all.map((r) => r.display) }
+
+  let overflow: SortedRecord[] = []
+  const shares = separateSizeClasses && groups.length > 1 ? shelfShares(groups, slots, unitsOf) : null
+  if (shares) {
+    let start = 0
+    groups.forEach((group, index) => {
+      const run = slots.slice(start, start + shares[index])
+      start += shares[index]
+      overflow.push(...fillRun(group, run, state, sizeOf, unitsOf, false))
+    })
+  } else {
+    overflow = fillRun(all, slots, state, sizeOf, unitsOf, separateSizeClasses)
+  }
+
+  const unplaced: DisplayRelease[] = []
   for (const record of overflow) {
     const size = sizeOf.get(record.display.key) ?? 'other'
     const units = unitsOf.get(record.display.key) ?? 1
-    const hasRoom = (slot: Slot) => (used.get(slot.id) ?? 0) + units <= slot.capacity
+    const hasRoom = (slot: Slot) => (state.used.get(slot.id) ?? 0) + units <= slot.capacity
     const clean = separateSizeClasses
-      ? slots.find((slot) => hasRoom(slot) && classOfSlot.get(slot.id) === size)
+      ? slots.find((slot) => hasRoom(slot) && state.classOfSlot.get(slot.id) === size)
       : undefined
     const slot = clean ?? slots.find(hasRoom)
     if (!slot) {
       unplaced.push(record.display)
       continue
     }
-    place(slot, record, size, units)
+    state.placements.set(record.display.key, slot.id)
+    state.used.set(slot.id, (state.used.get(slot.id) ?? 0) + units)
+    if (!state.classOfSlot.has(slot.id)) state.classOfSlot.set(slot.id, size)
   }
 
-  return { placements, unplaced }
+  return { placements: state.placements, unplaced }
 }
 
 export function planCabinet(input: CabinetPlanInput): CabinetPlan {
@@ -360,7 +443,9 @@ export function planCabinet(input: CabinetPlanInput): CabinetPlan {
   const byKey = new Map<string, DisplayRelease>()
   for (const display of releases) byKey.set(display.key, display)
 
-  const sorted = options.separateSizeClasses
+  // With sizes kept apart, each size is its own run, in the order of each run's
+  // first record, so the cabinet still starts with the earliest artist.
+  const groups = options.separateSizeClasses
     ? SIZE_CLASSES.map((sizeClass, index) => ({
         index,
         records: sortKeyed(
@@ -374,11 +459,11 @@ export function planCabinet(input: CabinetPlanInput): CabinetPlan {
           (a, b) =>
             compareSortedRecords(a.records[0], b.records[0], options.sort) || a.index - b.index,
         )
-        .flatMap((group) => group.records)
-    : sortKeyed(releases, options.sort, artistKeys)
+        .map((group) => group.records)
+    : [sortKeyed(releases, options.sort, artistKeys)]
 
   const { placements, unplaced } = allocate(
-    sorted,
+    groups,
     cabinet.slots,
     sizeOf,
     unitsOf,
@@ -421,7 +506,7 @@ export function planCabinet(input: CabinetPlanInput): CabinetPlan {
   // with that option off, mixing is the expected layout. One warning for the
   // whole cabinet, with how many shelves it affects.
   if (options.separateSizeClasses) {
-    const mixed = slotPlans.filter((plan) => plan.records.length > 1 && plan.sizeClass === 'mixed')
+    const mixed = slotPlans.filter((plan) => plan.sizeClass === 'mixed')
     if (mixed.length > 0) conflicts.push({ type: 'size-mix', count: mixed.length })
   }
 
@@ -444,6 +529,20 @@ export function planCabinet(input: CabinetPlanInput): CabinetPlan {
   }
   for (const artist of splitArtists) conflicts.push({ type: 'artist-split', artist })
 
+  // A record back-filled onto an earlier shelf than its place in the order
+  // breaks the reading order; say how many, so the layout isn't trusted blindly.
+  const shelfIndex = new Map(cabinet.slots.map((slot, index) => [slot.id, index]))
+  let furthest = -1
+  let outOfOrder = 0
+  for (const record of groups.flat()) {
+    const slotId = placements.get(record.display.key)
+    if (slotId === undefined) continue
+    const index = shelfIndex.get(slotId) ?? 0
+    if (index < furthest) outOfOrder++
+    else furthest = index
+  }
+  if (outOfOrder > 0) conflicts.push({ type: 'out-of-order', count: outOfOrder })
+
   if (unplaced.length > 0) conflicts.push({ type: 'unplaced', count: unplaced.length })
 
   return {
@@ -454,15 +553,22 @@ export function planCabinet(input: CabinetPlanInput): CabinetPlan {
   }
 }
 
+/** "1 shelf", "3 shelves". */
+export function plural(count = 0, one: string, many = `${one}s`): string {
+  return `${count.toLocaleString()} ${count === 1 ? one : many}`
+}
+
 export function conflictLabel(conflict: CabinetConflict): string {
   switch (conflict.type) {
     case 'over-capacity':
-      return `${conflict.count} over capacity`
+      return `${plural(conflict.count, 'space')} over capacity`
     case 'size-mix':
-      return `Mixed record sizes on ${conflict.count} ${conflict.count === 1 ? 'shelf' : 'shelves'}`
+      return `Mixed sizes on ${plural(conflict.count, 'shelf', 'shelves')}`
     case 'artist-split':
-      return `${conflict.artist} spans slots`
+      return `${conflict.artist} split across shelves`
+    case 'out-of-order':
+      return `${plural(conflict.count, 'record')} out of order`
     case 'unplaced':
-      return `${conflict.count} without a slot`
+      return `${plural(conflict.count, 'record')} without a shelf`
   }
 }

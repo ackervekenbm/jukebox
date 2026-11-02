@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2025-2026 ackervekenbm
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import type { DiscogsCollectionRelease } from '../types/discogs'
 import type { DisplayRelease } from '../utils/collection'
 import { makeSortKey } from '../utils/sortName'
-import { planCabinet } from '../utils/cabinet'
+import { planCabinet, type CabinetPlan, type PlannedSlot } from '../utils/cabinet'
 import type { Cabinet } from '../shared/cabinetDoc'
 import { CabinetScreen } from './CabinetScreen'
 
@@ -18,7 +18,7 @@ vi.mock('../hooks/useCabinet', () => ({
 
 let nextId = 0
 
-function release(artist: string, title: string): DisplayRelease {
+function release(artist: string, title: string, overrides: Partial<DisplayRelease> = {}): DisplayRelease {
   const id = ++nextId
   return {
     key: `${id}-${id}`,
@@ -39,6 +39,7 @@ function release(artist: string, title: string): DisplayRelease {
     thumb: '',
     release: {} as DiscogsCollectionRelease,
     dateAdded: '2024-01-01T00:00:00-00:00',
+    ...overrides,
   }
 }
 
@@ -47,7 +48,7 @@ const releases = [release('Alpha', 'First'), release('Beta', 'Second')]
 function cabinetOf(capacities: number[]): Cabinet {
   return {
     id: 'main',
-    name: 'Cabinet',
+    name: 'Record Cabinet',
     slots: capacities.map((capacity, index) => ({
       id: `slot-${index + 1}`,
       label: `Shelf ${index + 1}`,
@@ -56,10 +57,36 @@ function cabinetOf(capacities: number[]): Cabinet {
   }
 }
 
+/**
+ * A plan built by hand, so screen tests don't depend on how the planner fills
+ * shelves (the planner has its own tests).
+ */
+function planOf(cabinet: Cabinet, shelves: Partial<PlannedSlot>[], rest: Partial<CabinetPlan> = {}): CabinetPlan {
+  const slots = cabinet.slots.map((slot, index) => {
+    const shelf = shelves[index] ?? {}
+    const records = shelf.records ?? []
+    const used = shelf.used ?? records.reduce((total, record) => total + record.units, 0)
+    return {
+      slot,
+      records,
+      sizeClass: records.length === 0 ? null : '12-inch',
+      used,
+      overCapacity: Math.max(0, used - slot.capacity),
+      ...shelf,
+    } satisfies PlannedSlot
+  })
+  const placements: Record<string, string> = {}
+  for (const shelf of slots) for (const record of shelf.records) placements[record.key] = shelf.slot.id
+  return { placements, slots, unplaced: [], conflicts: [], ...rest }
+}
+
+const onShelf = (display: DisplayRelease, units = 1) => ({ key: display.key, display, units })
+
 const actions = {
   addSlot: vi.fn(),
   updateSlot: vi.fn(),
   removeSlot: vi.fn(),
+  restoreSlot: vi.fn(),
   setSort: vi.fn(),
   setSeparateSizeClasses: vi.fn(),
   toggleGatefold: vi.fn(),
@@ -67,171 +94,323 @@ const actions = {
   reset: vi.fn(),
 }
 
-function setState(capacities: number[], status = 'synced') {
-  setCabinet(cabinetOf(capacities), status)
-}
-
-function setCabinet(cabinet: Cabinet, status = 'synced') {
+function setState(cabinet: Cabinet, plan: CabinetPlan, overrides: Record<string, unknown> = {}) {
   mock.state = {
     cabinets: [cabinet],
     cabinet,
     options: { sort: 'chronological', separateSizeClasses: true },
-    plan: planCabinet({ releases, cabinet }),
+    plan,
     sleeves: {},
     gatefoldScan: null,
-    status,
+    status: 'synced',
     dirty: false,
     error: null,
     ...actions,
+    ...overrides,
   }
+}
+
+/** Two shelves of 75, one record on each. */
+function setDefault() {
+  const cabinet = cabinetOf([75, 75])
+  setState(cabinet, planOf(cabinet, [{ records: [onShelf(releases[0])] }, { records: [onShelf(releases[1])] }]))
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
-  setState([75, 75])
+  setDefault()
 })
 
-function renderScreen(onClose = vi.fn()) {
-  render(
-    <CabinetScreen username="alice" token="tok" releases={releases} onClose={onClose} />,
-  )
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+function renderScreen(onClose = vi.fn(), list = releases) {
+  render(<CabinetScreen username="alice" token="tok" releases={list} onClose={onClose} />)
   return onClose
 }
 
+const shelfHeader = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name},`) })
+
 describe('CabinetScreen', () => {
-  it('shows the cabinet, both shelves and the placed count', () => {
+  it('shows the cabinet, its shelves and how much they hold', () => {
     renderScreen()
 
     expect(screen.getByRole('heading', { name: 'Record Cabinet' })).toBeInTheDocument()
     expect(screen.getByText('2 shelves · 150 record spaces')).toBeInTheDocument()
-    expect(screen.getAllByText('Shelf 1')).toHaveLength(1)
-    expect(screen.getAllByText('Shelf 2')).toHaveLength(1)
-    expect(screen.getByText(/2 releases · 2 placed/)).toBeInTheDocument()
-    expect(screen.queryByText(/without a slot/)).not.toBeInTheDocument()
+    expect(screen.getByText('2 releases · 2 placed')).toBeInTheDocument()
+    expect(screen.queryByText(/without a shelf/)).not.toBeInTheDocument()
+  })
+
+  it('gives each shelf one fill count that says what it counts', () => {
+    // One gatefold alone on the shelf: 2 spaces used by 1 record, shown once as spaces.
+    const cabinet = cabinetOf([75])
+    setState(cabinet, planOf(cabinet, [{ records: [onShelf(releases[0], 2)] }]))
+    renderScreen()
+
+    const header = shelfHeader('Shelf 1')
+    expect(within(header).getByText('2 / 75 spaces')).toBeInTheDocument()
+    expect(header).not.toHaveTextContent(/records?/)
+    // Read out as separate phrases, not "Shelf 12 of 75…".
+    expect(header).toHaveAccessibleName('Shelf 1, 2 of 75 spaces used, 12"')
   })
 
   it('has no name fields for the cabinet or its shelves', () => {
     renderScreen()
-    fireEvent.click(screen.getByRole('button', { name: /Shelf 1/ }))
+    fireEvent.click(shelfHeader('Shelf 1'))
 
-    expect(screen.queryByLabelText('Cabinet name')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Shelf name')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Capacity of Shelf 1')).toBeInTheDocument()
+    expect(screen.queryAllByRole('textbox')).toEqual([])
+    expect(screen.getByRole('spinbutton', { name: 'Capacity of Shelf 1' })).toBeInTheDocument()
   })
 
   it('numbers shelves by position, whatever their ids and stored labels', () => {
-    setCabinet({
+    const cabinet: Cabinet = {
       id: 'main',
       name: 'Old name',
       slots: [
         { id: 'slot-1', label: 'Kitchen', capacity: 75 },
         { id: 'slot-3', label: 'Shelf 3', capacity: 75 },
       ],
-    })
+    }
+    setState(cabinet, planOf(cabinet, []))
     renderScreen()
 
-    expect(screen.getByRole('button', { name: /Shelf 1/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Shelf 2/ })).toBeInTheDocument()
+    expect(shelfHeader('Shelf 1')).toBeInTheDocument()
+    expect(shelfHeader('Shelf 2')).toBeInTheDocument()
     expect(screen.queryByText('Kitchen')).not.toBeInTheDocument()
     expect(screen.queryByText('Shelf 3')).not.toBeInTheDocument()
     expect(screen.queryByText('Old name')).not.toBeInTheDocument()
   })
 
-  it('warns about mixed sizes once, and only when sizes are kept apart', () => {
-    // Alternating 12" and 7" on shelves of 3, 2 and 1: two shelves have to mix.
-    const mixed = ['A', 'B', 'C', 'D', 'E', 'F'].map((artist, index) => ({
-      ...release(artist, artist.toLowerCase()),
-      formatText: index % 2 ? 'Vinyl · 7"' : 'Vinyl · 12"',
-    }))
-    const cabinet = cabinetOf([3, 2, 1])
-    const show = (separateSizeClasses: boolean) => {
-      const options = { sort: 'chronological' as const, separateSizeClasses }
-      mock.state = {
-        cabinets: [cabinet],
+  it('shows each record with the year it is sorted by', () => {
+    // A 2015 reissue of a 1971 album files (and shows) as 1971, like the main view.
+    const reissue = release('The Band', 'Zulu', { year: 2015, originalYear: 1971 })
+    const cabinet = cabinetOf([75])
+    setState(cabinet, planOf(cabinet, [{ records: [onShelf(reissue)] }]))
+    renderScreen(vi.fn(), [reissue])
+    fireEvent.click(shelfHeader('Shelf 1'))
+
+    const row = screen.getByText('Zulu').closest('li')!
+    expect(within(row).getByText('1971')).toBeInTheDocument()
+    expect(within(row).queryByText('2015')).not.toBeInTheDocument()
+  })
+
+  describe('warnings', () => {
+    it('shows the planner\'s warnings, and tags a mixed shelf only when sizes are kept apart', () => {
+      const cabinet = cabinetOf([75, 75])
+      const plan = planOf(
         cabinet,
-        options,
-        plan: planCabinet({ releases: mixed, cabinet, options }),
-        sleeves: {},
-        gatefoldScan: null,
-        status: 'synced',
-        dirty: false,
-        error: null,
-        ...actions,
-      }
-      return render(
-        <CabinetScreen username="alice" token="tok" releases={mixed} onClose={vi.fn()} />,
+        [{ records: [onShelf(releases[0]), onShelf(releases[1])], sizeClass: 'mixed' }],
+        { conflicts: [{ type: 'size-mix', count: 1 }, { type: 'out-of-order', count: 2 }] },
       )
-    }
 
-    const apart = show(true)
-    const warnings = screen.getByRole('list', { name: 'Cabinet warnings' })
-    expect(within(warnings).getAllByText(/Mixed record sizes/)).toHaveLength(1)
-    expect(within(warnings).getByText('Mixed record sizes on 2 shelves')).toBeInTheDocument()
-    expect(screen.getAllByText('Mixed sizes')).toHaveLength(2)
-    apart.unmount()
+      setState(cabinet, plan)
+      const { unmount } = render(
+        <CabinetScreen username="alice" token="tok" releases={releases} onClose={vi.fn()} />,
+      )
+      const warnings = screen.getByRole('list', { name: 'Cabinet warnings' })
+      expect(within(warnings).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+        'Mixed sizes on 1 shelf',
+        '2 records out of order',
+      ])
+      expect(within(shelfHeader('Shelf 1')).getByText('Mixed sizes')).toBeInTheDocument()
+      unmount()
 
-    show(false)
-    expect(screen.queryByText(/Mixed record sizes/)).not.toBeInTheDocument()
-    expect(screen.queryByText('Mixed sizes')).not.toBeInTheDocument()
+      // With sizes not kept apart, a mixed shelf is the expected layout.
+      setState(cabinet, { ...plan, conflicts: [] }, {
+        options: { sort: 'chronological', separateSizeClasses: false },
+      })
+      renderScreen()
+      expect(screen.queryByText('Mixed sizes')).not.toBeInTheDocument()
+    })
+
+    it('tags an empty shelf with no size at all', () => {
+      const cabinet = cabinetOf([75, 75])
+      setState(cabinet, planOf(cabinet, [{ records: [onShelf(releases[0])] }]))
+      renderScreen()
+
+      const empty = shelfHeader('Shelf 2')
+      expect(empty).toHaveTextContent('0 / 75 spaces')
+      expect(empty).not.toHaveTextContent('12"')
+      expect(empty).not.toHaveTextContent('Mixed sizes')
+      expect(shelfHeader('Shelf 1')).toHaveTextContent('12"')
+    })
+
+    it('says how far over capacity a shelf is', () => {
+      const cabinet = cabinetOf([1])
+      setState(cabinet, planOf(cabinet, [{ records: [onShelf(releases[0], 2), onShelf(releases[1])] }]))
+      renderScreen()
+      expect(within(shelfHeader('Shelf 1')).getByText('2 spaces over')).toBeInTheDocument()
+    })
   })
 
-  it('tags an empty shelf with no size at all', () => {
-    // Two records over three shelves: the planner fills two, the third stays empty.
-    setState([75, 75, 75])
-    renderScreen()
+  describe('removing a shelf', () => {
+    it('removes the last shelf too, and says what to do next', () => {
+      const cabinet = cabinetOf([75])
+      setState(cabinet, planOf(cabinet, []))
+      actions.removeSlot.mockReturnValue({ slot: cabinet.slots[0], index: 0 })
+      renderScreen()
+      fireEvent.click(shelfHeader('Shelf 1'))
 
-    const empty = screen.getByRole('button', { name: /Shelf 3/ })
-    expect(empty).toHaveTextContent('0 / 75')
-    expect(empty).not.toHaveTextContent('Mixed sizes')
-    expect(screen.getByRole('button', { name: /Shelf 1/ })).toHaveTextContent('12"')
+      const remove = screen.getByRole('button', { name: 'Remove Shelf 1' })
+      expect(remove).toBeEnabled()
+      fireEvent.click(remove)
+      expect(actions.removeSlot).toHaveBeenCalledWith('slot-1')
+    })
+
+    it('offers to undo, and puts the shelf back', () => {
+      const cabinet = cabinetOf([30, 75])
+      const removed = { slot: cabinet.slots[0], index: 0 }
+      actions.removeSlot.mockReturnValue(removed)
+      renderScreen()
+      fireEvent.click(shelfHeader('Shelf 1'))
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Shelf 1' }))
+
+      const message = screen.getByRole('status')
+      expect(message).toHaveTextContent('Shelf 1 removed')
+      fireEvent.click(within(message).getByRole('button', { name: 'Undo' }))
+      expect(actions.restoreSlot).toHaveBeenCalledWith(expect.objectContaining(removed))
+      expect(message).toBeEmptyDOMElement()
+    })
+
+    it('lets the undo message go after a few seconds', () => {
+      vi.useFakeTimers()
+      actions.removeSlot.mockReturnValue({ slot: cabinetOf([75]).slots[0], index: 0 })
+      renderScreen()
+      fireEvent.click(shelfHeader('Shelf 1'))
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Shelf 1' }))
+      expect(screen.getByRole('status')).toHaveTextContent('Shelf 1 removed')
+
+      act(() => {
+        vi.advanceTimersByTime(8000)
+      })
+      expect(screen.getByRole('status')).toBeEmptyDOMElement()
+    })
+
+    it('moves focus to the shelf that takes its place', () => {
+      const cabinet = cabinetOf([75, 75])
+      actions.removeSlot.mockImplementation(() => {
+        // The hook drops the shelf; the next render shows only Shelf 2's id.
+        const after = { ...cabinet, slots: [cabinet.slots[1]] }
+        setState(after, planOf(after, []))
+        return { slot: cabinet.slots[0], index: 0 }
+      })
+      const { rerender } = render(
+        <CabinetScreen username="alice" token="tok" releases={releases} onClose={vi.fn()} />,
+      )
+      fireEvent.click(shelfHeader('Shelf 1'))
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Shelf 1' }))
+      rerender(<CabinetScreen username="alice" token="tok" releases={releases} onClose={vi.fn()} />)
+
+      // slot-2 is now first, so it reads "Shelf 1".
+      expect(shelfHeader('Shelf 1')).toHaveFocus()
+    })
   })
 
-  it('removes the last shelf too', () => {
-    setState([75])
-    renderScreen()
-    fireEvent.click(screen.getByRole('button', { name: /Shelf 1/ }))
+  describe('adding a shelf', () => {
+    it('adds a shelf of the size entered, and returns focus to "Add shelf"', () => {
+      renderScreen()
+      fireEvent.click(screen.getByRole('button', { name: 'Add shelf' }))
+      fireEvent.change(screen.getByRole('spinbutton', { name: 'Shelf size' }), { target: { value: '60' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
 
-    const remove = screen.getByRole('button', { name: 'Remove Shelf 1' })
-    expect(remove).toBeEnabled()
-    fireEvent.click(remove)
-    expect(actions.removeSlot).toHaveBeenCalledWith('slot-1')
+      expect(actions.addSlot).toHaveBeenCalledWith(60)
+      expect(screen.getByRole('button', { name: 'Add shelf' })).toHaveFocus()
+    })
+
+    it('keeps its field named on narrow screens, where the visible label is hidden', () => {
+      renderScreen()
+      fireEvent.click(screen.getByRole('button', { name: 'Add shelf' }))
+      expect(screen.getByRole('spinbutton', { name: 'Shelf size' })).toHaveAttribute(
+        'aria-label',
+        'Shelf size',
+      )
+    })
+
+    it.each(['0', '-5', '501', '1e9', '2.5', ''])('refuses a shelf size of "%s" and says why', (value) => {
+      renderScreen()
+      fireEvent.click(screen.getByRole('button', { name: 'Add shelf' }))
+      const field = screen.getByRole('spinbutton', { name: 'Shelf size' })
+      fireEvent.change(field, { target: { value } })
+      fireEvent.keyDown(field, { key: 'Enter' })
+
+      expect(actions.addSlot).not.toHaveBeenCalled()
+      expect(screen.getByRole('alert')).toHaveTextContent('Enter a whole number from 1 to 500.')
+      expect(field).toHaveAttribute('aria-invalid', 'true')
+    })
+
+    it('closes on Escape and returns focus to "Add shelf"', () => {
+      renderScreen()
+      fireEvent.click(screen.getByRole('button', { name: 'Add shelf' }))
+      fireEvent.keyDown(screen.getByRole('spinbutton', { name: 'Shelf size' }), { key: 'Escape' })
+
+      expect(screen.queryByRole('spinbutton', { name: 'Shelf size' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Add shelf' })).toHaveFocus()
+    })
+  })
+
+  describe('shelf capacity', () => {
+    it('saves a valid capacity', () => {
+      renderScreen()
+      fireEvent.click(shelfHeader('Shelf 1'))
+      fireEvent.change(screen.getByRole('spinbutton', { name: 'Capacity of Shelf 1' }), {
+        target: { value: '40' },
+      })
+      expect(actions.updateSlot).toHaveBeenCalledWith('slot-1', { capacity: 40 })
+    })
+
+    it('lets the field be cleared while typing, without saving anything', () => {
+      renderScreen()
+      fireEvent.click(shelfHeader('Shelf 1'))
+      const field = screen.getByRole('spinbutton', { name: 'Capacity of Shelf 1' })
+      fireEvent.change(field, { target: { value: '' } })
+
+      expect(field).toHaveValue(null)
+      expect(actions.updateSlot).not.toHaveBeenCalled()
+      expect(screen.getByText('Enter a whole number from 1 to 500.')).toBeInTheDocument()
+
+      // Leaving the field puts the saved size back.
+      fireEvent.blur(field)
+      expect(field).toHaveValue(75)
+    })
+
+    it('refuses a capacity out of range', () => {
+      renderScreen()
+      fireEvent.click(shelfHeader('Shelf 1'))
+      const field = screen.getByRole('spinbutton', { name: 'Capacity of Shelf 1' })
+      fireEvent.change(field, { target: { value: '9999' } })
+
+      expect(actions.updateSlot).not.toHaveBeenCalled()
+      expect(field).toHaveAttribute('aria-invalid', 'true')
+    })
   })
 
   it('says what to do when there are no shelves', () => {
-    setState([])
+    const cabinet = cabinetOf([])
+    setState(cabinet, planOf(cabinet, [], { unplaced: releases }))
     renderScreen()
 
     expect(screen.getByText(/No shelves yet/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add shelf' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Without a shelf/ })).toHaveTextContent('2 records')
-  })
-
-  it('adds a shelf', () => {
-    renderScreen()
-    fireEvent.click(screen.getByRole('button', { name: 'Add shelf' }))
-    fireEvent.change(screen.getByLabelText('Shelf size'), { target: { value: '60' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
-    expect(actions.addSlot).toHaveBeenCalledWith(60)
+    expect(screen.getByText('0 shelves')).toBeInTheDocument()
+    expect(within(screen.getByRole('button', { name: /^Without a shelf/ })).getByText('2 records')).toBeInTheDocument()
   })
 
   it('manages records automatically without per-record shelf controls', () => {
     renderScreen()
-
     expect(screen.queryByLabelText('Shelf for First')).not.toBeInTheDocument()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   })
 
-  it('offers the main view\'s Year / A–Z order and the size separation', () => {
+  it('offers the main view\'s Year / A–Z order as toggle buttons, and the size separation', () => {
     renderScreen()
 
-    const order = screen.getByRole('radiogroup', { name: 'Sort within each artist' })
-    expect(within(order).getAllByRole('radio').map((radio) => radio.textContent)).toEqual([
-      'Year',
-      'A–Z',
-    ])
-    expect(within(order).getByRole('radio', { name: 'Year' })).toHaveAttribute('aria-checked', 'true')
+    const order = screen.getByRole('group', { name: 'Order within each artist' })
+    const buttons = within(order).getAllByRole('button')
+    expect(buttons.map((button) => button.textContent)).toEqual(['Year', 'A–Z'])
+    expect(within(order).getByRole('button', { name: 'Year' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(order).getByRole('button', { name: 'A–Z' })).toHaveAttribute('aria-pressed', 'false')
 
-    fireEvent.click(within(order).getByRole('radio', { name: 'A–Z' }))
+    fireEvent.click(within(order).getByRole('button', { name: 'A–Z' }))
     expect(actions.setSort).toHaveBeenCalledWith('byName')
 
     const sizes = screen.getByRole('switch', { name: 'Separate record sizes' })
@@ -241,20 +420,30 @@ describe('CabinetScreen', () => {
   })
 
   it('lists records that fit nowhere in a collapsible section shaped like a shelf', () => {
-    setState([1])
+    const cabinet = cabinetOf([1])
+    setState(
+      cabinet,
+      planOf(cabinet, [{ records: [onShelf(releases[0])] }], {
+        unplaced: [releases[1]],
+        conflicts: [{ type: 'unplaced', count: 1 }],
+      }),
+    )
     renderScreen()
 
     const warnings = screen.getByRole('list', { name: 'Cabinet warnings' })
-    expect(within(warnings).getByText('1 without a slot')).toBeInTheDocument()
+    expect(within(warnings).getByText('1 record without a shelf')).toBeInTheDocument()
+    expect(screen.getByText('2 releases · 1 placed · 1 without a shelf')).toBeInTheDocument()
 
     // Collapsed by default, like the shelves, with the count in its header.
-    const toggle = screen.getByRole('button', { name: /Without a shelf/ })
+    const toggle = screen.getByRole('button', { name: /^Without a shelf/ })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(toggle).toHaveTextContent(/^Without a shelf1 record▸$/)
+    expect(toggle).not.toHaveAttribute('aria-controls')
+    expect(within(toggle).getByText('1 record')).toBeInTheDocument()
     expect(screen.queryByText('Second')).not.toBeInTheDocument()
 
     fireEvent.click(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(toggle).toHaveAttribute('aria-controls', 'cabinet-unplaced')
     const body = document.getElementById('cabinet-unplaced')
     expect(body).toHaveClass('cabinet-slot-body')
     expect(within(body!).getByText('Second')).toBeInTheDocument()
@@ -265,37 +454,14 @@ describe('CabinetScreen', () => {
   })
 
   it('shows when a release takes two spaces', () => {
-    const gatefold = { ...releases[0], formatText: 'Vinyl · 12" · Gatefold' }
-    const cabinet = cabinetOf([75, 75])
-    mock.state = {
-      cabinets: [cabinet],
-      cabinet,
-      options: { sort: 'chronological', separateSizeClasses: true },
-      plan: planCabinet({ releases: [gatefold, releases[1]], cabinet }),
-      sleeves: {},
-      gatefoldScan: null,
-      status: 'synced',
-      dirty: false,
-      error: null,
-      ...actions,
-    }
-    render(
-      <CabinetScreen
-        username="alice"
-        token="tok"
-        releases={[gatefold, releases[1]]}
-        onClose={vi.fn()}
-      />,
-    )
+    const gatefold = release('Gamma', 'Folded', { formatText: 'Vinyl · 12" · LP · Gatefold' })
+    const cabinet = cabinetOf([75])
+    setState(cabinet, planOf(cabinet, [{ records: [onShelf(gatefold, 2)] }]))
+    renderScreen(vi.fn(), [gatefold])
+    fireEvent.click(shelfHeader('Shelf 1'))
 
-    // One gatefold alone on the shelf: the header gives the spaces used (2), not
-    // a second, different record count (1).
-    const shelf = screen.getByRole('button', { name: /Shelf 1/ })
-    expect(shelf).toHaveTextContent(/^Shelf 12 \/ 7512"▸$/)
-    expect(shelf).not.toHaveTextContent('records')
-
-    fireEvent.click(shelf)
-    expect(screen.getByText('2 spaces')).toBeInTheDocument()
+    const row = screen.getByText('Folded').closest('li')!
+    expect(within(row).getByText('2 spaces')).toBeInTheDocument()
   })
 
   it('toggles a record between gatefold and standard sleeve', () => {
@@ -371,9 +537,17 @@ describe('CabinetScreen', () => {
     expect(actions.retry).toHaveBeenCalled()
   })
 
-  it('closes from the button and the backdrop', () => {
+  it('closes from the button', () => {
     const onClose = renderScreen()
     fireEvent.click(screen.getByRole('button', { name: 'Close cabinet' }))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('still lays out a real plan from the planner', () => {
+    // One end-to-end check that the screen and the planner agree on shapes.
+    const cabinet = cabinetOf([75, 75])
+    setState(cabinet, planCabinet({ releases, cabinet }))
+    renderScreen()
+    expect(screen.getByText('2 releases · 2 placed')).toBeInTheDocument()
   })
 })

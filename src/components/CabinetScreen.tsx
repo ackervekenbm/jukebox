@@ -3,18 +3,19 @@
 
 import { sortYear, type DisplayRelease } from '../utils/collection'
 import { useScrollLock } from '../hooks/useScrollLock'
-import { useCabinet, type CabinetStatus } from '../hooks/useCabinet'
+import { useCabinet, type CabinetStatus, type RemovedSlot } from '../hooks/useCabinet'
 import {
   SIZE_CLASS_LABELS,
   conflictLabel,
   detectedGatefold,
   discCountOf,
   isGatefold,
+  plural,
   sizeClassOf,
   spaceUnitsOf,
 } from '../utils/cabinet'
 import { CloseIcon, TrashIcon } from './icons'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const STATUS_TEXT: Record<CabinetStatus, string> = {
   local: 'Saved on this device',
@@ -28,11 +29,81 @@ const STATUS_TEXT: Record<CabinetStatus, string> = {
 /** Expansion key for the "Without a shelf" section; shelf ids look like `slot-1`. */
 const UNPLACED_ID = 'unplaced'
 
+/** A shelf's size, in record spaces: anything a real shelf could plausibly hold. */
+const MIN_SHELF_SIZE = 1
+const MAX_SHELF_SIZE = 500
+const DEFAULT_SHELF_SIZE = '75'
+
+/** A whole number of record spaces in range, or null with the reason shown. */
+function parseShelfSize(value: string): number | null {
+  const size = Number(value)
+  if (value.trim() === '' || !Number.isInteger(size)) return null
+  return size >= MIN_SHELF_SIZE && size <= MAX_SHELF_SIZE ? size : null
+}
+
+const SHELF_SIZE_ERROR = `Enter a whole number from ${MIN_SHELF_SIZE} to ${MAX_SHELF_SIZE}.`
+
+/** How long "Shelf n removed · Undo" stays up. */
+const UNDO_MS = 8000
+
 // The main view's in-artist order, with its labels; artists always come first.
 const SORTS = [
   { id: 'chronological', label: 'Year', title: 'Oldest to newest within each artist' },
   { id: 'byName', label: 'A–Z', title: 'By album name within each artist' },
 ] as const
+
+/**
+ * A shelf's capacity, edited as text so the field can be cleared while typing.
+ * Only a valid size reaches the cabinet; anything else is shown as an error
+ * until it's fixed, and the field goes back to the saved size when it loses
+ * focus.
+ */
+function CapacityInput({
+  shelfName,
+  capacity,
+  onChange,
+}: {
+  shelfName: string
+  capacity: number
+  onChange: (capacity: number) => void
+}) {
+  const [draft, setDraft] = useState(String(capacity))
+  const [prevCapacity, setPrevCapacity] = useState(capacity)
+  if (capacity !== prevCapacity) {
+    setPrevCapacity(capacity)
+    setDraft(String(capacity))
+  }
+  const invalid = parseShelfSize(draft) === null
+  const errorId = `${shelfName.replace(/\s+/g, '-').toLowerCase()}-capacity-error`
+  return (
+    <div className="cabinet-capacity-field">
+      <label className="cabinet-slot-capacity">
+        <span>Capacity</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={MIN_SHELF_SIZE}
+          max={MAX_SHELF_SIZE}
+          aria-label={`Capacity of ${shelfName}`}
+          aria-invalid={invalid}
+          aria-describedby={invalid ? errorId : undefined}
+          value={draft}
+          onChange={(event) => {
+            setDraft(event.target.value)
+            const size = parseShelfSize(event.target.value)
+            if (size !== null) onChange(size)
+          }}
+          onBlur={() => setDraft(String(capacity))}
+        />
+      </label>
+      {invalid && (
+        <p className="cabinet-field-error" id={errorId}>
+          {SHELF_SIZE_ERROR}
+        </p>
+      )}
+    </div>
+  )
+}
 
 interface CabinetScreenProps {
   username: string
@@ -61,6 +132,7 @@ export function CabinetScreen({
     addSlot,
     updateSlot,
     removeSlot,
+    restoreSlot,
     setSort,
     setSeparateSizeClasses,
     toggleGatefold,
@@ -73,7 +145,28 @@ export function CabinetScreen({
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const unplacedExpanded = expanded.has(UNPLACED_ID)
   const [adding, setAdding] = useState(false)
-  const [newCapacity, setNewCapacity] = useState('75')
+  const [newCapacity, setNewCapacity] = useState(DEFAULT_SHELF_SIZE)
+  const [newCapacityError, setNewCapacityError] = useState(false)
+  const [removed, setRemoved] = useState<(RemovedSlot & { name: string }) | null>(null)
+
+  // Focus targets for after a shelf is removed or restored, or the add form
+  // closes, so keyboard and screen-reader users aren't dropped on <body>.
+  const addButtonRef = useRef<HTMLButtonElement>(null)
+  const headerRefs = useRef(new Map<string, HTMLButtonElement>())
+  const pendingFocus = useRef<string | 'add' | null>(null)
+  useEffect(() => {
+    const target = pendingFocus.current
+    if (target === null) return
+    pendingFocus.current = null
+    if (target === 'add') addButtonRef.current?.focus()
+    else headerRefs.current.get(target)?.focus()
+  })
+
+  useEffect(() => {
+    if (!removed) return
+    const timer = setTimeout(() => setRemoved(null), UNDO_MS)
+    return () => clearTimeout(timer)
+  }, [removed])
 
   const toggleExpanded = (slotId: string) => {
     setExpanded((current) => {
@@ -84,11 +177,43 @@ export function CabinetScreen({
     })
   }
 
-  const handleAdd = () => {
-    const cap = Math.max(1, Math.round(Number(newCapacity) || 75))
-    addSlot(cap)
-    setNewCapacity(String(cap))
+  const closeAdd = () => {
     setAdding(false)
+    setNewCapacityError(false)
+    pendingFocus.current = 'add'
+  }
+
+  const handleAdd = () => {
+    const size = parseShelfSize(newCapacity)
+    if (size === null) {
+      setNewCapacityError(true)
+      return
+    }
+    addSlot(size)
+    closeAdd()
+  }
+
+  const handleRemove = (slotId: string, name: string) => {
+    const index = plan.slots.findIndex((entry) => entry.slot.id === slotId)
+    const result = removeSlot(slotId)
+    if (!result) return
+    setRemoved({ ...result, name })
+    // A new shelf can reuse the id later; it shouldn't open already expanded.
+    setExpanded((current) => {
+      const next = new Set(current)
+      next.delete(slotId)
+      return next
+    })
+    // Focus the shelf that takes its place, else the one before, else "Add shelf".
+    const neighbour = plan.slots[index + 1] ?? plan.slots[index - 1]
+    pendingFocus.current = neighbour ? neighbour.slot.id : 'add'
+  }
+
+  const handleUndo = () => {
+    if (!removed) return
+    restoreSlot(removed)
+    pendingFocus.current = removed.slot.id
+    setRemoved(null)
   }
 
   const spaceReason = (record: DisplayRelease) => {
@@ -174,8 +299,8 @@ export function CabinetScreen({
           </header>
 
           <p className="cabinet-summary">
-            {releases.length.toLocaleString()} releases · {placed.toLocaleString()} placed
-            {plan.unplaced.length > 0 && ` · ${plan.unplaced.length.toLocaleString()} without a slot`}
+            {plural(releases.length, 'release')} · {placed.toLocaleString()} placed
+            {plan.unplaced.length > 0 && ` · ${plan.unplaced.length.toLocaleString()} without a shelf`}
           </p>
 
           <section className="cabinet-settings" aria-label="Cabinet settings">
@@ -190,15 +315,14 @@ export function CabinetScreen({
               </div>
               <div
                 className="sort-toggle cabinet-segmented"
-                role="radiogroup"
-                aria-label="Sort within each artist"
+                role="group"
+                aria-labelledby="cabinet-order-title"
               >
                 {SORTS.map((sort) => (
                   <button
                     key={sort.id}
                     type="button"
-                    role="radio"
-                    aria-checked={options.sort === sort.id}
+                    aria-pressed={options.sort === sort.id}
                     className={options.sort === sort.id ? 'active' : ''}
                     onClick={() => setSort(sort.id)}
                     title={sort.title}
@@ -261,38 +385,55 @@ export function CabinetScreen({
                 <span className="cabinet-setting-hint">
                   {plan.slots.length === 0
                     ? '0 shelves'
-                    : `${plan.slots.length.toLocaleString()} ${plan.slots.length === 1 ? 'shelf' : 'shelves'} · ${totalCapacity.toLocaleString()} record spaces`}
+                    : `${plural(plan.slots.length, 'shelf', 'shelves')} · ${plural(totalCapacity, 'record space')}`}
                 </span>
               </div>
               {adding ? (
-                <div className="cabinet-add">
-                  <label className="cabinet-slot-capacity">
-                    <span>Shelf size</span>
-                    <input
-                      type="number"
-                      min={1}
-                      value={newCapacity}
-                      onChange={(event) => setNewCapacity(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') handleAdd()
-                        if (event.key === 'Escape') setAdding(false)
-                      }}
-                      autoFocus
-                    />
-                  </label>
-                  <button type="button" className="cabinet-primary-btn" onClick={handleAdd}>
-                    Add
-                  </button>
-                  <button type="button" className="secondary-btn" onClick={() => setAdding(false)}>
-                    Cancel
-                  </button>
+                <div className="cabinet-add-form">
+                  <div className="cabinet-add">
+                    <label className="cabinet-slot-capacity">
+                      <span>Shelf size</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={MIN_SHELF_SIZE}
+                        max={MAX_SHELF_SIZE}
+                        // The visible label is hidden on phones; this name isn't.
+                        aria-label="Shelf size"
+                        aria-invalid={newCapacityError}
+                        aria-describedby={newCapacityError ? 'cabinet-new-size-error' : undefined}
+                        value={newCapacity}
+                        onChange={(event) => {
+                          setNewCapacity(event.target.value)
+                          setNewCapacityError(false)
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') handleAdd()
+                          if (event.key === 'Escape') closeAdd()
+                        }}
+                        autoFocus
+                      />
+                    </label>
+                    <button type="button" className="cabinet-primary-btn" onClick={handleAdd}>
+                      Add
+                    </button>
+                    <button type="button" className="secondary-btn" onClick={closeAdd}>
+                      Cancel
+                    </button>
+                  </div>
+                  {newCapacityError && (
+                    <p className="cabinet-field-error" id="cabinet-new-size-error" role="alert">
+                      {SHELF_SIZE_ERROR}
+                    </p>
+                  )}
                 </div>
               ) : (
                 <button
                   type="button"
                   className="cabinet-primary-btn"
+                  ref={addButtonRef}
                   onClick={() => {
-                    setNewCapacity('75')
+                    setNewCapacity(DEFAULT_SHELF_SIZE)
                     setAdding(true)
                   }}
                 >
@@ -333,58 +474,56 @@ export function CabinetScreen({
               // Shelves are numbered by position, so the numbers stay 1…n after
               // a shelf is removed.
               const shelfName = `Shelf ${index + 1}`
+              const fill = `${slot.used.toLocaleString()} of ${slot.slot.capacity.toLocaleString()} spaces used`
+              const sizeTag =
+                slot.sizeClass !== null && slot.sizeClass !== 'mixed'
+                  ? SIZE_CLASS_LABELS[slot.sizeClass]
+                  : null
+              const mixedTag = slot.sizeClass === 'mixed' && options.separateSizeClasses
+              const overTag = slot.overCapacity > 0 ? `${plural(slot.overCapacity, 'space')} over` : null
+              // Spoken as one phrase with pauses; the visible parts would otherwise
+              // run together ("Shelf 12 of 75…" reads as shelf 12).
+              const headerLabel = [shelfName, fill, sizeTag, mixedTag && 'Mixed sizes', overTag]
+                .filter(Boolean)
+                .join(', ')
               return (
                 <section key={slot.slot.id} className="cabinet-slot">
                   <button
                     type="button"
-                    className="cabinet-slot-head cabinet-slot-toggle"
+                    className="cabinet-slot-toggle"
+                    ref={(element) => {
+                      if (element) headerRefs.current.set(slot.slot.id, element)
+                      else headerRefs.current.delete(slot.slot.id)
+                    }}
                     onClick={() => toggleExpanded(slot.slot.id)}
+                    aria-label={headerLabel}
                     aria-expanded={isExpanded}
-                    aria-controls={`cabinet-slot-${slot.slot.id}`}
+                    aria-controls={isExpanded ? `cabinet-slot-${slot.slot.id}` : undefined}
                   >
                     <span className="cabinet-slot-toggle-label">{shelfName}</span>
                     {/* One fill count: spaces used of capacity. It only differs from
                         the record count by gatefolds, which say "2 spaces" inside. */}
-                    <span
-                      className="cabinet-slot-count"
-                      title={`${slot.used.toLocaleString()} of ${slot.slot.capacity.toLocaleString()} spaces used`}
-                    >
-                      {slot.used.toLocaleString()} / {slot.slot.capacity.toLocaleString()}
+                    <span className="cabinet-slot-count">
+                      {slot.used.toLocaleString()} / {slot.slot.capacity.toLocaleString()} spaces
                     </span>
-                    {slot.sizeClass !== null && slot.sizeClass !== 'mixed' && (
-                      <span className="cabinet-tag">{SIZE_CLASS_LABELS[slot.sizeClass]}</span>
-                    )}
-                    {slot.sizeClass === 'mixed' && options.separateSizeClasses && (
-                      <span className="cabinet-tag warn">Mixed sizes</span>
-                    )}
-                    {slot.overCapacity > 0 && (
-                      <span className="cabinet-tag danger">
-                        {slot.overCapacity} over capacity
-                      </span>
-                    )}
+                    {sizeTag && <span className="cabinet-tag">{sizeTag}</span>}
+                    {mixedTag && <span className="cabinet-tag warn">Mixed sizes</span>}
+                    {overTag && <span className="cabinet-tag danger">{overTag}</span>}
                     <span className="cabinet-slot-chevron">{isExpanded ? '▾' : '▸'}</span>
                   </button>
 
                   {isExpanded && (
                     <div id={`cabinet-slot-${slot.slot.id}`} className="cabinet-slot-body">
                       <div className="cabinet-slot-tools">
-                        <label className="cabinet-slot-capacity">
-                          <span>Capacity</span>
-                          <input
-                            type="number"
-                            min={1}
-                            aria-label={`Capacity of ${shelfName}`}
-                            value={slot.slot.capacity}
-                            onChange={(event) => {
-                              const capacity = Math.max(1, Math.round(Number(event.target.value) || 1))
-                              updateSlot(slot.slot.id, { capacity })
-                            }}
-                          />
-                        </label>
+                        <CapacityInput
+                          shelfName={shelfName}
+                          capacity={slot.slot.capacity}
+                          onChange={(capacity) => updateSlot(slot.slot.id, { capacity })}
+                        />
                         <button
                           type="button"
                           className="icon-btn"
-                          onClick={() => removeSlot(slot.slot.id)}
+                          onClick={() => handleRemove(slot.slot.id, shelfName)}
                           title="Remove shelf"
                           aria-label={`Remove ${shelfName}`}
                         >
@@ -409,16 +548,14 @@ export function CabinetScreen({
               <section className="cabinet-slot cabinet-unplaced">
                 <button
                   type="button"
-                  className="cabinet-slot-head cabinet-slot-toggle"
+                  className="cabinet-slot-toggle"
                   onClick={() => toggleExpanded(UNPLACED_ID)}
+                  aria-label={`Without a shelf, ${plural(plan.unplaced.length, 'record')}`}
                   aria-expanded={unplacedExpanded}
-                  aria-controls="cabinet-unplaced"
+                  aria-controls={unplacedExpanded ? 'cabinet-unplaced' : undefined}
                 >
                   <span className="cabinet-slot-toggle-label">Without a shelf</span>
-                  <span className="cabinet-slot-count" title="Records without a shelf">
-                    {plan.unplaced.length.toLocaleString()}{' '}
-                    {plan.unplaced.length === 1 ? 'record' : 'records'}
-                  </span>
+                  <span className="cabinet-slot-count">{plural(plan.unplaced.length, 'record')}</span>
                   <span className="cabinet-slot-chevron">{unplacedExpanded ? '▾' : '▸'}</span>
                 </button>
 
@@ -433,6 +570,18 @@ export function CabinetScreen({
                   </div>
                 )}
               </section>
+            )}
+          </div>
+
+          {/* Always rendered, so screen readers announce the message when it appears. */}
+          <div className="cabinet-undo-region" role="status">
+            {removed && (
+              <div className="cabinet-undo">
+                <span>{removed.name} removed</span>
+                <button type="button" onClick={handleUndo}>
+                  Undo
+                </button>
+              </div>
             )}
           </div>
         </div>
