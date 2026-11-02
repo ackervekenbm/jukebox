@@ -46,9 +46,14 @@ const updateStmt = db.prepare(
 export const getCabinetRow = (username: string): CabinetRow | null =>
   (selectStmt.get(username) as CabinetRow | undefined) ?? null
 
+/**
+ * Saves a document if `expected` matches the stored revision. `doc` can be a
+ * function of the stored row, so a write that builds on it (keeping a field an
+ * older client left out) reads the same row it replaces, in one transaction.
+ */
 export const putCabinetRow = (
   username: string,
-  doc: string,
+  doc: string | ((current: CabinetRow | null) => string),
   expected: number | 'force',
 ): CabinetRow => {
   const save = db.transaction((): CabinetRow => {
@@ -59,10 +64,11 @@ export const putCabinetRow = (
     }
     const nextRevision = currentRevision + 1
     const savedAt = new Date().toISOString()
+    const text = typeof doc === 'function' ? doc(current) : doc
     if (current) {
-      updateStmt.run(doc, nextRevision, savedAt, username)
+      updateStmt.run(text, nextRevision, savedAt, username)
     } else {
-      insertStmt.run(username, doc, nextRevision, savedAt)
+      insertStmt.run(username, text, nextRevision, savedAt)
     }
     return getCabinetRow(username)!
   })
