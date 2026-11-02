@@ -4,7 +4,15 @@
 import { sortYear, type DisplayRelease } from '../utils/collection'
 import { useScrollLock } from '../hooks/useScrollLock'
 import { useCabinet, type CabinetStatus } from '../hooks/useCabinet'
-import { SIZE_CLASS_LABELS, conflictLabel, spaceUnitsOf } from '../utils/cabinet'
+import {
+  SIZE_CLASS_LABELS,
+  conflictLabel,
+  detectedGatefold,
+  discCountOf,
+  isGatefold,
+  sizeClassOf,
+  spaceUnitsOf,
+} from '../utils/cabinet'
 import { CloseIcon, TrashIcon } from './icons'
 import { useState } from 'react'
 
@@ -30,14 +38,24 @@ interface CabinetScreenProps {
   username: string
   token: string | null
   releases: DisplayRelease[]
+  /** The collection is still loading or enriching; the gatefold scan waits for it. */
+  collectionBusy?: boolean
   onClose: () => void
 }
 
-export function CabinetScreen({ username, token, releases, onClose }: CabinetScreenProps) {
+export function CabinetScreen({
+  username,
+  token,
+  releases,
+  collectionBusy = false,
+  onClose,
+}: CabinetScreenProps) {
   useScrollLock(true)
   const {
     options,
     plan,
+    sleeves,
+    gatefoldScan,
     status,
     error,
     addSlot,
@@ -45,11 +63,13 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
     removeSlot,
     setSort,
     setSeparateSizeClasses,
+    toggleGatefold,
     retry,
-  } = useCabinet({ username, token, releases, enabled: true })
+  } = useCabinet({ username, token, releases, enabled: true, collectionBusy })
 
   const placed = Object.keys(plan.placements).length
   const totalCapacity = plan.slots.reduce((total, slot) => total + slot.slot.capacity, 0)
+  const gatefoldCount = releases.filter((record) => isGatefold(record, sleeves)).length
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const unplacedExpanded = expanded.has(UNPLACED_ID)
   const [adding, setAdding] = useState(false)
@@ -71,6 +91,28 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
     setAdding(false)
   }
 
+  const spaceReason = (record: DisplayRelease) => {
+    const discs = discCountOf(record)
+    const parts = []
+    if (isGatefold(record, sleeves)) parts.push('Gatefold sleeve')
+    if (discs > 1) parts.push(`${discs} discs`)
+    return `${parts.join(', ')}: takes ${spaceUnitsOf(record, sleeves)} spaces`
+  }
+
+  // Says where the current call comes from, so a wrong one can be traced.
+  const sleeveTitle = (record: DisplayRelease) => {
+    const overridden = sleeves.overrides?.[String(record.id)] !== undefined
+    if (overridden) {
+      return isGatefold(record, sleeves)
+        ? 'Gatefold — marked by you. Click to undo.'
+        : 'Standard sleeve — marked by you. Click to undo.'
+    }
+    if (detectedGatefold(record, sleeves)) {
+      return 'Gatefold — found on Discogs. Click if it is a standard sleeve.'
+    }
+    return 'Standard sleeve. Click to mark it as a gatefold.'
+  }
+
   const recordRow = (record: DisplayRelease) => (
     <li className="cabinet-record" key={record.key}>
       {record.thumb ? (
@@ -83,10 +125,22 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
         <span className="cabinet-record-artist">{record.artistName}</span>
       </span>
       {sortYear(record) > 0 && <span className="cabinet-record-year">{sortYear(record)}</span>}
-      {spaceUnitsOf(record) > 1 && (
-        <span className="cabinet-record-space" title="Gatefold — takes two spaces">
-          2 spaces
+      {spaceUnitsOf(record, sleeves) > 1 && (
+        <span className="cabinet-record-space" title={spaceReason(record)}>
+          {spaceUnitsOf(record, sleeves)} spaces
         </span>
+      )}
+      {sizeClassOf(record) !== 'other' && (
+        <button
+          type="button"
+          className={`cabinet-sleeve-btn${isGatefold(record, sleeves) ? ' active' : ''}`}
+          aria-pressed={isGatefold(record, sleeves)}
+          aria-label={`Gatefold: ${record.title}`}
+          title={sleeveTitle(record)}
+          onClick={() => toggleGatefold(record)}
+        >
+          Gatefold
+        </button>
       )}
     </li>
   )
@@ -168,6 +222,30 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
                 />
                 <span className="cabinet-switch-track" aria-hidden="true" />
               </label>
+            </div>
+
+            <div className="cabinet-setting">
+              <div className="cabinet-setting-text">
+                <span className="cabinet-setting-title">Gatefolds</span>
+                <span className="cabinet-setting-hint" aria-live="polite">
+                  {gatefoldScan
+                    ? `Checking release notes: ${gatefoldScan.done.toLocaleString()} of ${gatefoldScan.total.toLocaleString()} records`
+                    : collectionBusy
+                      ? 'Release notes are checked once your collection has finished loading.'
+                      : 'Read from each record\'s format and release notes. Correct one with its Gatefold button.'}
+                </span>
+                {gatefoldScan && (
+                  <progress
+                    className="cabinet-progress"
+                    value={gatefoldScan.done}
+                    max={gatefoldScan.total}
+                    aria-label="Release notes checked"
+                  />
+                )}
+              </div>
+              <span className="cabinet-setting-value">
+                {gatefoldCount.toLocaleString()} found
+              </span>
             </div>
 
             <div className="cabinet-setting">

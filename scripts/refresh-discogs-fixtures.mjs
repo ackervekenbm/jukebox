@@ -115,10 +115,16 @@ async function main() {
   }
 
   const release = await get(`/releases/${releaseId}`, token)
-  // The parser only reads id/title/year/tracklist, so keep the fixture lean.
+  // The parser only reads id/title/year/tracklist/notes, so keep the fixture lean.
   await writeFixture(
     `release-${releaseId}.json`,
-    { id: release.id, title: release.title, year: release.year, tracklist: release.tracklist },
+    {
+      id: release.id,
+      title: release.title,
+      year: release.year,
+      tracklist: release.tracklist,
+      notes: release.notes,
+    },
   )
 
   console.log('Done. `git diff src/test/fixtures/discogs` shows what changed.')

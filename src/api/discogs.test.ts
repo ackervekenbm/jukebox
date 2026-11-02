@@ -7,7 +7,8 @@ import {
   fetchCollectionValue,
   fetchFolders,
   fetchMasterYears,
-  fetchReleaseTracklist,
+  fetchReleaseDetails,
+  fetchReleaseGatefolds,
 } from './discogs'
 
 const API = '/discogs'
@@ -216,14 +217,58 @@ describe('fetchMasterYears', () => {
   })
 })
 
-describe('fetchReleaseTracklist', () => {
-  it('returns the release tracklist', async () => {
+describe('fetchReleaseDetails', () => {
+  it('returns the tracklist and whether the notes say gatefold', async () => {
     mockFetch(() =>
-      json({ id: 5, title: 'X', year: 2000, tracklist: [{ position: 'A1', title: 'T', duration: '1:00' }] }),
+      json({
+        id: 5,
+        title: 'X',
+        year: 2000,
+        tracklist: [{ position: 'A1', title: 'T', duration: '1:00' }],
+        notes: '180 Gram Heavyweight Vinyl\nGatefold sleeve.\nMade in the EU.',
+      }),
     )
-    await expect(fetchReleaseTracklist(5, 'tok')).resolves.toEqual([
-      { position: 'A1', title: 'T', duration: '1:00' },
+    await expect(fetchReleaseDetails(5, 'tok')).resolves.toEqual({
+      tracks: [{ position: 'A1', title: 'T', duration: '1:00' }],
+      gatefold: true,
+    })
+  })
+
+  it('reads a release without notes as no gatefold', async () => {
+    mockFetch(() => json({ id: 5, title: 'X', year: 2000, tracklist: [] }))
+    await expect(fetchReleaseDetails(5, 'tok')).resolves.toEqual({ tracks: [], gatefold: false })
+  })
+})
+
+describe('fetchReleaseGatefolds', () => {
+  it('reads each release once, streams answers, and counts a removed release as no gatefold', async () => {
+    const requested: string[] = []
+    mockFetch((url) => {
+      requested.push(url)
+      const id = Number(/\/releases\/(\d+)$/.exec(url)?.[1])
+      if (id === 3) return json({ message: 'Release not found.' }, 404)
+      return json({ id, title: 'X', year: 2000, tracklist: [], notes: id === 1 ? 'Gate-fold cover' : 'Insert' })
+    })
+    const onRelease = vi.fn()
+
+    const promise = fetchReleaseGatefolds([1, 2, 3, 1], 'tok', undefined, undefined, onRelease)
+    await vi.advanceTimersByTimeAsync(400)
+
+    await expect(promise).resolves.toEqual({ 1: true, 2: false, 3: false })
+    expect(requested).toEqual([`${API}/releases/1`, `${API}/releases/2`, `${API}/releases/3`])
+    expect(onRelease.mock.calls).toEqual([
+      [1, true],
+      [2, false],
+      [3, false],
     ])
+  })
+
+  it('leaves a release that keeps failing out, so it is asked again later', async () => {
+    mockFetch(() => json({ message: 'boom' }, 500))
+
+    const promise = fetchReleaseGatefolds([1], 'tok')
+    for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(2500)
+    await expect(promise).resolves.toEqual({})
   })
 })
 describe('fetchCollectionValue', () => {

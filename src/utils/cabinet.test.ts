@@ -2,10 +2,19 @@
 // Copyright (C) 2025-2026 ackervekenbm
 
 import { describe, expect, it } from 'vitest'
-import type { DiscogsCollectionRelease } from '../types/discogs'
+import type { DiscogsCollectionRelease, DiscogsFormat } from '../types/discogs'
 import { compareReleases, type DisplayRelease } from './collection'
 import { makeSortKey } from './sortName'
-import { conflictLabel, planCabinet, sizeClassOf, spaceUnitsOf } from './cabinet'
+import {
+  conflictLabel,
+  discCountOf,
+  isGatefold,
+  needsNotesCheck,
+  notesSayGatefold,
+  planCabinet,
+  sizeClassOf,
+  spaceUnitsOf,
+} from './cabinet'
 
 interface FakeInput {
   artist: string
@@ -13,6 +22,8 @@ interface FakeInput {
   id?: number
   year?: number
   formatText?: string
+  /** Raw formats; by default one format named like the start of formatText. */
+  formats?: DiscogsFormat[]
 }
 
 let counter = 0
@@ -39,7 +50,11 @@ function fake(input: FakeInput): DisplayRelease {
     formatText,
     coverImage: '',
     thumb: '',
-    release: {} as DiscogsCollectionRelease,
+    release: {
+      basic_information: {
+        formats: input.formats ?? [{ name: formatText.split(' · ')[0], qty: '1' }],
+      },
+    } as unknown as DiscogsCollectionRelease,
     dateAdded: '2024-01-01T00:00:00-00:00',
   }
 }
@@ -116,6 +131,85 @@ describe('spaceUnitsOf', () => {
 
   it('counts a standard sleeve as one space', () => {
     expect(spaceUnitsOf(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · 12" · LP' }))).toBe(1)
+  })
+
+  it('finds a gatefold in a format\'s free text', () => {
+    const record = fake({
+      artist: 'A',
+      title: 'T',
+      formatText: 'Vinyl · LP · Album',
+      formats: [{ name: 'Vinyl', qty: '1', text: '180g, Gatefold', descriptions: ['LP', 'Album'] }],
+    })
+    expect(spaceUnitsOf(record)).toBe(2)
+  })
+
+  it('counts a gatefold the release notes describe', () => {
+    // Blink-182 – Enema Of The State (9160941): only the notes say gatefold.
+    const record = fake({ artist: 'blink-182', title: 'Enema Of The State', id: 9160941, formatText: 'Vinyl · LP · Album · Reissue · Stereo' })
+    expect(spaceUnitsOf(record)).toBe(1)
+    expect(spaceUnitsOf(record, { notes: { '9160941': true } })).toBe(2)
+    expect(spaceUnitsOf(record, { notes: { '9160941': false } })).toBe(1)
+  })
+
+  it('lets the user\'s call win both ways', () => {
+    const plain = fake({ artist: 'A', title: 'T', id: 1, formatText: 'Vinyl · LP' })
+    const folded = fake({ artist: 'A', title: 'U', id: 2, formatText: 'Vinyl · LP · Gatefold' })
+    expect(spaceUnitsOf(plain, { overrides: { '1': true } })).toBe(2)
+    expect(spaceUnitsOf(folded, { overrides: { '2': false } })).toBe(1)
+    expect(isGatefold(folded, { notes: { '2': true }, overrides: { '2': false } })).toBe(false)
+  })
+
+  it('gives a multi-disc set one space per disc, gatefold or not', () => {
+    const lps = (qty: string, descriptions: string[] = ['LP']) =>
+      fake({
+        artist: 'A',
+        title: 'T',
+        formatText: ['Vinyl', ...descriptions].join(' · '),
+        formats: [{ name: 'Vinyl', qty, descriptions }],
+      })
+    expect(spaceUnitsOf(lps('2'))).toBe(2)
+    expect(spaceUnitsOf(lps('2', ['LP', 'Gatefold']))).toBe(2)
+    expect(spaceUnitsOf(lps('3'))).toBe(3)
+    expect(discCountOf(lps('nonsense'))).toBe(1)
+  })
+
+  it('counts vinyl discs only in a mixed set', () => {
+    const record = fake({
+      artist: 'A',
+      title: 'T',
+      formatText: 'Vinyl · LP / CD · Album',
+      formats: [
+        { name: 'Vinyl', qty: '1', descriptions: ['LP'] },
+        { name: 'CD', qty: '2', descriptions: ['Album'] },
+      ],
+    })
+    expect(discCountOf(record)).toBe(1)
+    expect(spaceUnitsOf(record)).toBe(1)
+  })
+})
+
+describe('notesSayGatefold', () => {
+  it('recognises the ways notes write it', () => {
+    expect(notesSayGatefold('180 Gram Heavyweight Vinyl\nGatefold sleeve.')).toBe(true)
+    expect(notesSayGatefold('Comes in a gate-fold cover')).toBe(true)
+    expect(notesSayGatefold('Gate fold jacket with lyrics')).toBe(true)
+    expect(notesSayGatefold('Printed inner sleeve. Includes a download voucher.')).toBe(false)
+    expect(notesSayGatefold(undefined)).toBe(false)
+  })
+})
+
+describe('needsNotesCheck', () => {
+  it('only asks about single vinyl LPs that are not known yet', () => {
+    const lp = fake({ artist: 'A', title: 'T', id: 1, formatText: 'Vinyl · LP' })
+    expect(needsNotesCheck(lp)).toBe(true)
+    expect(needsNotesCheck(lp, { notes: { '1': false } })).toBe(false)
+    expect(needsNotesCheck(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · LP · Gatefold' }))).toBe(false)
+    expect(needsNotesCheck(fake({ artist: 'A', title: 'T', formatText: 'CD · Album' }))).toBe(false)
+    expect(
+      needsNotesCheck(
+        fake({ artist: 'A', title: 'T', formatText: 'Vinyl · LP', formats: [{ name: 'Vinyl', qty: '2' }] }),
+      ),
+    ).toBe(false)
   })
 })
 
@@ -395,6 +489,15 @@ describe('planCabinet', () => {
     })
     const splits = plan.conflicts.filter((conflict) => conflict.type === 'artist-split')
     expect(splits).toEqual([{ type: 'artist-split', artist: 'A' }])
+  })
+
+  it('fills shelves by the sleeves it learns from the notes', () => {
+    const releases = [1, 2, 3].map((id) => fake({ artist: 'A', title: `a${id}`, id, formatText: 'Vinyl · LP' }))
+    const cabinet = cabinetWith([3])
+    expect(planCabinet({ releases, cabinet }).unplaced).toEqual([])
+    const plan = planCabinet({ releases, cabinet, sleeves: { notes: { '1': true } } })
+    expect(plan.slots[0].used).toBe(3)
+    expect(plan.unplaced).toHaveLength(1)
   })
 
   it('counts a gatefold as two spaces against shelf capacity', () => {

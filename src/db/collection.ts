@@ -27,6 +27,7 @@ const STORE = 'collection'
 const MASTER_STORE = 'masterYears'
 const DETAIL_STORE = 'releaseDetails'
 const VALUE_STORE = 'collectionValue'
+const SLEEVE_STORE = 'releaseSleeves'
 const MASTER_KEY = 'all'
 
 export async function getCachedCollection(username: string): Promise<CachedCollection | undefined> {
@@ -69,6 +70,32 @@ export async function getReleaseTracklist(releaseId: number): Promise<DiscogsTra
 export async function setReleaseTracklist(releaseId: number, tracks: DiscogsTrack[]): Promise<void> {
   const db = await dbPromise
   await db.put(DETAIL_STORE, tracks, releaseId)
+}
+
+// Whether each release's notes describe a gatefold, one row per release id. A
+// sleeve never changes, so answers are kept for good; one row per release lets
+// the cabinet's scan and the release-detail screen record answers side by side.
+export async function getReleaseGatefolds(): Promise<Record<string, boolean>> {
+  const db = await dbPromise
+  const [keys, values] = await Promise.all([
+    db.getAllKeys(SLEEVE_STORE),
+    db.getAll(SLEEVE_STORE),
+  ])
+  const result: Record<string, boolean> = {}
+  keys.forEach((key, index) => {
+    result[String(key)] = values[index] === true
+  })
+  return result
+}
+
+export async function setReleaseGatefold(releaseId: number, gatefold: boolean): Promise<void> {
+  const db = await dbPromise
+  await db.put(SLEEVE_STORE, gatefold, releaseId)
+}
+
+export async function clearReleaseGatefolds(): Promise<void> {
+  const db = await dbPromise
+  await db.clear(SLEEVE_STORE)
 }
 
 export async function clearReleaseDetails(): Promise<void> {

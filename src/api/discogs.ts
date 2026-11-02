@@ -11,6 +11,7 @@ import type {
   DiscogsRelease,
   DiscogsTrack,
 } from '../types/discogs'
+import { notesSayGatefold } from '../utils/cabinet'
 
 // Same-origin /discogs proxy (vite dev + nginx) for all API calls. The app
 // cannot call the API cross-origin: Discogs' 429 rate-limit responses carry no
@@ -157,13 +158,24 @@ function moneyString(value: string | number | undefined): string {
   return ''
 }
 
-export async function fetchReleaseTracklist(
+/** What the app reads from a full release: its tracklist and whether its notes say gatefold. */
+export interface ReleaseDetails {
+  tracks: DiscogsTrack[]
+  gatefold: boolean
+}
+
+function releaseDetailsOf(data: DiscogsRelease): ReleaseDetails {
+  return { tracks: data.tracklist ?? [], gatefold: notesSayGatefold(data.notes) }
+}
+
+export async function fetchReleaseDetails(
   releaseId: number,
   token: string,
   signal?: AbortSignal,
-): Promise<DiscogsTrack[]> {
-  const data = await requestJson<DiscogsRelease>(`/releases/${releaseId}`, token, signal)
-  return data.tracklist ?? []
+): Promise<ReleaseDetails> {
+  return releaseDetailsOf(
+    await requestJson<DiscogsRelease>(`/releases/${releaseId}`, token, signal),
+  )
 }
 
 async function requestJson<T>(
@@ -229,40 +241,38 @@ async function describeError(response: Response): Promise<string> {
   return message
 }
 
-// Year a master's music was originally released. Fetched per unique master.
-// Discogs has no batch endpoint, so each id costs one request: the fetch runs
-// in small staggered batches to overlap request latency (much faster than
-// strictly serial), and pauses between batches so the average stays inside the
-// ~60 req/min rate limit.
+// Per-id Discogs lookups (master years, release notes). Discogs has no batch
+// endpoint, so each id costs one request: the fetch runs in small staggered
+// batches to overlap request latency (much faster than strictly serial), and
+// pauses between batches so the average stays inside the ~60 req/min rate
+// limit.
 //
-// Result semantics:
-// - a year (number) — original release year, cached.
-// - null — the master genuinely has no usable year, cached so we don't
-//   re-request known-missing masters on every sync.
+// `read` turns a response into a result; it sees 200 and 404 responses only:
+// - a value — cached by the caller (a 404 is how a lookup says "known missing",
+//   so it isn't requested again on every sync).
 // - undefined — the fetch failed after retries (network, timeout, 5xx,
-//   rate-limit bail); NOT cached, so the master is retried next sync.
+//   rate-limit bail); NOT cached, so the id is retried next sync.
 //
-// `onMasterYear` streams results as they arrive so callers can progressively
+// `onResult` streams results as they arrive so callers can progressively
 // update the UI instead of blocking until every request has finished.
-export type MasterYears = Record<number, number | null>
-type MasterYearResult = number | null | undefined
-
-export async function fetchMasterYears(
-  masterIds: number[],
+async function fetchEach<T>(
+  ids: number[],
+  pathOf: (id: number) => string,
+  read: (response: Response) => Promise<T>,
   token: string,
-  onProgress?: (loaded: number, total: number) => void,
-  signal?: AbortSignal,
-  onMasterYear?: (masterId: number, year: number | null) => void,
-): Promise<MasterYears> {
-  const ids = [...new Set(masterIds)]
-  const result: MasterYears = {}
+  signal: AbortSignal | undefined,
+  onProgress: ((loaded: number, total: number) => void) | undefined,
+  onResult: ((id: number, value: T) => void) | undefined,
+): Promise<Record<number, T>> {
+  const unique = [...new Set(ids)]
+  const result: Record<number, T> = {}
 
   const BATCH_SIZE = 6
   const STAGGER_MS = 100
   const BATCH_PAUSE_MS = 6600 // 6 requests / ~7.1s ≈ 51 req/min
   let done = 0
 
-  async function fetchYear(id: number, offset: number): Promise<MasterYearResult> {
+  async function fetchOne(id: number, offset: number): Promise<T | undefined> {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
     if (offset > 0) await sleep(offset * STAGGER_MS)
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
@@ -274,7 +284,7 @@ export async function fetchMasterYears(
     for (;;) {
       let response: Response
       try {
-        response = await discogsFetch(`/masters/${id}`, token, signal)
+        response = await discogsFetch(pathOf(id), token, signal)
       } catch {
         // Same rule as requestJson: an internal timeout rejects the fetch but
         // only a caller abort actually cancels the sync.
@@ -295,12 +305,7 @@ export async function fetchMasterYears(
         continue
       }
 
-      if (response.ok) {
-        const master = (await response.json()) as DiscogsMaster
-        return typeof master.year === 'number' ? master.year : null
-      }
-
-      if (response.status === 404) return null
+      if (response.ok || response.status === 404) return read(response)
 
       // Other HTTP error (5xx etc.), failed after retries: not cached.
       if (++attempts >= maxAttempts) return undefined
@@ -308,24 +313,74 @@ export async function fetchMasterYears(
     }
   }
 
-  for (let offset = 0; offset < ids.length; offset += BATCH_SIZE) {
-    const batch = ids.slice(offset, offset + BATCH_SIZE)
-    const years = await Promise.all(batch.map((id, i) => fetchYear(id, i)))
+  for (let offset = 0; offset < unique.length; offset += BATCH_SIZE) {
+    const batch = unique.slice(offset, offset + BATCH_SIZE)
+    const values = await Promise.all(batch.map((id, i) => fetchOne(id, i)))
     batch.forEach((id, i) => {
-      const year = years[i]
-      if (year === undefined) return
-      result[id] = year
-      onMasterYear?.(id, year)
+      const value = values[i]
+      if (value === undefined) return
+      result[id] = value
+      onResult?.(id, value)
     })
     done += batch.length
-    onProgress?.(done, ids.length)
+    onProgress?.(done, unique.length)
 
-    if (offset + BATCH_SIZE < ids.length) {
+    if (offset + BATCH_SIZE < unique.length) {
       await sleep(BATCH_PAUSE_MS)
       if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
     }
   }
 
   return result
+}
+
+// Year a master's music was originally released, fetched per unique master.
+// A year is cached; null means the master genuinely has no usable year (or no
+// longer exists), cached so known-missing masters aren't re-requested.
+export type MasterYears = Record<number, number | null>
+
+export function fetchMasterYears(
+  masterIds: number[],
+  token: string,
+  onProgress?: (loaded: number, total: number) => void,
+  signal?: AbortSignal,
+  onMasterYear?: (masterId: number, year: number | null) => void,
+): Promise<MasterYears> {
+  return fetchEach<number | null>(
+    masterIds,
+    (id) => `/masters/${id}`,
+    async (response) => {
+      if (!response.ok) return null
+      const master = (await response.json()) as DiscogsMaster
+      return typeof master.year === 'number' ? master.year : null
+    },
+    token,
+    signal,
+    onProgress,
+    onMasterYear,
+  )
+}
+
+// Whether each release's notes describe a gatefold sleeve. The collection
+// listing has no notes, so this is one full-release request per id, paced like
+// the master years. A removed release (404) counts as "no gatefold" and is
+// cached like any answer.
+export function fetchReleaseGatefolds(
+  releaseIds: number[],
+  token: string,
+  onProgress?: (loaded: number, total: number) => void,
+  signal?: AbortSignal,
+  onRelease?: (releaseId: number, gatefold: boolean) => void,
+): Promise<Record<number, boolean>> {
+  return fetchEach<boolean>(
+    releaseIds,
+    (id) => `/releases/${id}`,
+    async (response) =>
+      response.ok && releaseDetailsOf((await response.json()) as DiscogsRelease).gatefold,
+    token,
+    signal,
+    onProgress,
+    onRelease,
+  )
 }
 

@@ -772,6 +772,7 @@ export default function App() {
           username={settings.username}
           token={settings.token}
           releases={displayReleases}
+          collectionBusy={status === 'loading'}
           onClose={() => setShowCabinet(false)}
         />
       )}

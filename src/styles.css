@@ -2389,6 +2389,37 @@ button:disabled {
   color: var(--text-faint);
 }
 
+.cabinet-setting-value {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.cabinet-progress {
+  width: 100%;
+  max-width: 260px;
+  height: 4px;
+  margin-top: 6px;
+  border: none;
+  border-radius: 999px;
+  background: var(--panel);
+  appearance: none;
+  overflow: hidden;
+}
+
+.cabinet-progress::-webkit-progress-bar {
+  background: var(--panel);
+}
+
+.cabinet-progress::-webkit-progress-value {
+  background: var(--accent);
+}
+
+.cabinet-progress::-moz-progress-bar {
+  background: var(--accent);
+}
+
 .cabinet-segmented {
   flex-shrink: 0;
   padding: 3px;
@@ -2692,6 +2723,27 @@ button:disabled {
   background: var(--bg-elevated);
   border: 1px solid var(--accent);
   color: var(--accent);
+}
+
+.cabinet-sleeve-btn {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 0.68rem;
+}
+
+.cabinet-sleeve-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-dim);
+}
+
+.cabinet-sleeve-btn.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
 }
 
 .cabinet-records {

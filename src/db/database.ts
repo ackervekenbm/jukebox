@@ -8,9 +8,9 @@ export const DB_NAME = 'vinyl-vault'
 /**
  * Schema version. Bump when a store is added or a row shape changes so every
  * browser re-runs the upgrade below. v5 added the listenLog store, v6 the
- * cabinet store.
+ * cabinet store, v7 the releaseSleeves store.
  */
-export const VERSION = 6
+export const VERSION = 7
 
 /** Every object store the app uses; the upgrade creates any that are missing. */
 const STORES = [
@@ -20,6 +20,7 @@ const STORES = [
   'collectionValue',
   'listenLog',
   'cabinet',
+  'releaseSleeves',
 ]
 
 /**

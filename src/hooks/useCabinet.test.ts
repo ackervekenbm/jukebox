@@ -11,6 +11,16 @@ import * as syncApi from '../api/sync'
 import type { CabinetDoc } from '../shared/cabinetDoc'
 import { buildCabinetDoc, defaultCabinet, nextSlotId, rebaseCabinetDoc, useCabinet } from './useCabinet'
 
+// The release-notes scan has its own tests; here it reports whatever notes the
+// test sets, and never touches the network.
+const scan = vi.hoisted(() => ({ notes: {} as Record<string, boolean>, paused: [] as boolean[] }))
+vi.mock('./useGatefoldNotes', () => ({
+  useGatefoldNotes: ({ paused }: { paused: boolean }) => {
+    scan.paused.push(paused)
+    return { notes: scan.notes, progress: null }
+  },
+}))
+
 let nextId = 0
 
 function release(artist: string, title: string): DisplayRelease {
@@ -55,6 +65,8 @@ const useIt = (overrides: Partial<Parameters<typeof useCabinet>[0]> = {}) =>
 
 beforeEach(() => {
   vi.restoreAllMocks()
+  scan.notes = {}
+  scan.paused = []
 })
 
 afterEach(() => {
@@ -238,5 +250,69 @@ describe('useCabinet', () => {
     const ids = result.current.cabinet.slots.map((slot) => slot.id)
     expect(ids).toEqual(['slot-1', 'slot-3', 'slot-4'])
     expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  describe('gatefolds', () => {
+    const synced = async () => {
+      vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
+      vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+      vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: null, etag: '"r0"' })
+    }
+
+    it('counts a gatefold the release notes found as two spaces', async () => {
+      await synced()
+      scan.notes = { [String(releases[0].id)]: true }
+      const { result } = renderHook(() => useIt())
+      await waitFor(() => expect(result.current.status).toBe('synced'))
+
+      const units = result.current.plan.slots.flatMap((slot) => slot.records.map((record) => record.units))
+      expect(units.sort()).toEqual([1, 2])
+    })
+
+    it('stores a manual call in the synced document, and drops it when it agrees with Discogs again', async () => {
+      await synced()
+      const { result } = renderHook(() => useIt())
+      await waitFor(() => expect(result.current.status).toBe('synced'))
+      const id = String(releases[0].id)
+
+      act(() => result.current.toggleGatefold(releases[0]))
+      expect(result.current.sleeves.overrides).toEqual({ [id]: true })
+      expect(result.current.dirty).toBe(true)
+
+      act(() => result.current.toggleGatefold(releases[0]))
+      expect(result.current.sleeves.overrides).toEqual({})
+    })
+
+    it('lets the user overrule a gatefold Discogs reports', async () => {
+      await synced()
+      scan.notes = { [String(releases[0].id)]: true }
+      const { result } = renderHook(() => useIt())
+      await waitFor(() => expect(result.current.status).toBe('synced'))
+
+      act(() => result.current.toggleGatefold(releases[0]))
+      expect(result.current.sleeves.overrides).toEqual({ [String(releases[0].id)]: false })
+      const units = result.current.plan.slots.flatMap((slot) => slot.records.map((record) => record.units))
+      expect(units).toEqual([1, 1])
+    })
+
+    it('restores manual calls from the stored document', async () => {
+      const stored = { ...docWith('Record Cabinet'), sleeves: { [String(releases[1].id)]: true } }
+      vi.spyOn(store, 'getCabinet').mockResolvedValue({ username: 'alice', doc: stored, revision: 1, dirty: false })
+      vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+
+      const { result } = renderHook(() => useIt({ token: null }))
+      await waitFor(() => expect(result.current.sleeves.overrides).toEqual(stored.sleeves))
+    })
+
+    it('holds the release-notes scan while the collection is busy', () => {
+      vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
+      renderHook(() => useIt({ token: null, collectionBusy: true }))
+      expect(scan.paused.at(-1)).toBe(true)
+    })
+
+    it('keeps the manual calls through a sync conflict', () => {
+      const local = { ...docWith('Record Cabinet'), sleeves: { '7': true } }
+      expect(rebaseCabinetDoc(local).sleeves).toEqual({ '7': true })
+    })
   })
 })

@@ -91,8 +91,17 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   Optionally it groups 12" and 7"/10" onto separate shelves (size class:
   an explicit inch size in the format text wins, otherwise vinyl formats are
   12" and anything else — CD, cassette, file — is "other"); that mode orders the size groups by their
-  earliest record so the cabinet still starts with the earliest artist. It
-  counts a gatefold sleeve as two capacity spaces and reports size-mix /
+  earliest record so the cabinet still starts with the earliest artist.
+  Shelf space (`spaceUnitsOf`): one per vinyl disc (2×LP = 2), or 2 for a
+  gatefold, whichever is larger. A gatefold is found in the format
+  descriptions or a format's free `text`, else in the release **notes** —
+  which the collection listing lacks, so `src/hooks/useGatefoldNotes.ts`
+  fetches `/releases/{id}` (the shared `fetchEach` batcher in
+  `src/api/discogs.ts`, same pacing as master years) for single vinyl LPs
+  only, while the cabinet is open and the collection isn't enriching, and
+  caches each answer for good; the release-detail screen records it too. The
+  user's own call (`sleeves` in the synced doc, release id → boolean) wins
+  over detection and is dropped when it agrees with it again. It reports size-mix /
   artist-split / unplaced conflicts. Both respect the size separation: mixing
   is only flagged when sizes are kept apart, and then an artist's 12" and
   7"/10" runs count separately, so only a run that itself crosses shelves is a
@@ -116,11 +125,12 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   values, collection counts), so the committed copies are a frozen baseline for
   offline PR CI, not a mirror of the API.
 - `src/db/database.ts` — one shared `openDB` connection for IndexedDB
-  `vinyl-vault` (idb lib), six stores: `collection` (1 row/username),
+  `vinyl-vault` (idb lib), seven stores: `collection` (1 row/username),
   `masterYears` (1 row), `collectionValue` (1 row/username), `releaseDetails`
   (unbounded tracklist cache — the app's main space grower), `listenLog`
-  (random-pick history, capped at 200 entries/username) and `cabinet` (one
-  cabinet doc + revision/`dirty` flag per username). Bump `VERSION` there
+  (random-pick history, capped at 200 entries/username), `cabinet` (one
+  cabinet doc + revision/`dirty` flag per username) and `releaseSleeves`
+  (release id → whether its notes say gatefold; kept for good). Bump `VERSION` there
   to invalidate caches after a shape change. `src/db/collection.ts`,
   `src/db/listenLog.ts` and `src/db/cabinet.ts` are the typed store APIs;
   `settings.ts`, `views.ts`, `cabinetOptions.ts` and `picker.ts` in the same

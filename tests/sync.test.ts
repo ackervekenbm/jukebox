@@ -208,4 +208,19 @@ describe('PUT /api/sync/cabinet', () => {
     const get = await request(app).get('/api/sync/cabinet').set(alice)
     expect(get.body.doc.cabinets[0].slots).toEqual([])
   })
+
+  it('keeps the manual sleeve calls, and rejects ones that are not true/false', async () => {
+    const doc = { ...sampleDoc(), sleeves: { '9160941': true, '42': false } }
+    const res = await request(app).put('/api/sync/cabinet').set(alice).set('If-Match', '*').send(doc)
+    expect(res.status).toBe(200)
+    const get = await request(app).get('/api/sync/cabinet').set(alice)
+    expect(get.body.doc.sleeves).toEqual({ '9160941': true, '42': false })
+
+    const bad = await request(app)
+      .put('/api/sync/cabinet')
+      .set(alice)
+      .set('If-Match', '*')
+      .send({ ...sampleDoc(), sleeves: { '1': 'gatefold' } })
+    expect(bad.status).toBe(400)
+  })
 })

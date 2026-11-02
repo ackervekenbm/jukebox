@@ -7,7 +7,7 @@ import {
   fetchCollectionValue,
   fetchFolders,
   fetchMasterYears,
-  fetchReleaseTracklist,
+  fetchReleaseDetails,
 } from './discogs'
 import type {
   DiscogsCollectionFolderResponse,
@@ -149,14 +149,16 @@ describe.skipIf(masterYears.length === 0)('Discogs contract: master years', () =
   })
 })
 
-describe.skipIf(releaseFixture === undefined)('Discogs contract: release tracklist', () => {
-  it('parses the real release tracklist', async () => {
+describe.skipIf(releaseFixture === undefined)('Discogs contract: release details', () => {
+  it('parses the real release tracklist and notes', async () => {
     const data = releaseFixture as DiscogsRelease
     mockFetch(() => json(data))
 
-    const tracks = await fetchReleaseTracklist(data.id, 'tok')
+    const { tracks, gatefold } = await fetchReleaseDetails(data.id, 'tok')
 
     expect(tracks).toEqual(data.tracklist)
+    expect(typeof gatefold).toBe('boolean')
+    if (data.notes !== undefined) expect(typeof data.notes).toBe('string')
     expect(tracks.length).toBeGreaterThan(0)
     for (const track of tracks) {
       expect(typeof track.position).toBe('string')

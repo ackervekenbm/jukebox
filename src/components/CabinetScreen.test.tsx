@@ -62,6 +62,7 @@ const actions = {
   removeSlot: vi.fn(),
   setSort: vi.fn(),
   setSeparateSizeClasses: vi.fn(),
+  toggleGatefold: vi.fn(),
   retry: vi.fn(),
   reset: vi.fn(),
 }
@@ -76,6 +77,8 @@ function setCabinet(cabinet: Cabinet, status = 'synced') {
     cabinet,
     options: { sort: 'chronological', separateSizeClasses: true },
     plan: planCabinet({ releases, cabinet }),
+    sleeves: {},
+    gatefoldScan: null,
     status,
     dirty: false,
     error: null,
@@ -148,6 +151,8 @@ describe('CabinetScreen', () => {
         cabinet,
         options,
         plan: planCabinet({ releases: mixed, cabinet, options }),
+        sleeves: {},
+        gatefoldScan: null,
         status: 'synced',
         dirty: false,
         error: null,
@@ -267,6 +272,8 @@ describe('CabinetScreen', () => {
       cabinet,
       options: { sort: 'chronological', separateSizeClasses: true },
       plan: planCabinet({ releases: [gatefold, releases[1]], cabinet }),
+      sleeves: {},
+      gatefoldScan: null,
       status: 'synced',
       dirty: false,
       error: null,
@@ -289,6 +296,59 @@ describe('CabinetScreen', () => {
 
     fireEvent.click(shelf)
     expect(screen.getByText('2 spaces')).toBeInTheDocument()
+  })
+
+  it('toggles a record between gatefold and standard sleeve', () => {
+    renderScreen()
+    fireEvent.click(screen.getByRole('button', { name: /Shelf 1/ }))
+
+    const toggle = screen.getByRole('button', { name: 'Gatefold: First' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(toggle)
+    expect(actions.toggleGatefold).toHaveBeenCalledWith(releases[0])
+  })
+
+  it('shows a gatefold found in the release notes, and why it takes two spaces', () => {
+    const cabinet = cabinetOf([75, 75])
+    const sleeves = { notes: { [String(releases[0].id)]: true } }
+    mock.state = {
+      cabinets: [cabinet],
+      cabinet,
+      options: { sort: 'chronological', separateSizeClasses: true },
+      plan: planCabinet({ releases, cabinet, sleeves }),
+      sleeves,
+      gatefoldScan: null,
+      status: 'synced',
+      dirty: false,
+      error: null,
+      ...actions,
+    }
+    renderScreen()
+    expect(screen.getByText('1 found')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Shelf 1/ }))
+
+    const toggle = screen.getByRole('button', { name: 'Gatefold: First' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    expect(toggle).toHaveAttribute('title', expect.stringMatching(/found on Discogs/))
+    expect(screen.getByText('2 spaces')).toHaveAttribute('title', 'Gatefold sleeve: takes 2 spaces')
+  })
+
+  it('reports the release-notes check while it runs', () => {
+    const state = mock.state as { gatefoldScan: unknown }
+    state.gatefoldScan = { done: 12, total: 40 }
+    renderScreen()
+
+    expect(screen.getByText('Checking release notes: 12 of 40 records')).toBeInTheDocument()
+    const bar = screen.getByRole('progressbar', { name: 'Release notes checked' })
+    expect(bar).toHaveAttribute('value', '12')
+    expect(bar).toHaveAttribute('max', '40')
+  })
+
+  it('says the check waits for the collection to load', () => {
+    render(
+      <CabinetScreen username="alice" token="tok" releases={releases} collectionBusy onClose={vi.fn()} />,
+    )
+    expect(screen.getByText(/checked once your collection has finished loading/)).toBeInTheDocument()
   })
 
   it('offers a retry when a sync fails', () => {
