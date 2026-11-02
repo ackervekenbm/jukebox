@@ -97,16 +97,22 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   (`shelfShares`: enough to fit, spare shelves to the fullest groups) and is
   spread evenly over it; only when the shelves can't hold the groups apart
   does one walk over all shelves mix them.
-  Shelf space (`spaceUnitsOf`): one per vinyl disc (2×LP = 2), or 2 for a
-  gatefold, whichever is larger. A gatefold is found in the format
-  descriptions or a format's free `text`, else in the release **notes** —
-  which the collection listing lacks, so `src/hooks/useGatefoldNotes.ts`
-  fetches `/releases/{id}` (the shared `fetchEach` batcher in
-  `src/api/discogs.ts`, same pacing as master years) for single vinyl LPs
-  only, while the cabinet is open and the collection isn't enriching, and
-  caches each answer for good; the release-detail screen records it too. The
+  Shelf space (`spaceUnitsOf`): one per disc of the release's largest
+  vinyl size (2×LP = 2; a bonus 7" in an LP adds nothing), or 2 for a
+  gatefold, whichever is larger. Gatefold detection (`mentionsGatefold`)
+  reads only vinyl formats — their descriptions and free `text` — and
+  else the release **notes**; it knows other languages (Klappcover, pochette
+  ouvrante, …) and skips denials ("not a gatefold", "unlike the original
+  gatefold") and gatefold items ("gatefold poster"). The collection listing
+  has no notes, so `src/hooks/useGatefoldNotes.ts` fetches `/releases/{id}`
+  (the shared `fetchEach` batcher in `src/api/discogs.ts`, same pacing as
+  master years; a 401/403 stops the whole run) for single vinyl discs the user
+  hasn't decided, only while the cabinet is open and the collection has
+  loaded. It caches the notes **text**, not a yes/no, so improving the
+  detector needs no refetch; the release-detail screen stores notes too. The
   user's own call (`sleeves` in the synced doc, release id → boolean) wins
-  over detection and is dropped when it agrees with it again.
+  over detection and is dropped when it agrees with it again; the server keeps
+  the stored calls when an older client saves without the field.
   A last pass back-fills records that found no room into any
   space left, which can put them on an earlier shelf than their place in the
   order. Conflicts: over-capacity, size-mix (one for the cabinet, only when
@@ -141,8 +147,11 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   (unbounded tracklist cache — the app's main space grower), `listenLog`
   (random-pick history, capped at 200 entries/username), `cabinet` (one
   cabinet doc + revision/`dirty` flag per username) and `releaseSleeves`
-  (release id → whether its notes say gatefold; kept for good). Bump `VERSION` there
-  to invalidate caches after a shape change. `src/db/collection.ts`,
+  (release id → its notes text, for the gatefold check; kept for good). Bump
+  `VERSION` there to invalidate caches after a shape change. Upgrades with
+  other tabs open: `blocked` (an older tab holds the database) and `blocking`
+  (a newer tab wants it; this one closes its connection) set a state that
+  `useDatabaseState` turns into an app-wide banner. `src/db/collection.ts`,
   `src/db/listenLog.ts` and `src/db/cabinet.ts` are the typed store APIs;
   `settings.ts`, `views.ts`, `cabinetOptions.ts` and `picker.ts` in the same
   folder are the localStorage counterparts.

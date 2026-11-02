@@ -739,6 +739,15 @@ button:disabled {
   -webkit-backdrop-filter: blur(8px);
 }
 
+/* Shown over everything: nothing loads while another tab blocks the upgrade. */
+.database-banner {
+  position: fixed;
+  top: env(safe-area-inset-top, 0px);
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+
 .sync-banner.error {
   background: var(--bg);
   background: color-mix(in srgb, var(--danger) 14%, var(--bg));
@@ -2431,16 +2440,20 @@ button:disabled {
   margin-top: 6px;
   border: none;
   border-radius: 999px;
-  background: var(--panel);
+  /* The track must show against the card: --border, not --panel. */
+  background: var(--border);
+  -webkit-appearance: none;
   appearance: none;
   overflow: hidden;
 }
 
 .cabinet-progress::-webkit-progress-bar {
-  background: var(--panel);
+  border-radius: 999px;
+  background: var(--border);
 }
 
 .cabinet-progress::-webkit-progress-value {
+  border-radius: 999px;
   background: var(--accent);
 }
 
@@ -2819,29 +2832,68 @@ button:disabled {
   padding: 2px 6px;
   border-radius: 999px;
   background: var(--bg-elevated);
-  border: 1px solid var(--accent);
-  color: var(--accent);
+  border: 1px solid var(--accent-text);
+  color: var(--accent-text);
 }
 
 .cabinet-sleeve-btn {
+  position: relative;
   flex-shrink: 0;
-  padding: 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
   border-radius: 999px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--text-faint);
   background: transparent;
-  color: var(--text-faint);
-  font-size: 0.68rem;
+  color: var(--text-dim);
+  font-size: 0.7rem;
 }
 
-.cabinet-sleeve-btn:hover {
-  border-color: var(--accent);
-  color: var(--text-dim);
+/* A bigger hit area than the pill shows, for fingers. */
+.cabinet-sleeve-btn::after {
+  content: '';
+  position: absolute;
+  inset: -8px -4px;
 }
 
 .cabinet-sleeve-btn.active {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--bg);
+  border-color: var(--accent-fill);
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+
+/* Only where a pointer can hover: on touch a hover style sticks after a tap. */
+@media (hover: hover) {
+  .cabinet-sleeve-btn:hover {
+    border-color: var(--accent-text);
+    color: var(--text);
+  }
+
+  .cabinet-sleeve-btn.active:hover {
+    border-color: var(--accent-fill-hover);
+    background: var(--accent-fill-hover);
+    color: var(--on-accent-hover);
+  }
+}
+
+/* "you": the user made this call, shown rather than only in a tooltip. */
+.cabinet-sleeve-yours {
+  padding: 0 4px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 0.6rem;
+  line-height: 1.3;
+}
+
+/* Read by screen readers, not shown. */
+.cabinet-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .cabinet-records {

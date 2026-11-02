@@ -10,6 +10,7 @@ import {
   detectedGatefold,
   discCountOf,
   isGatefold,
+  isUserCall,
   plural,
   sizeClassOf,
   spaceUnitsOf,
@@ -109,8 +110,8 @@ interface CabinetScreenProps {
   username: string
   token: string | null
   releases: DisplayRelease[]
-  /** The collection is still loading or enriching; the gatefold scan waits for it. */
-  collectionBusy?: boolean
+  /** The collection has loaded (not enriching, no error); the gatefold scan waits for it. */
+  collectionReady?: boolean
   onClose: () => void
 }
 
@@ -118,7 +119,7 @@ export function CabinetScreen({
   username,
   token,
   releases,
-  collectionBusy = false,
+  collectionReady = true,
   onClose,
 }: CabinetScreenProps) {
   useScrollLock(true)
@@ -127,6 +128,7 @@ export function CabinetScreen({
     plan,
     sleeves,
     gatefoldScan,
+    gatefoldScanError,
     status,
     error,
     addSlot,
@@ -137,11 +139,24 @@ export function CabinetScreen({
     setSeparateSizeClasses,
     toggleGatefold,
     retry,
-  } = useCabinet({ username, token, releases, enabled: true, collectionBusy })
+  } = useCabinet({ username, token, releases, enabled: true, collectionReady })
 
   const placed = Object.keys(plan.placements).length
   const totalCapacity = plan.slots.reduce((total, slot) => total + slot.slot.capacity, 0)
-  const gatefoldCount = releases.filter((record) => isGatefold(record, sleeves)).length
+  // Screen readers hear the scan start and end, not every step of it.
+  const [scanAnnouncement, setScanAnnouncement] = useState('')
+  const [scanWasRunning, setScanWasRunning] = useState(false)
+  if ((gatefoldScan !== null) !== scanWasRunning) {
+    setScanWasRunning(gatefoldScan !== null)
+    setScanAnnouncement(
+      gatefoldScan !== null ? 'Checking release notes for gatefold sleeves.' : 'Release notes checked.',
+    )
+  }
+
+  // Releases, not copies: two copies of one pressing share a sleeve.
+  const gatefoldCount = new Set(
+    releases.filter((record) => isGatefold(record, sleeves)).map((record) => record.id),
+  ).size
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const unplacedExpanded = expanded.has(UNPLACED_ID)
   const [adding, setAdding] = useState(false)
@@ -216,29 +231,25 @@ export function CabinetScreen({
     setRemoved(null)
   }
 
-  const spaceReason = (record: DisplayRelease) => {
-    const discs = discCountOf(record)
-    const parts = []
-    if (isGatefold(record, sleeves)) parts.push('Gatefold sleeve')
-    if (discs > 1) parts.push(`${discs} discs`)
-    return `${parts.join(', ')}: takes ${spaceUnitsOf(record, sleeves)} spaces`
-  }
-
-  // Says where the current call comes from, so a wrong one can be traced.
-  const sleeveTitle = (record: DisplayRelease) => {
-    const overridden = sleeves.overrides?.[String(record.id)] !== undefined
-    if (overridden) {
+  // Says where the sleeve call comes from, so a wrong one can be traced.
+  const sleeveSource = (record: DisplayRelease) => {
+    if (isUserCall(record, sleeves)) {
       return isGatefold(record, sleeves)
-        ? 'Gatefold — marked by you. Click to undo.'
-        : 'Standard sleeve — marked by you. Click to undo.'
+        ? 'Gatefold, marked by you. Press again to go back to what Discogs says.'
+        : 'Standard sleeve, marked by you. Press again to go back to what Discogs says.'
     }
-    if (detectedGatefold(record, sleeves)) {
-      return 'Gatefold — found on Discogs. Click if it is a standard sleeve.'
-    }
-    return 'Standard sleeve. Click to mark it as a gatefold.'
+    return detectedGatefold(record, sleeves)
+      ? 'Gatefold, according to Discogs. Press if it is a standard sleeve.'
+      : 'Standard sleeve. Press to mark it as a gatefold.'
   }
 
-  const recordRow = (record: DisplayRelease) => (
+  const recordRow = (record: DisplayRelease) => {
+    const units = spaceUnitsOf(record, sleeves)
+    const discs = discCountOf(record)
+    const gatefold = isGatefold(record, sleeves)
+    const vinyl = sizeClassOf(record) !== 'other'
+    const yours = isUserCall(record, sleeves)
+    return (
     <li className="cabinet-record" key={record.key}>
       {record.thumb ? (
         <img className="cabinet-record-art" src={record.thumb} alt="" loading="lazy" />
@@ -253,29 +264,35 @@ export function CabinetScreen({
       {/* Sleeve chips sit right-aligned on the artist's line, under the year, so
           the years line up whatever chips a record has; the Gatefold button
           comes last so it lines up too. */}
-      {(sizeClassOf(record) !== 'other' || spaceUnitsOf(record, sleeves) > 1) && (
+      {(vinyl || units > 1) && (
         <span className="cabinet-record-tags">
-          {spaceUnitsOf(record, sleeves) > 1 && (
-            <span className="cabinet-record-space" title={spaceReason(record)}>
-              {spaceUnitsOf(record, sleeves)} spaces
+          {/* Says why it takes more than one space: its discs, or (with the
+              Gatefold button pressed next to it) its sleeve. */}
+          {units > 1 && (
+            <span className="cabinet-record-space">
+              {discs > 1 ? `${discs} discs` : `${units} spaces`}
             </span>
           )}
-          {sizeClassOf(record) !== 'other' && (
+          {vinyl && (
             <button
               type="button"
-              className={`cabinet-sleeve-btn${isGatefold(record, sleeves) ? ' active' : ''}`}
-              aria-pressed={isGatefold(record, sleeves)}
+              className={`cabinet-sleeve-btn${gatefold ? ' active' : ''}`}
+              aria-pressed={gatefold}
               aria-label={`Gatefold: ${record.title}`}
-              title={sleeveTitle(record)}
+              aria-description={sleeveSource(record)}
+              title={sleeveSource(record)}
               onClick={() => toggleGatefold(record)}
             >
               Gatefold
+              {/* Shown, not only told: a tooltip never appears on a touch screen. */}
+              {yours && <span className="cabinet-sleeve-yours">you</span>}
             </button>
           )}
         </span>
       )}
     </li>
-  )
+    )
+  }
 
   return (
     <div
@@ -358,12 +375,19 @@ export function CabinetScreen({
             <div className="cabinet-setting">
               <div className="cabinet-setting-text">
                 <span className="cabinet-setting-title">Gatefolds</span>
-                <span className="cabinet-setting-hint" aria-live="polite">
+                {/* Not a live region: it counts up about once a second while the
+                    scan runs. The status below announces only start and end. */}
+                <span className="cabinet-setting-hint">
                   {gatefoldScan
                     ? `Checking release notes: ${gatefoldScan.done.toLocaleString()} of ${gatefoldScan.total.toLocaleString()} records`
-                    : collectionBusy
-                      ? 'Release notes are checked once your collection has finished loading.'
-                      : 'Read from each record\'s format and release notes. Correct one with its Gatefold button.'}
+                    : gatefoldScanError
+                      ? gatefoldScanError
+                      : !collectionReady
+                        ? 'Release notes are checked once your collection has loaded.'
+                        : 'Read from each record\'s format and release notes. Correct one with its Gatefold button.'}
+                </span>
+                <span className="cabinet-visually-hidden" role="status" aria-label="Release notes check">
+                  {scanAnnouncement}
                 </span>
                 {gatefoldScan && (
                   <progress
@@ -375,7 +399,7 @@ export function CabinetScreen({
                 )}
               </div>
               <span className="cabinet-setting-value">
-                {gatefoldCount.toLocaleString()} found
+                {plural(gatefoldCount, 'gatefold')}
               </span>
             </div>
 
@@ -574,7 +598,7 @@ export function CabinetScreen({
           </div>
 
           {/* Always rendered, so screen readers announce the message when it appears. */}
-          <div className="cabinet-undo-region" role="status">
+          <div className="cabinet-undo-region" role="status" aria-label="Removed shelf">
             {removed && (
               <div className="cabinet-undo">
                 <span>{removed.name} removed</span>
