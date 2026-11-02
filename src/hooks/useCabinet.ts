@@ -48,6 +48,36 @@ export function nextSlotId(slots: Slot[]): string {
   return `slot-${highest + 1}`
 }
 
+/**
+ * Gives every shelf an id of its own. Older app versions numbered new shelves
+ * by count, so a synced cabinet can hold two shelves with one id; removing one
+ * would then remove both. Later duplicates get a fresh id; the first keeps it.
+ */
+export function withUniqueSlotIds(cabinets: Cabinet[]): Cabinet[] {
+  return cabinets.map((entry) => {
+    const seen = new Set<string>()
+    let changed = false
+    const slots: Slot[] = []
+    for (const slot of entry.slots) {
+      if (seen.has(slot.id)) {
+        changed = true
+        slots.push({ ...slot, id: nextSlotId([...entry.slots, ...slots]) })
+      } else {
+        slots.push(slot)
+      }
+      seen.add(slots[slots.length - 1].id)
+    }
+    return changed ? { ...entry, slots } : entry
+  })
+}
+
+/** The cabinets to show for a stored or synced document. */
+function cabinetsOf(doc: CabinetDoc): Cabinet[] {
+  // No cabinet at all means a document from before cabinets existed; a cabinet
+  // without shelves is a layout the user started over, and stays empty.
+  return doc.cabinets.length > 0 ? withUniqueSlotIds(doc.cabinets) : [defaultCabinet()]
+}
+
 /** The synced document for a computed layout, stamped with the current time. */
 export function buildCabinetDoc(cabinets: Cabinet[], plan: CabinetPlan): CabinetDoc {
   return {
@@ -81,6 +111,11 @@ export interface UseCabinetArgs {
   enabled: boolean
 }
 
+export interface RemovedSlot {
+  slot: Slot
+  index: number
+}
+
 export interface UseCabinetResult {
   cabinets: Cabinet[]
   cabinet: Cabinet
@@ -91,7 +126,10 @@ export interface UseCabinetResult {
   error: string | null
   addSlot: (capacity?: number) => void
   updateSlot: (slotId: string, patch: Partial<Slot>) => void
-  removeSlot: (slotId: string) => void
+  /** Removes a shelf and returns it with its position, so it can be put back. */
+  removeSlot: (slotId: string) => RemovedSlot | null
+  /** Puts a removed shelf back where it was. */
+  restoreSlot: (removed: RemovedSlot) => void
   setSort: (sort: CabinetSortMode) => void
   setSeparateSizeClasses: (separate: boolean) => void
   retry: () => void
@@ -127,11 +165,23 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
     [username],
   )
 
+  // Every local edit bumps this, so a push can tell whether the cabinet moved
+  // on while it was in flight.
+  const edits = useRef(0)
+  const edited = useCallback(() => {
+    edits.current++
+    setDirty(true)
+  }, [])
+
   /**
    * Pushes a document, rebasing and retrying while the server reports a newer
    * revision. Gives up after a few rounds so a rebase loop cannot spin.
+   *
+   * An edit made while the push is in flight must not be lost: the push only
+   * marks the cabinet clean when nothing changed meanwhile, and a rebase
+   * builds on the latest local copy rather than the one it sent.
    */
-  const push = useCallback(
+  const pushOnce = useCallback(
     async (startDoc: CabinetDoc, startRevision: number): Promise<void> => {
       const authToken = live.current.token
       if (!authToken) {
@@ -139,6 +189,7 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
         return
       }
       setStatus('syncing')
+      const editsAtStart = edits.current
       let nextDoc = startDoc
       let nextRevision = startRevision
 
@@ -147,14 +198,22 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
           const result = await pushCabinet(authToken, nextDoc, revisionEtag(nextRevision))
           const savedRevision = revisionFromEtag(result.etag, nextRevision + 1)
           setRevision(savedRevision)
-          setDirty(false)
+          // A push queued behind this one must start from the saved revision.
+          live.current = { ...live.current, revision: savedRevision }
           setError(null)
-          setStatus('synced')
-          persist(nextDoc, savedRevision, false)
+          if (edits.current === editsAtStart) {
+            setDirty(false)
+            setStatus('synced')
+            persist(nextDoc, savedRevision, false)
+          } else {
+            // Newer edits are waiting; they stay dirty and get their own push.
+            persist(live.current.doc, savedRevision, true)
+          }
           return
         } catch (err) {
           if (err instanceof SyncConflictError) {
-            nextDoc = rebaseCabinetDoc(nextDoc)
+            const base = edits.current === editsAtStart ? nextDoc : live.current.doc
+            nextDoc = rebaseCabinetDoc(base)
             nextRevision = revisionFromEtag(err.etag, nextRevision)
             setCabinets(nextDoc.cabinets)
             setRevision(nextRevision)
@@ -173,6 +232,30 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
     [persist],
   )
 
+  // One push at a time: a push asked for while another is in flight waits for
+  // it, then sends the latest local copy from the revision it saved.
+  const inFlight = useRef(false)
+  const queued = useRef(false)
+  const push = useCallback(
+    async (startDoc: CabinetDoc, startRevision: number): Promise<void> => {
+      if (inFlight.current) {
+        queued.current = true
+        return
+      }
+      inFlight.current = true
+      try {
+        await pushOnce(startDoc, startRevision)
+        while (queued.current) {
+          queued.current = false
+          await pushOnce(live.current.doc, live.current.revision)
+        }
+      } finally {
+        inFlight.current = false
+      }
+    },
+    [pushOnce],
+  )
+
   useEffect(() => {
     if (!enabled || !username) return
     let cancelled = false
@@ -181,7 +264,7 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
       const stored = await getCabinet(username)
       if (cancelled) return
       if (stored) {
-        setCabinets(stored.doc.cabinets.length > 0 ? stored.doc.cabinets : [defaultCabinet()])
+        setCabinets(cabinetsOf(stored.doc))
         setRevision(stored.revision)
         setDirty(stored.dirty)
       } else {
@@ -206,13 +289,13 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
           return
         }
         if (stored?.dirty) {
-          const rebased = rebaseCabinetDoc(stored.doc)
+          const rebased = rebaseCabinetDoc({ ...stored.doc, cabinets: cabinetsOf(stored.doc) })
           setCabinets(rebased.cabinets)
           setRevision(remoteRevision)
           await push(rebased, remoteRevision)
           return
         }
-        setCabinets(remote.doc.cabinets.length > 0 ? remote.doc.cabinets : [defaultCabinet()])
+        setCabinets(cabinetsOf(remote.doc))
         setRevision(remoteRevision)
         setStatus('synced')
         persist(remote.doc, remoteRevision, false)
@@ -264,8 +347,8 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
         ...current.slice(1),
       ]
     })
-    setDirty(true)
-  }, [])
+    edited()
+  }, [edited])
 
   const updateSlot = useCallback((slotId: string, patch: Partial<Slot>) => {
     setCabinets((current) =>
@@ -280,19 +363,44 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
           : entry,
       ),
     )
-    setDirty(true)
-  }, [])
+    edited()
+  }, [edited])
 
-  const removeSlot = useCallback((slotId: string) => {
-    setCabinets((current) => {
-      const first = current[0]
-      return [
-        { ...first, slots: first.slots.filter((slot) => slot.id !== slotId) },
-        ...current.slice(1),
-      ]
-    })
-    setDirty(true)
-  }, [])
+  const removeSlot = useCallback(
+    (slotId: string): RemovedSlot | null => {
+      const index = cabinets[0].slots.findIndex((slot) => slot.id === slotId)
+      if (index < 0) return null
+      const removed = { slot: cabinets[0].slots[index], index }
+      setCabinets((current) => {
+        const first = current[0]
+        return [
+          { ...first, slots: first.slots.filter((slot) => slot.id !== slotId) },
+          ...current.slice(1),
+        ]
+      })
+      edited()
+      return removed
+    },
+    [cabinets, edited],
+  )
+
+  const restoreSlot = useCallback(
+    ({ slot, index }: RemovedSlot) => {
+      setCabinets((current) => {
+        const first = current[0]
+        // A shelf added since may have taken the id; the restored one then gets
+        // a fresh one, so two shelves never share an id.
+        const restored = first.slots.some((existing) => existing.id === slot.id)
+          ? { ...slot, id: nextSlotId(first.slots) }
+          : slot
+        const slots = [...first.slots]
+        slots.splice(Math.min(index, slots.length), 0, restored)
+        return [{ ...first, slots }, ...current.slice(1)]
+      })
+      edited()
+    },
+    [edited],
+  )
 
   const setSort = useCallback((sort: CabinetSortMode) => {
     setOptions((current) => {
@@ -336,6 +444,7 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
     addSlot,
     updateSlot,
     removeSlot,
+    restoreSlot,
     setSort,
     setSeparateSizeClasses,
     retry,
