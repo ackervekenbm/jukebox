@@ -88,19 +88,29 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   rules (`compareReleases` / `sortYear` in `src/utils/collection.ts`:
   original year, undated last), so change ordering there, never in a second
   copy. A record credited to several artists is filed once, under the first.
-  Optionally it groups 12" and 7"/10" onto separate shelves (size class:
-  an explicit inch size in the format text wins, otherwise vinyl formats are
-  12" and anything else — CD, cassette, file — is "other"); that mode orders the size groups by their
-  earliest record so the cabinet still starts with the earliest artist. It
-  counts a gatefold sleeve as two capacity spaces and reports size-mix /
-  artist-split / unplaced conflicts. Both respect the size separation: mixing
-  is only flagged when sizes are kept apart, and then an artist's 12" and
-  7"/10" runs count separately, so only a run that itself crosses shelves is a
-  split. Layout is fully automatic — there are no
-  manual pins.
+  Size class (`sizeClassOf`) is judged per format of a release and only
+  vinyl formats count: a vinyl format is 12" unless it states a smaller size,
+  the largest wins (an LP with a bonus 7" is 12"), and a release with no vinyl
+  — CD, cassette, file, a 3" CD — is "other". Optionally it keeps the sizes
+  on separate shelves: each size group (ordered by its earliest record, so the
+  cabinet still starts with the earliest artist) gets its own run of shelves
+  (`shelfShares`: enough to fit, spare shelves to the fullest groups) and is
+  spread evenly over it; only when the shelves can't hold the groups apart
+  does one walk over all shelves mix them. It counts a gatefold sleeve as two
+  capacity spaces. A last pass back-fills records that found no room into any
+  space left, which can put them on an earlier shelf than their place in the
+  order. Conflicts: over-capacity, size-mix (one for the cabinet, only when
+  sizes are kept apart), artist-split (per size run when sizes are kept
+  apart), out-of-order (back-filled records) and unplaced. Layout is fully
+  automatic — there are no manual pins.
 - Record cabinet — `src/hooks/useCabinet.ts` orchestrates it: storage-first
   load from IndexedDB, debounced `PUT /api/sync/cabinet` when local changes are
-  dirty, and a 409 rebase-and-retry when the server copy moved. Client sync
+  dirty, and a 409 rebase-and-retry when the server copy moved. Pushes run one
+  at a time, and a push only marks the cabinet clean when no edit happened
+  while it was in flight (an edit counter), so a quick second edit is never
+  lost. Shelf ids are unique: the schema rejects duplicates and loading
+  repairs them (`withUniqueSlotIds`), since older clients numbered shelves by
+  count. Client sync
   lives in `src/api/sync.ts`; the screen is `src/components/CabinetScreen.tsx`.
   Storage-first and local-wins are the invariants: browser data is the
   source of truth and the server copy is only the cross-device echo.

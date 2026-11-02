@@ -11,6 +11,13 @@
   --text-faint: #67708f;
   --accent: #ffd27a;
   --accent-strong: #d97a1e;
+  /* Filled accent controls (and their hover), the text on them, and
+     accent-coloured text on panels; each pair keeps 4.5:1 in its theme. */
+  --accent-fill: #ffd27a;
+  --accent-fill-hover: #d97a1e;
+  --on-accent: #0b1020;
+  --on-accent-hover: #0b1020;
+  --accent-text: #ffd27a;
   --danger: #ff7a7a;
   --ok: #7ad9a0;
 
@@ -39,6 +46,11 @@ html[data-theme='paper'] {
   --text-faint: #a79c8b;
   --accent: #c2571c;
   --accent-strong: #9b4313;
+  --accent-fill: #9b4313;
+  --accent-fill-hover: #7d360f;
+  --on-accent: #ffffff;
+  --on-accent-hover: #ffffff;
+  --accent-text: #9b4313;
   --danger: #b3261e;
   --ok: #1d7a4f;
 
@@ -60,6 +72,11 @@ html[data-theme='club'] {
   --text-faint: #6f6c90;
   --accent: #ff4fd8;
   --accent-strong: #c41f8f;
+  --accent-fill: #ff4fd8;
+  --accent-fill-hover: #c41f8f;
+  --on-accent: #0c0c12;
+  --on-accent-hover: #ffffff;
+  --accent-text: #ff4fd8;
   --danger: #ff5370;
   --ok: #3be8b0;
 
@@ -79,6 +96,11 @@ html[data-theme='forest'] {
   --text-faint: #6d877d;
   --accent: #f0b54a;
   --accent-strong: #c98d2b;
+  --accent-fill: #f0b54a;
+  --accent-fill-hover: #c98d2b;
+  --on-accent: #0a120e;
+  --on-accent-hover: #0a120e;
+  --accent-text: #f0b54a;
   --danger: #ff8a7a;
   --ok: #7ad9a0;
 
@@ -2386,7 +2408,13 @@ button:disabled {
 
 .cabinet-setting-hint {
   font-size: 0.78rem;
-  color: var(--text-faint);
+  color: var(--text-dim);
+}
+
+.cabinet-field-error {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  color: var(--danger);
 }
 
 .cabinet-segmented {
@@ -2404,9 +2432,9 @@ button:disabled {
   font-size: 0.82rem;
 }
 
-/* The theme's own contrast colour on the accent, readable in light and dark themes. */
 .cabinet-segmented button.active {
-  color: var(--bg);
+  background: var(--accent-fill);
+  color: var(--on-accent);
 }
 
 /* A real checkbox (role="switch"), drawn as a sliding switch. */
@@ -2431,7 +2459,8 @@ button:disabled {
   height: 26px;
   border-radius: 999px;
   background: var(--panel);
-  border: 1px solid var(--border);
+  /* --text-dim, not --border: the off state needs a visible edge (3:1). */
+  border: 1px solid var(--text-dim);
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
@@ -2448,13 +2477,13 @@ button:disabled {
 }
 
 .cabinet-switch input:checked + .cabinet-switch-track {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
 }
 
 .cabinet-switch input:checked + .cabinet-switch-track::after {
   transform: translateX(18px);
-  background: var(--bg);
+  background: var(--on-accent);
 }
 
 .cabinet-switch input:focus-visible + .cabinet-switch-track {
@@ -2462,20 +2491,29 @@ button:disabled {
   outline-offset: 2px;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .cabinet-switch-track,
+  .cabinet-switch-track::after {
+    transition: none;
+  }
+}
+
 .cabinet-primary-btn {
   flex-shrink: 0;
   padding: 7px 16px;
   border-radius: 999px;
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--bg);
+  border-color: var(--accent-fill);
+  background: var(--accent-fill);
+  color: var(--on-accent);
   font-size: 0.82rem;
   font-weight: 600;
 }
 
-.cabinet-primary-btn:hover {
-  background: var(--accent-strong);
-  border-color: var(--accent-strong);
+.cabinet-primary-btn:hover,
+.cabinet-undo button:hover {
+  background: var(--accent-fill-hover);
+  border-color: var(--accent-fill-hover);
+  color: var(--on-accent-hover);
 }
 
 .cabinet-add {
@@ -2485,6 +2523,49 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.cabinet-add-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.cabinet-capacity-field {
+  display: flex;
+  flex-direction: column;
+}
+
+/* "Shelf n removed · Undo": pinned to the bottom of the card while it shows. */
+.cabinet-undo-region {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.cabinet-undo {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 8px 8px 8px 16px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.cabinet-undo button {
+  padding: 5px 14px;
+  border-radius: 999px;
+  border-color: var(--accent-fill);
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font-weight: 600;
+}
 
 .cabinet-conflicts {
   list-style: none;
@@ -2591,19 +2672,13 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 
-.cabinet-slot-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 8px 0 0;
-}
-
 /* Laid out like a shelf; the dashed edge marks it as not being one. */
 .cabinet-unplaced {
   border-style: dashed;
 }
 
 .cabinet-tag {
+  white-space: nowrap;
   font-size: 0.72rem;
   padding: 2px 8px;
   border-radius: 999px;
@@ -2614,9 +2689,10 @@ button:disabled {
 
 /* Shelf tags and warning chips share the same two warning levels. */
 .cabinet-tag.warn,
-.cabinet-conflict.size-mix {
-  border-color: var(--accent);
-  color: var(--accent);
+.cabinet-conflict.size-mix,
+.cabinet-conflict.out-of-order {
+  border-color: var(--accent-text);
+  color: var(--accent-text);
 }
 
 .cabinet-tag.danger {
@@ -2634,13 +2710,13 @@ button:disabled {
 
 .cabinet-empty {
   margin: 0;
-  color: var(--text-faint);
+  color: var(--text-dim);
   font-size: 0.85rem;
 }
 
 .cabinet-hint {
   margin: 0;
-  color: var(--text-faint);
+  color: var(--text-dim);
   font-size: 0.8rem;
 }
 
