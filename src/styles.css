@@ -2662,6 +2662,8 @@ button:disabled {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
   column-gap: 10px;
+  /* Breathing room between the year and the chips under it. */
+  row-gap: 4px;
   padding: 6px 0;
   border-top: 1px solid var(--border);
 }
