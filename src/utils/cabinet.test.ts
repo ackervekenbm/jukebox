@@ -11,7 +11,8 @@ import {
   discCountOf,
   isGatefold,
   needsNotesCheck,
-  notesSayGatefold,
+  isUserCall,
+  mentionsGatefold,
   planCabinet,
   sizeClassOf,
   spaceUnitsOf,
@@ -166,8 +167,31 @@ describe('spaceUnitsOf', () => {
     // Blink-182 – Enema Of The State (9160941): only the notes say gatefold.
     const record = fake({ artist: 'blink-182', title: 'Enema Of The State', id: 9160941, formatText: 'Vinyl · LP · Album · Reissue · Stereo' })
     expect(spaceUnitsOf(record)).toBe(1)
-    expect(spaceUnitsOf(record, { notes: { '9160941': true } })).toBe(2)
-    expect(spaceUnitsOf(record, { notes: { '9160941': false } })).toBe(1)
+    const notes = '180 Gram Heavyweight Vinyl\nGatefold sleeve.\nMade in the EU.'
+    expect(spaceUnitsOf(record, { notes: { '9160941': notes } })).toBe(2)
+    expect(spaceUnitsOf(record, { notes: { '9160941': 'Printed inner sleeve.' } })).toBe(1)
+    expect(spaceUnitsOf(record, { notes: { '9160941': '' } })).toBe(1)
+  })
+
+  it('ignores gatefold text on a format that is not vinyl', () => {
+    // A CD's gatefold card sleeve doesn't make the LP in the same set thicker.
+    const set = fake({
+      artist: 'A',
+      title: 'T',
+      formatText: 'Vinyl · LP / CD · Album · Gatefold',
+      formats: [
+        { name: 'Vinyl', qty: '1', descriptions: ['LP'] },
+        { name: 'CD', qty: '1', text: 'Gatefold digisleeve', descriptions: ['Album', 'Gatefold'] },
+      ],
+    })
+    expect(spaceUnitsOf(set)).toBe(1)
+    const cd = fake({
+      artist: 'A',
+      title: 'T',
+      formatText: 'CD · Album',
+      formats: [{ name: 'CD', qty: '1', text: 'Gatefold Cardboard Sleeve' }],
+    })
+    expect(isGatefold(cd)).toBe(false)
   })
 
   it('lets the user\'s call win both ways', () => {
@@ -175,7 +199,15 @@ describe('spaceUnitsOf', () => {
     const folded = fake({ artist: 'A', title: 'U', id: 2, formatText: 'Vinyl · LP · Gatefold' })
     expect(spaceUnitsOf(plain, { overrides: { '1': true } })).toBe(2)
     expect(spaceUnitsOf(folded, { overrides: { '2': false } })).toBe(1)
-    expect(isGatefold(folded, { notes: { '2': true }, overrides: { '2': false } })).toBe(false)
+    expect(isGatefold(folded, { notes: { '2': 'Gatefold' }, overrides: { '2': false } })).toBe(false)
+  })
+
+  it('treats only a call that disagrees with Discogs as the user\'s', () => {
+    const lp = fake({ artist: 'A', title: 'T', id: 1, formatText: 'Vinyl · LP' })
+    expect(isUserCall(lp, { overrides: { '1': true } })).toBe(true)
+    // Marked as gatefold before the notes said so: it now agrees, so it's Discogs' call.
+    expect(isUserCall(lp, { notes: { '1': 'Gatefold sleeve' }, overrides: { '1': true } })).toBe(false)
+    expect(isUserCall(lp)).toBe(false)
   })
 
   it('gives a multi-disc set one space per disc, gatefold or not', () => {
@@ -190,6 +222,29 @@ describe('spaceUnitsOf', () => {
     expect(spaceUnitsOf(lps('2', ['LP', 'Gatefold']))).toBe(2)
     expect(spaceUnitsOf(lps('3'))).toBe(3)
     expect(discCountOf(lps('nonsense'))).toBe(1)
+  })
+
+  it('does not count a bonus 7" or flexi tucked in an LP\'s sleeve', () => {
+    const bonus = fake({
+      artist: 'A',
+      title: 'T',
+      formatText: 'Vinyl · LP · Album / Vinyl · 7" · Single / Flexi-disc · 7"',
+      formats: [
+        { name: 'Vinyl', qty: '1', descriptions: ['LP', 'Album'] },
+        { name: 'Vinyl', qty: '1', descriptions: ['7"', 'Single'] },
+        { name: 'Flexi-disc', qty: '1', descriptions: ['7"'] },
+      ],
+    })
+    expect(discCountOf(bonus)).toBe(1)
+    expect(spaceUnitsOf(bonus)).toBe(1)
+    // A double 7" single still takes two.
+    const double7 = fake({
+      artist: 'A',
+      title: 'T',
+      formatText: 'Vinyl · 7"',
+      formats: [{ name: 'Vinyl', qty: '2', descriptions: ['7"'] }],
+    })
+    expect(discCountOf(double7)).toBe(2)
   })
 
   it('counts vinyl discs only in a mixed set', () => {
@@ -207,13 +262,44 @@ describe('spaceUnitsOf', () => {
   })
 })
 
-describe('notesSayGatefold', () => {
-  it('recognises the ways notes write it', () => {
-    expect(notesSayGatefold('180 Gram Heavyweight Vinyl\nGatefold sleeve.')).toBe(true)
-    expect(notesSayGatefold('Comes in a gate-fold cover')).toBe(true)
-    expect(notesSayGatefold('Gate fold jacket with lyrics')).toBe(true)
-    expect(notesSayGatefold('Printed inner sleeve. Includes a download voucher.')).toBe(false)
-    expect(notesSayGatefold(undefined)).toBe(false)
+describe('mentionsGatefold', () => {
+  it.each([
+    '180 Gram Heavyweight Vinyl\nGatefold sleeve.',
+    'Comes in a gate-fold cover',
+    'Gate fold jacket with lyrics',
+    'Pitman Pressing, Gatefold',
+    'Issued in gatefold jacket',
+    'Klappcover mit Textbeilage',
+    'Pochette ouvrante',
+    'Copertina apribile',
+    'Doble carpeta',
+    'Uitklaphoes',
+    'Fold-out cover with poster',
+    'Tri-fold sleeve',
+    '見開きジャケット',
+    // A denial in an earlier sentence doesn't carry over.
+    'Not on label. Gatefold sleeve.',
+  ])('finds a gatefold in "%s"', (text) => {
+    expect(mentionsGatefold(text)).toBe(true)
+  })
+
+  it.each([
+    'Printed inner sleeve. Includes a download voucher.',
+    'Unlike the original gatefold issue, this repress comes in a single sleeve.',
+    'Not a gatefold.',
+    'No gatefold on this pressing',
+    'Comes without the gatefold of the first edition',
+    'Includes a gatefold poster',
+    'With gatefold insert',
+    'Gatefold inner sleeve',
+    '',
+  ])('finds no gatefold in "%s"', (text) => {
+    expect(mentionsGatefold(text)).toBe(false)
+  })
+
+  it('reads a gatefold that a denied mention is followed by', () => {
+    expect(mentionsGatefold('Not the poster: the jacket is a gatefold.')).toBe(true)
+    expect(mentionsGatefold(undefined)).toBe(false)
   })
 })
 
@@ -221,7 +307,9 @@ describe('needsNotesCheck', () => {
   it('only asks about single vinyl LPs that are not known yet', () => {
     const lp = fake({ artist: 'A', title: 'T', id: 1, formatText: 'Vinyl · LP' })
     expect(needsNotesCheck(lp)).toBe(true)
-    expect(needsNotesCheck(lp, { notes: { '1': false } })).toBe(false)
+    expect(needsNotesCheck(lp, { notes: { '1': '' } })).toBe(false)
+    // The user already decided; the notes can't change that.
+    expect(needsNotesCheck(lp, { overrides: { '1': false } })).toBe(false)
     expect(needsNotesCheck(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · LP · Gatefold' }))).toBe(false)
     expect(needsNotesCheck(fake({ artist: 'A', title: 'T', formatText: 'CD · Album' }))).toBe(false)
     expect(
@@ -598,7 +686,7 @@ describe('planCabinet', () => {
     const releases = [1, 2, 3].map((id) => fake({ artist: 'A', title: `a${id}`, id, formatText: 'Vinyl · LP' }))
     const cabinet = cabinetWith([3])
     expect(planCabinet({ releases, cabinet }).unplaced).toEqual([])
-    const plan = planCabinet({ releases, cabinet, sleeves: { notes: { '1': true } } })
+    const plan = planCabinet({ releases, cabinet, sleeves: { notes: { '1': 'Gatefold sleeve.' } } })
     expect(plan.slots[0].used).toBe(3)
     expect(plan.unplaced).toHaveLength(1)
   })

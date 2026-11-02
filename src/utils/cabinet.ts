@@ -17,7 +17,32 @@ export const SIZE_CLASS_LABELS: Record<SizeClass, string> = {
 }
 
 const INCH_PATTERN = /(\d+(?:[.,]\d+)?)\s*(?:"|″|”|inch|inches)/gi
-const GATEFOLD_PATTERN = /\bgate[- ]?fold/i
+/**
+ * Ways Discogs entries say "gatefold": English, plus the words pressings from
+ * Germany, France, Italy, Spain, the Netherlands and Japan use, and fold-out
+ * and tri-fold jackets (also thicker than a single sleeve).
+ */
+const GATEFOLD_PATTERN =
+  /gate[- ]?fold|klapp(?:cover|hülle|huelle)|pochette ouvrante|copertina apribile|doble carpeta|carpeta doble|uitklaphoes|fold[- ]?out (?:sleeve|cover|jacket)|tri[- ]?fold|見開き/giu
+/** "not a gatefold", "unlike the original gatefold": the mention denies it. */
+const DENIAL_BEFORE = /\b(?:not|no|non|without|unlike|instead of|rather than|lacks?)\b[^.;:\n]{0,30}$/iu
+/** "gatefold poster", "gatefold insert": a gatefold item, not the jacket. */
+const ITEM_AFTER = /^[\s-]*(?:poster|insert|inner|booklet|print|card|lyric)/iu
+
+/**
+ * Whether a piece of Discogs text says the jacket is a gatefold: a gatefold
+ * word that isn't denied just before it or followed by a gatefold item.
+ */
+export function mentionsGatefold(text: string | undefined): boolean {
+  if (!text) return false
+  for (const match of text.matchAll(GATEFOLD_PATTERN)) {
+    const start = match.index ?? 0
+    const before = text.slice(Math.max(0, start - 60), start)
+    const after = text.slice(start + match[0].length)
+    if (!DENIAL_BEFORE.test(before) && !ITEM_AFTER.test(after)) return true
+  }
+  return false
+}
 
 /** The largest size a piece of format text states, in inches. */
 function statedInches(text: string): number | null {
@@ -64,47 +89,66 @@ export function sizeClassOf(display: DisplayRelease): SizeClass {
 
 /**
  * What is known about sleeves beyond the collection listing, keyed by release
- * id. `notes` is what each release's own notes say (fetched once from the full
- * release, which the collection listing leaves out); `overrides` is the
- * user's call, and wins over anything detected.
+ * id. `notes` holds each release's own notes text (fetched once from the full
+ * release, which the collection listing leaves out; '' when it has none), so a
+ * better gatefold search re-reads them without asking Discogs again.
+ * `overrides` is the user's call, and wins over anything detected.
  */
 export interface SleeveFacts {
-  notes?: Record<string, boolean>
+  notes?: Record<string, string>
   overrides?: Record<string, boolean>
 }
 
-function formatsOf(display: DisplayRelease) {
-  return display.release?.basic_information?.formats ?? []
+/** The vinyl formats of a release; CDs and tapes in a set don't make it thicker. */
+function vinylFormatsOf(display: DisplayRelease) {
+  return (display.release?.basic_information?.formats ?? []).filter((format) =>
+    isVinylName(format.name),
+  )
 }
 
-/** Whether release notes describe a gatefold ("Gatefold sleeve.", "gate-fold cover"). */
-export function notesSayGatefold(notes: string | undefined): boolean {
-  return typeof notes === 'string' && GATEFOLD_PATTERN.test(notes)
-}
-
-/** The collection listing names it: a format description or a format's free text. */
+/** The listing names it: a vinyl format's descriptions or its free text. */
 function formatSaysGatefold(display: DisplayRelease): boolean {
-  if (GATEFOLD_PATTERN.test(display.formatText)) return true
-  return formatsOf(display).some((format) => GATEFOLD_PATTERN.test(format.text ?? ''))
+  const parts = display.formatText
+    .split(' / ')
+    .filter((part) => isVinylName(part.split(' · ')[0] ?? ''))
+  return (
+    parts.some((part) => mentionsGatefold(part)) ||
+    vinylFormatsOf(display).some((format) => mentionsGatefold(format.text))
+  )
 }
 
-/** Gatefold as detected from Discogs data alone, ignoring the user's override. */
+/** Gatefold as detected from Discogs data alone, ignoring the user's call. */
 export function detectedGatefold(display: DisplayRelease, facts: SleeveFacts = {}): boolean {
-  return formatSaysGatefold(display) || facts.notes?.[String(display.id)] === true
+  return formatSaysGatefold(display) || mentionsGatefold(facts.notes?.[String(display.id)])
 }
 
 export function isGatefold(display: DisplayRelease, facts: SleeveFacts = {}): boolean {
   return facts.overrides?.[String(display.id)] ?? detectedGatefold(display, facts)
 }
 
-/** Vinyl discs in the release ("2×Vinyl" is two), at least one. */
+/** Whether the user's own call disagrees with detection (an agreeing one changes nothing). */
+export function isUserCall(display: DisplayRelease, facts: SleeveFacts = {}): boolean {
+  const call = facts.overrides?.[String(display.id)]
+  return call !== undefined && call !== detectedGatefold(display, facts)
+}
+
+/**
+ * Discs that take their own space: the vinyl discs of the release's largest
+ * size ("2×Vinyl, LP" is two). A bonus 7" or flexi tucked in an LP's sleeve
+ * adds nothing. At least one.
+ */
 export function discCountOf(display: DisplayRelease): number {
-  let discs = 0
-  for (const format of formatsOf(display)) {
-    if (!VINYL_FORMATS.has(format.name.trim().toLowerCase())) continue
+  const sized = vinylFormatsOf(display).map((format) => {
     const qty = Number.parseInt(format.qty, 10)
-    discs += Number.isFinite(qty) && qty > 0 ? qty : 1
-  }
+    return {
+      inches: statedInches([...(format.descriptions ?? []), format.text ?? ''].join(' ')) ?? 12,
+      discs: Number.isFinite(qty) && qty > 0 ? qty : 1,
+    }
+  })
+  const largest = Math.max(0, ...sized.map((format) => format.inches))
+  const discs = sized
+    .filter((format) => format.inches === largest)
+    .reduce((total, format) => total + format.discs, 0)
   return Math.max(1, discs)
 }
 
@@ -119,14 +163,17 @@ export function spaceUnitsOf(display: DisplayRelease, facts: SleeveFacts = {}): 
 
 /**
  * Whether fetching the release's notes could change its shelf space: a single
- * vinyl disc whose listing doesn't already say gatefold, not checked yet.
+ * vinyl disc whose listing doesn't already say gatefold, that the user hasn't
+ * decided themselves, and that hasn't been checked yet.
  */
 export function needsNotesCheck(display: DisplayRelease, facts: SleeveFacts = {}): boolean {
+  const id = String(display.id)
   return (
     isVinyl(display) &&
     discCountOf(display) < 2 &&
     !formatSaysGatefold(display) &&
-    facts.notes?.[String(display.id)] === undefined
+    facts.overrides?.[id] === undefined &&
+    facts.notes?.[id] === undefined
   )
 }
 
