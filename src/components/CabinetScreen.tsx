@@ -49,6 +49,7 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
   } = useCabinet({ username, token, releases, enabled: true })
 
   const placed = Object.keys(plan.placements).length
+  const totalCapacity = plan.slots.reduce((total, slot) => total + slot.slot.capacity, 0)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const unplacedExpanded = expanded.has(UNPLACED_ID)
   const [adding, setAdding] = useState(false)
@@ -116,10 +117,21 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
             {plan.unplaced.length > 0 && ` · ${plan.unplaced.length.toLocaleString()} without a slot`}
           </p>
 
-          <div className="cabinet-tools">
-            <div className="global-sort">
-              <span className="global-sort-label">Sort</span>
-              <div className="sort-toggle" role="radiogroup" aria-label="Sort within each artist">
+          <section className="cabinet-settings" aria-label="Cabinet settings">
+            <div className="cabinet-setting">
+              <div className="cabinet-setting-text">
+                <span className="cabinet-setting-title" id="cabinet-order-title">
+                  Order within each artist
+                </span>
+                <span className="cabinet-setting-hint">
+                  Artists are always filed by name, like the main view.
+                </span>
+              </div>
+              <div
+                className="sort-toggle cabinet-segmented"
+                role="radiogroup"
+                aria-label="Sort within each artist"
+              >
                 {SORTS.map((sort) => (
                   <button
                     key={sort.id}
@@ -136,51 +148,74 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
               </div>
             </div>
 
-            <label className="cabinet-toggle">
-              <input
-                type="checkbox"
-                checked={options.separateSizeClasses}
-                onChange={(event) => setSeparateSizeClasses(event.target.checked)}
-              />
-              Keep 12&quot; and 7&quot; apart
-            </label>
-
-            {adding ? (
-              <div className="cabinet-add">
-                <label className="cabinet-slot-capacity">
-                  <span>Shelf size</span>
-                  <input
-                    type="number"
-                    min={1}
-                    value={newCapacity}
-                    onChange={(event) => setNewCapacity(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') handleAdd()
-                      if (event.key === 'Escape') setAdding(false)
-                    }}
-                    autoFocus
-                  />
-                </label>
-                <button type="button" className="secondary-btn" onClick={handleAdd}>
-                  Add
-                </button>
-                <button type="button" className="secondary-btn" onClick={() => setAdding(false)}>
-                  Cancel
-                </button>
+            <div className="cabinet-setting">
+              <div className="cabinet-setting-text">
+                <span className="cabinet-setting-title" id="cabinet-sizes-title">
+                  Separate record sizes
+                </span>
+                <span className="cabinet-setting-hint" id="cabinet-sizes-hint">
+                  Keep 12&quot; records on their own shelves, apart from 7&quot; and 10&quot;.
+                </span>
               </div>
-            ) : (
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={() => {
-                  setNewCapacity('75')
-                  setAdding(true)
-                }}
-              >
-                Add shelf
-              </button>
-            )}
-          </div>
+              <label className="cabinet-switch">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={options.separateSizeClasses}
+                  onChange={(event) => setSeparateSizeClasses(event.target.checked)}
+                  aria-labelledby="cabinet-sizes-title"
+                  aria-describedby="cabinet-sizes-hint"
+                />
+                <span className="cabinet-switch-track" aria-hidden="true" />
+              </label>
+            </div>
+
+            <div className="cabinet-setting">
+              <div className="cabinet-setting-text">
+                <span className="cabinet-setting-title">Shelves</span>
+                <span className="cabinet-setting-hint">
+                  {plan.slots.length === 0
+                    ? '0 shelves'
+                    : `${plan.slots.length.toLocaleString()} ${plan.slots.length === 1 ? 'shelf' : 'shelves'} · ${totalCapacity.toLocaleString()} record spaces`}
+                </span>
+              </div>
+              {adding ? (
+                <div className="cabinet-add">
+                  <label className="cabinet-slot-capacity">
+                    <span>Shelf size</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={newCapacity}
+                      onChange={(event) => setNewCapacity(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') handleAdd()
+                        if (event.key === 'Escape') setAdding(false)
+                      }}
+                      autoFocus
+                    />
+                  </label>
+                  <button type="button" className="cabinet-primary-btn" onClick={handleAdd}>
+                    Add
+                  </button>
+                  <button type="button" className="secondary-btn" onClick={() => setAdding(false)}>
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="cabinet-primary-btn"
+                  onClick={() => {
+                    setNewCapacity('75')
+                    setAdding(true)
+                  }}
+                >
+                  Add shelf
+                </button>
+              )}
+            </div>
+          </section>
 
           {error && (
             <div className="sync-banner error" role="alert">

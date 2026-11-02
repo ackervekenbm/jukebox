@@ -100,6 +100,7 @@ describe('CabinetScreen', () => {
     renderScreen()
 
     expect(screen.getByRole('heading', { name: 'Record Cabinet' })).toBeInTheDocument()
+    expect(screen.getByText('2 shelves · 150 record spaces')).toBeInTheDocument()
     expect(screen.getAllByText('Shelf 1')).toHaveLength(1)
     expect(screen.getAllByText('Shelf 2')).toHaveLength(1)
     expect(screen.getByText(/2 releases · 2 placed/)).toBeInTheDocument()
@@ -192,7 +193,9 @@ describe('CabinetScreen', () => {
     fireEvent.click(within(order).getByRole('radio', { name: 'A–Z' }))
     expect(actions.setSort).toHaveBeenCalledWith('byName')
 
-    fireEvent.click(screen.getByLabelText(/Keep 12"/))
+    const sizes = screen.getByRole('switch', { name: 'Separate record sizes' })
+    expect(sizes).toBeChecked()
+    fireEvent.click(sizes)
     expect(actions.setSeparateSizeClasses).toHaveBeenCalledWith(false)
   })
 
