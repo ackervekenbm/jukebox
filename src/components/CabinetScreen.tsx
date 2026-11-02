@@ -258,11 +258,13 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
                     aria-controls={`cabinet-slot-${slot.slot.id}`}
                   >
                     <span className="cabinet-slot-toggle-label">{shelfName}</span>
-                    <span className="cabinet-slot-count" title="Record spaces used">
+                    {/* One fill count: spaces used of capacity. It only differs from
+                        the record count by gatefolds, which say "2 spaces" inside. */}
+                    <span
+                      className="cabinet-slot-count"
+                      title={`${slot.used.toLocaleString()} of ${slot.slot.capacity.toLocaleString()} spaces used`}
+                    >
                       {slot.used.toLocaleString()} / {slot.slot.capacity.toLocaleString()}
-                    </span>
-                    <span className="cabinet-slot-count" title="Records on shelf">
-                      {slot.records.length.toLocaleString()} records
                     </span>
                     {slot.sizeClass !== null && slot.sizeClass !== 'mixed' && (
                       <span className="cabinet-tag">{SIZE_CLASS_LABELS[slot.sizeClass]}</span>
@@ -329,7 +331,8 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
                 >
                   <span className="cabinet-slot-toggle-label">Without a shelf</span>
                   <span className="cabinet-slot-count" title="Records without a shelf">
-                    {plan.unplaced.length.toLocaleString()} records
+                    {plan.unplaced.length.toLocaleString()}{' '}
+                    {plan.unplaced.length === 1 ? 'record' : 'records'}
                   </span>
                   <span className="cabinet-slot-chevron">{unplacedExpanded ? '▾' : '▸'}</span>
                 </button>

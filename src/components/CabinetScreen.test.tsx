@@ -176,7 +176,7 @@ describe('CabinetScreen', () => {
     renderScreen()
 
     const empty = screen.getByRole('button', { name: /Shelf 3/ })
-    expect(empty).toHaveTextContent('0 records')
+    expect(empty).toHaveTextContent('0 / 75')
     expect(empty).not.toHaveTextContent('Mixed sizes')
     expect(screen.getByRole('button', { name: /Shelf 1/ })).toHaveTextContent('12"')
   })
@@ -245,7 +245,7 @@ describe('CabinetScreen', () => {
     // Collapsed by default, like the shelves, with the count in its header.
     const toggle = screen.getByRole('button', { name: /Without a shelf/ })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(toggle).toHaveTextContent('1 records')
+    expect(toggle).toHaveTextContent(/^Without a shelf1 record▸$/)
     expect(screen.queryByText('Second')).not.toBeInTheDocument()
 
     fireEvent.click(toggle)
@@ -281,7 +281,13 @@ describe('CabinetScreen', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Shelf 1/ }))
+    // One gatefold alone on the shelf: the header gives the spaces used (2), not
+    // a second, different record count (1).
+    const shelf = screen.getByRole('button', { name: /Shelf 1/ })
+    expect(shelf).toHaveTextContent(/^Shelf 12 \/ 7512"▸$/)
+    expect(shelf).not.toHaveTextContent('records')
+
+    fireEvent.click(shelf)
     expect(screen.getByText('2 spaces')).toBeInTheDocument()
   })
 
