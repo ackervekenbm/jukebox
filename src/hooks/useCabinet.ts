@@ -121,8 +121,8 @@ export interface UseCabinetArgs {
   releases: DisplayRelease[]
   /** The cabinet only loads and syncs while its screen is on. */
   enabled: boolean
-  /** The collection is still enriching: hold the gatefold scan until it's done. */
-  collectionBusy?: boolean
+  /** The collection has loaded (not enriching, no error); the gatefold scan waits for it. */
+  collectionReady?: boolean
 }
 
 export interface RemovedSlot {
@@ -139,6 +139,8 @@ export interface UseCabinetResult {
   sleeves: SleeveFacts
   /** The release-notes gatefold scan, null when idle. */
   gatefoldScan: GatefoldScanProgress | null
+  /** Why the release-notes scan stopped early, else null. */
+  gatefoldScanError: string | null
   status: CabinetStatus
   dirty: boolean
   error: string | null
@@ -161,7 +163,7 @@ export function useCabinet({
   token,
   releases,
   enabled,
-  collectionBusy = false,
+  collectionReady = true,
 }: UseCabinetArgs): UseCabinetResult {
   const [cabinets, setCabinets] = useState<Cabinet[]>(() => [defaultCabinet()])
   const [overrides, setOverrides] = useState<Record<string, boolean>>({})
@@ -171,11 +173,16 @@ export function useCabinet({
   const [status, setStatus] = useState<CabinetStatus>('local')
   const [error, setError] = useState<string | null>(null)
 
-  const { notes, progress: gatefoldScan } = useGatefoldNotes({
+  const {
+    notes,
+    progress: gatefoldScan,
+    error: gatefoldScanError,
+  } = useGatefoldNotes({
     releases,
     token,
     enabled,
-    paused: collectionBusy,
+    paused: !collectionReady,
+    overrides,
   })
   const sleeves = useMemo<SleeveFacts>(() => ({ notes, overrides }), [notes, overrides])
 
@@ -511,6 +518,7 @@ export function useCabinet({
     plan,
     sleeves,
     gatefoldScan,
+    gatefoldScanError,
     status,
     dirty,
     error,

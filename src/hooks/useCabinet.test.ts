@@ -20,11 +20,11 @@ import {
 
 // The release-notes scan has its own tests; here it reports whatever notes the
 // test sets, and never touches the network.
-const scan = vi.hoisted(() => ({ notes: {} as Record<string, boolean>, paused: [] as boolean[] }))
+const scan = vi.hoisted(() => ({ notes: {} as Record<string, string>, paused: [] as boolean[] }))
 vi.mock('./useGatefoldNotes', () => ({
   useGatefoldNotes: ({ paused }: { paused: boolean }) => {
     scan.paused.push(paused)
-    return { notes: scan.notes, progress: null }
+    return { notes: scan.notes, progress: null, error: null }
   },
 }))
 
@@ -268,7 +268,7 @@ describe('useCabinet', () => {
 
     it('counts a gatefold the release notes found as two spaces', async () => {
       await synced()
-      scan.notes = { [String(releases[0].id)]: true }
+      scan.notes = { [String(releases[0].id)]: 'Gatefold sleeve.' }
       const { result } = renderHook(() => useIt())
       await waitFor(() => expect(result.current.status).toBe('synced'))
 
@@ -292,7 +292,7 @@ describe('useCabinet', () => {
 
     it('lets the user overrule a gatefold Discogs reports', async () => {
       await synced()
-      scan.notes = { [String(releases[0].id)]: true }
+      scan.notes = { [String(releases[0].id)]: 'Gatefold sleeve.' }
       const { result } = renderHook(() => useIt())
       await waitFor(() => expect(result.current.status).toBe('synced'))
 
@@ -311,10 +311,63 @@ describe('useCabinet', () => {
       await waitFor(() => expect(result.current.sleeves.overrides).toEqual(stored.sleeves))
     })
 
-    it('holds the release-notes scan while the collection is busy', () => {
+    it('holds the release-notes scan until the collection has loaded', () => {
       vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
-      renderHook(() => useIt({ token: null, collectionBusy: true }))
+      const { rerender } = renderHook(({ ready }) => useIt({ token: null, collectionReady: ready }), {
+        initialProps: { ready: false },
+      })
       expect(scan.paused.at(-1)).toBe(true)
+      rerender({ ready: true })
+      expect(scan.paused.at(-1)).toBe(false)
+    })
+
+    it('toggles a call made before the notes agreed with it back to standard, in one press', async () => {
+      // Marked as gatefold, then the notes said so too: the call no longer
+      // disagrees, so one press makes it a standard sleeve, as the button shows.
+      await synced()
+      const id = String(releases[0].id)
+      const stored = { ...docWith('Record Cabinet'), sleeves: { [id]: true } }
+      vi.spyOn(store, 'getCabinet').mockResolvedValue({ username: 'alice', doc: stored, revision: 1, dirty: false })
+      scan.notes = { [id]: 'Gatefold sleeve.' }
+      const { result } = renderHook(() => useIt({ token: null }))
+      await waitFor(() => expect(result.current.sleeves.overrides).toEqual({ [id]: true }))
+
+      act(() => result.current.toggleGatefold(releases[0]))
+      expect(result.current.sleeves.overrides).toEqual({ [id]: false })
+    })
+
+    it('keeps a toggle made while a push is in flight', async () => {
+      vi.useFakeTimers()
+      await synced()
+      let release: () => void = () => {}
+      const pushSpy = vi
+        .spyOn(syncApi, 'pushCabinet')
+        .mockImplementationOnce(
+          (_token, doc) =>
+            new Promise((resolve) => {
+              release = () => resolve({ doc, etag: '"r1"' })
+            }),
+        )
+        .mockImplementation(async (_token, doc) => ({ doc, etag: '"r2"' }))
+      const { result } = renderHook(() => useIt())
+      await act(async () => {})
+
+      act(() => result.current.addSlot())
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(800)
+      })
+      act(() => result.current.toggleGatefold(releases[0]))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(800)
+        release()
+      })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(800)
+      })
+
+      expect(pushSpy).toHaveBeenCalledTimes(2)
+      expect(pushSpy.mock.calls[1][1].sleeves).toEqual({ [String(releases[0].id)]: true })
+      expect(result.current.dirty).toBe(false)
     })
 
     it('keeps the manual calls through a sync conflict', () => {

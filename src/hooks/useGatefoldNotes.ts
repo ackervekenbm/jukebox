@@ -4,8 +4,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DisplayRelease } from '../utils/collection'
 import { needsNotesCheck } from '../utils/cabinet'
-import { fetchReleaseGatefolds } from '../api/discogs'
-import { getReleaseGatefolds, setReleaseGatefold } from '../db/collection'
+import { DiscogsError, fetchReleaseNotes } from '../api/discogs'
+import { getReleaseNotes, setReleaseNotes } from '../db/collection'
 
 export interface GatefoldScanProgress {
   done: number
@@ -18,47 +18,58 @@ export interface UseGatefoldNotesArgs {
   /** The scan only runs while the cabinet is on screen. */
   enabled: boolean
   /**
-   * Hold off while the collection's own enrichment runs, so the two don't split
-   * the Discogs rate budget and throttle each other.
+   * Hold off until the collection has loaded: while its own enrichment runs the
+   * two would split the Discogs rate budget, and after a failed load (a bad
+   * token, no network) every request would fail too.
    */
   paused: boolean
+  /** Release id → the user's own call; those releases need no notes. */
+  overrides?: Record<string, boolean>
 }
 
 export interface UseGatefoldNotesResult {
-  /** Release id → whether its notes describe a gatefold. */
-  notes: Record<string, boolean>
+  /** Release id → its notes text ('' when it has none). */
+  notes: Record<string, string>
   /** The running scan, null when nothing is left to check. */
   progress: GatefoldScanProgress | null
+  /** Why the scan stopped early (Discogs refused the token), else null. */
+  error: string | null
 }
 
+const NO_OVERRIDES: Record<string, boolean> = {}
+
 /**
- * What each vinyl release's notes say about its sleeve. The collection listing
- * leaves notes out, so the scan reads the full release once per record it
- * could matter for, caches every answer for good (a sleeve never changes), and
- * streams answers in so the layout updates as it goes. Closing the cabinet
- * stops the scan; it picks up where it left off next time.
+ * What each vinyl release's notes say. The collection listing leaves notes
+ * out, so the scan reads the full release once per record they could matter
+ * for, caches the notes for good, and streams them in so the layout updates as
+ * it goes. Closing the cabinet stops the scan; it picks up where it left off
+ * next time.
  */
 export function useGatefoldNotes({
   releases,
   token,
   enabled,
   paused,
+  overrides = NO_OVERRIDES,
 }: UseGatefoldNotesArgs): UseGatefoldNotesResult {
-  const [notes, setNotes] = useState<Record<string, boolean>>({})
+  const [notes, setNotes] = useState<Record<string, string>>({})
   const [loaded, setLoaded] = useState(false)
   const [progress, setProgress] = useState<GatefoldScanProgress | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  // The scan reads answers through this ref, so a streamed answer doesn't
+  // The scan reads these through refs, so a streamed answer or a toggle doesn't
   // restart the scan it came from.
   const notesRef = useRef(notes)
+  const overridesRef = useRef(overrides)
   useEffect(() => {
     notesRef.current = notes
-  }, [notes])
+    overridesRef.current = overrides
+  }, [notes, overrides])
 
   useEffect(() => {
     if (!enabled) return
     let cancelled = false
-    getReleaseGatefolds()
+    getReleaseNotes()
       .catch(() => ({}))
       .then((cached) => {
         if (cancelled) return
@@ -73,32 +84,37 @@ export function useGatefoldNotes({
 
   useEffect(() => {
     if (!enabled || !loaded || paused || !token) return
+    const facts = { notes: notesRef.current, overrides: overridesRef.current }
     const ids = [
       ...new Set(
-        releases
-          .filter((display) => needsNotesCheck(display, { notes: notesRef.current }))
-          .map((display) => display.id),
+        releases.filter((display) => needsNotesCheck(display, facts)).map((display) => display.id),
       ),
     ]
     if (ids.length === 0) return
 
     const controller = new AbortController()
+    setError(null)
     setProgress({ done: 0, total: ids.length })
-    fetchReleaseGatefolds(
+    fetchReleaseNotes(
       ids,
       token,
       (done, total) => {
         if (!controller.signal.aborted) setProgress({ done, total })
       },
       controller.signal,
-      (releaseId, gatefold) => {
-        setReleaseGatefold(releaseId, gatefold).catch(() => {})
+      (releaseId, text) => {
+        setReleaseNotes(releaseId, text).catch(() => {})
         if (controller.signal.aborted) return
-        setNotes((current) => ({ ...current, [String(releaseId)]: gatefold }))
+        setNotes((current) => ({ ...current, [String(releaseId)]: text }))
       },
     )
-      .catch(() => {
-        // Aborted or failed: unanswered releases are asked again next time.
+      .catch((err) => {
+        // Unanswered releases are asked again next time. A refused token would
+        // only fail again, so say so instead of retrying silently.
+        if (controller.signal.aborted) return
+        if (err instanceof DiscogsError && (err.status === 401 || err.status === 403)) {
+          setError('Discogs refused the token, so release notes were not checked.')
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setProgress(null)
@@ -110,5 +126,5 @@ export function useGatefoldNotes({
     }
   }, [enabled, loaded, paused, token, releases])
 
-  return { notes, progress }
+  return { notes, progress, error }
 }

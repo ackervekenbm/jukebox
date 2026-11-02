@@ -55,36 +55,39 @@ beforeEach(() => {
 })
 
 describe('useGatefoldNotes', () => {
-  it('asks only about single vinyl LPs it has no answer for, and caches each answer', async () => {
-    vi.spyOn(db, 'getReleaseGatefolds').mockResolvedValue({ '3': false })
-    const save = vi.spyOn(db, 'setReleaseGatefold').mockResolvedValue(undefined)
+  it('asks only about single vinyl LPs it has no notes for, and caches the notes', async () => {
+    vi.spyOn(db, 'getReleaseNotes').mockResolvedValue({ '3': '' })
+    const save = vi.spyOn(db, 'setReleaseNotes').mockResolvedValue(undefined)
     const scan = vi
-      .spyOn(api, 'fetchReleaseGatefolds')
+      .spyOn(api, 'fetchReleaseNotes')
       .mockImplementation(async (ids, _token, onProgress, _signal, onRelease) => {
-        ids.forEach((id) => onRelease?.(id, id === 1))
+        const notesFor = (id: number) => (id === 1 ? 'Gatefold sleeve.' : '')
+        ids.forEach((id) => onRelease?.(id, notesFor(id)))
         onProgress?.(ids.length, ids.length)
-        return Object.fromEntries(ids.map((id) => [id, id === 1]))
+        return Object.fromEntries(ids.map((id) => [id, notesFor(id)]))
       })
 
     const { result } = renderHook(() =>
       useGatefoldNotes({ releases, token: 'tok', enabled: true, paused: false }),
     )
 
-    await waitFor(() => expect(result.current.notes).toEqual({ '1': true, '2': false, '3': false }))
+    await waitFor(() =>
+      expect(result.current.notes).toEqual({ '1': 'Gatefold sleeve.', '2': '', '3': '' }),
+    )
     expect(scan).toHaveBeenCalledTimes(1)
     expect(scan.mock.calls[0][0]).toEqual([1, 2])
     expect(save.mock.calls).toEqual([
-      [1, true],
-      [2, false],
+      [1, 'Gatefold sleeve.'],
+      [2, ''],
     ])
     await waitFor(() => expect(result.current.progress).toBeNull())
   })
 
   it('waits while the collection is busy, and reports progress once it runs', async () => {
-    vi.spyOn(db, 'getReleaseGatefolds').mockResolvedValue({})
+    vi.spyOn(db, 'getReleaseNotes').mockResolvedValue({})
     let finish: () => void = () => {}
     const scan = vi
-      .spyOn(api, 'fetchReleaseGatefolds')
+      .spyOn(api, 'fetchReleaseNotes')
       .mockImplementation((_ids, _token, onProgress) => {
         onProgress?.(1, 2)
         return new Promise((resolve) => {
@@ -96,7 +99,7 @@ describe('useGatefoldNotes', () => {
       ({ paused }) => useGatefoldNotes({ releases, token: 'tok', enabled: true, paused }),
       { initialProps: { paused: true } },
     )
-    await waitFor(() => expect(db.getReleaseGatefolds).toHaveBeenCalled())
+    await waitFor(() => expect(db.getReleaseNotes).toHaveBeenCalled())
     expect(scan).not.toHaveBeenCalled()
 
     rerender({ paused: false })
@@ -106,8 +109,8 @@ describe('useGatefoldNotes', () => {
   })
 
   it('does nothing while the cabinet is closed or without a token', async () => {
-    const load = vi.spyOn(db, 'getReleaseGatefolds').mockResolvedValue({})
-    const scan = vi.spyOn(api, 'fetchReleaseGatefolds').mockResolvedValue({})
+    const load = vi.spyOn(db, 'getReleaseNotes').mockResolvedValue({})
+    const scan = vi.spyOn(api, 'fetchReleaseNotes').mockResolvedValue({})
 
     renderHook(() => useGatefoldNotes({ releases, token: 'tok', enabled: false, paused: false }))
     renderHook(() => useGatefoldNotes({ releases, token: null, enabled: true, paused: false }))
@@ -116,10 +119,46 @@ describe('useGatefoldNotes', () => {
     expect(scan).not.toHaveBeenCalled()
   })
 
+  it('skips releases the user has already decided', async () => {
+    vi.spyOn(db, 'getReleaseNotes').mockResolvedValue({ '3': '' })
+    const scan = vi.spyOn(api, 'fetchReleaseNotes').mockResolvedValue({})
+
+    renderHook(() =>
+      useGatefoldNotes({ releases, token: 'tok', enabled: true, paused: false, overrides: { '1': true } }),
+    )
+    await waitFor(() => expect(scan).toHaveBeenCalled())
+    expect(scan.mock.calls[0][0]).toEqual([2])
+  })
+
+  it('says so when Discogs refuses the token, and stops', async () => {
+    vi.spyOn(db, 'getReleaseNotes').mockResolvedValue({})
+    vi.spyOn(api, 'fetchReleaseNotes').mockRejectedValue(
+      new api.DiscogsError('You must authenticate to access this resource.', 401),
+    )
+
+    const { result } = renderHook(() =>
+      useGatefoldNotes({ releases, token: 'bad', enabled: true, paused: false }),
+    )
+    await waitFor(() => expect(result.current.error).toMatch(/refused the token/))
+    expect(result.current.progress).toBeNull()
+  })
+
+  it('stays quiet about other failures; the next run asks again', async () => {
+    vi.spyOn(db, 'getReleaseNotes').mockResolvedValue({})
+    const scan = vi.spyOn(api, 'fetchReleaseNotes').mockRejectedValue(new Error('offline'))
+
+    const { result } = renderHook(() =>
+      useGatefoldNotes({ releases, token: 'tok', enabled: true, paused: false }),
+    )
+    await waitFor(() => expect(scan).toHaveBeenCalled())
+    await waitFor(() => expect(result.current.progress).toBeNull())
+    expect(result.current.error).toBeNull()
+  })
+
   it('stops the scan when the cabinet closes', async () => {
-    vi.spyOn(db, 'getReleaseGatefolds').mockResolvedValue({})
+    vi.spyOn(db, 'getReleaseNotes').mockResolvedValue({})
     let signal: AbortSignal | undefined
-    vi.spyOn(api, 'fetchReleaseGatefolds').mockImplementation((_ids, _token, _progress, s) => {
+    vi.spyOn(api, 'fetchReleaseNotes').mockImplementation((_ids, _token, _progress, s) => {
       signal = s
       return new Promise(() => {})
     })

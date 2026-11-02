@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DiscogsTrack } from '../types/discogs'
 import { fetchReleaseDetails } from '../api/discogs'
-import { getReleaseTracklist, setReleaseGatefold, setReleaseTracklist } from '../db/collection'
+import { getReleaseTracklist, setReleaseNotes, setReleaseTracklist } from '../db/collection'
 
 interface UseReleaseTracklistResult {
   tracks: DiscogsTrack[] | null
@@ -47,7 +47,7 @@ export function useReleaseTracklist(
           setReleaseTracklist(releaseId, fetched.tracks).catch(() => {})
           // The same request carries the notes, so the cabinet's gatefold check
           // for this release comes free.
-          setReleaseGatefold(releaseId, fetched.gatefold).catch(() => {})
+          setReleaseNotes(releaseId, fetched.notes).catch(() => {})
         }
       } catch (err) {
         if (controller.signal.aborted) return

@@ -11,7 +11,6 @@ import type {
   DiscogsRelease,
   DiscogsTrack,
 } from '../types/discogs'
-import { notesSayGatefold } from '../utils/cabinet'
 
 // Same-origin /discogs proxy (vite dev + nginx) for all API calls. The app
 // cannot call the API cross-origin: Discogs' 429 rate-limit responses carry no
@@ -158,14 +157,21 @@ function moneyString(value: string | number | undefined): string {
   return ''
 }
 
-/** What the app reads from a full release: its tracklist and whether its notes say gatefold. */
+/** What the app reads from a full release: its tracklist and its notes ('' when none). */
 export interface ReleaseDetails {
   tracks: DiscogsTrack[]
-  gatefold: boolean
+  notes: string
+}
+
+/** Notes are kept for the cabinet's gatefold check; a few thousand characters is plenty. */
+const MAX_NOTES_LENGTH = 4000
+
+function notesOf(data: DiscogsRelease): string {
+  return typeof data.notes === 'string' ? data.notes.slice(0, MAX_NOTES_LENGTH) : ''
 }
 
 function releaseDetailsOf(data: DiscogsRelease): ReleaseDetails {
-  return { tracks: data.tracklist ?? [], gatefold: notesSayGatefold(data.notes) }
+  return { tracks: data.tracklist ?? [], notes: notesOf(data) }
 }
 
 export async function fetchReleaseDetails(
@@ -251,7 +257,11 @@ async function describeError(response: Response): Promise<string> {
 // - a value — cached by the caller (a 404 is how a lookup says "known missing",
 //   so it isn't requested again on every sync).
 // - undefined — the fetch failed after retries (network, timeout, 5xx,
-//   rate-limit bail); NOT cached, so the id is retried next sync.
+//   rate-limit bail, a body that isn't JSON); NOT cached, so the id is retried
+//   next sync, and one bad id doesn't stop the others.
+//
+// A 401/403 means the token is wrong for every id, so it stops the whole run
+// with a DiscogsError instead of failing each id three times.
 //
 // `onResult` streams results as they arrive so callers can progressively
 // update the UI instead of blocking until every request has finished.
@@ -305,7 +315,17 @@ async function fetchEach<T>(
         continue
       }
 
-      if (response.ok || response.status === 404) return read(response)
+      if (response.status === 401 || response.status === 403) {
+        throw new DiscogsError(await describeError(response), response.status)
+      }
+
+      if (response.ok || response.status === 404) {
+        try {
+          return await read(response)
+        } catch {
+          return undefined
+        }
+      }
 
       // Other HTTP error (5xx etc.), failed after retries: not cached.
       if (++attempts >= maxAttempts) return undefined
@@ -361,22 +381,21 @@ export function fetchMasterYears(
   )
 }
 
-// Whether each release's notes describe a gatefold sleeve. The collection
-// listing has no notes, so this is one full-release request per id, paced like
-// the master years. A removed release (404) counts as "no gatefold" and is
-// cached like any answer.
-export function fetchReleaseGatefolds(
+// Each release's notes, where pressings often mention a gatefold sleeve. The
+// collection listing has no notes, so this is one full-release request per id,
+// paced like the master years. A removed release (404) has no notes ('') and
+// is cached like any answer.
+export function fetchReleaseNotes(
   releaseIds: number[],
   token: string,
   onProgress?: (loaded: number, total: number) => void,
   signal?: AbortSignal,
-  onRelease?: (releaseId: number, gatefold: boolean) => void,
-): Promise<Record<number, boolean>> {
-  return fetchEach<boolean>(
+  onRelease?: (releaseId: number, notes: string) => void,
+): Promise<Record<number, string>> {
+  return fetchEach<string>(
     releaseIds,
     (id) => `/releases/${id}`,
-    async (response) =>
-      response.ok && releaseDetailsOf((await response.json()) as DiscogsRelease).gatefold,
+    async (response) => (response.ok ? notesOf((await response.json()) as DiscogsRelease) : ''),
     token,
     signal,
     onProgress,
