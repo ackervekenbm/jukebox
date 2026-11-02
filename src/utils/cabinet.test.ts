@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import type { DiscogsCollectionRelease } from '../types/discogs'
 import { compareReleases, type DisplayRelease } from './collection'
 import { makeSortKey } from './sortName'
-import { planCabinet, sizeClassOf, spaceUnitsOf } from './cabinet'
+import { conflictLabel, planCabinet, sizeClassOf, spaceUnitsOf } from './cabinet'
 
 interface FakeInput {
   artist: string
@@ -208,14 +208,35 @@ describe('planCabinet', () => {
     expect(plan.conflicts).toEqual([])
   })
 
-  it('flags a slot that has to mix size classes', () => {
+  it('flags shelves that have to mix sizes, once for the whole cabinet', () => {
+    // Six records alternating 12" and 7" on shelves of 3, 2 and 1: the sizes
+    // can't be kept apart, and two shelves end up mixed.
+    const releases = ['A', 'B', 'C', 'D', 'E', 'F'].map((artist, index) =>
+      fake({ artist, title: artist.toLowerCase(), formatText: index % 2 ? 'Vinyl · 7"' : 'Vinyl · 12"' }),
+    )
+    const plan = planCabinet({
+      releases,
+      cabinet: cabinetWith([3, 2, 1]),
+      options: { sort: 'chronological', separateSizeClasses: true },
+    })
+    expect(plan.slots.map((slot) => slot.sizeClass)).toEqual(['mixed', 'mixed', 'small'])
+    const sizeMix = plan.conflicts.filter((conflict) => conflict.type === 'size-mix')
+    expect(sizeMix).toEqual([{ type: 'size-mix', count: 2 }])
+    expect(conflictLabel(sizeMix[0])).toBe('Mixed record sizes on 2 shelves')
+  })
+
+  it('does not warn about mixed sizes when they are not kept apart', () => {
     const releases = [
       fake({ artist: 'A', title: 'a', formatText: 'Vinyl · 12"' }),
       fake({ artist: 'B', title: 'b', formatText: 'Vinyl · 7"' }),
     ]
-    const plan = planCabinet({ releases, cabinet: cabinetWith([10]) })
+    const plan = planCabinet({
+      releases,
+      cabinet: cabinetWith([10]),
+      options: { sort: 'chronological', separateSizeClasses: false },
+    })
     expect(plan.slots[0].sizeClass).toBe('mixed')
-    expect(plan.conflicts).toEqual([{ type: 'size-mix', slotId: 'slot-1' }])
+    expect(plan.conflicts).toEqual([])
   })
 
   it('places every record when the cabinet has no slots', () => {

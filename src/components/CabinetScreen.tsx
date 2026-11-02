@@ -267,7 +267,9 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
                     {slot.sizeClass !== null && slot.sizeClass !== 'mixed' && (
                       <span className="cabinet-tag">{SIZE_CLASS_LABELS[slot.sizeClass]}</span>
                     )}
-                    {slot.sizeClass === 'mixed' && <span className="cabinet-tag warn">Mixed sizes</span>}
+                    {slot.sizeClass === 'mixed' && options.separateSizeClasses && (
+                      <span className="cabinet-tag warn">Mixed sizes</span>
+                    )}
                     {slot.overCapacity > 0 && (
                       <span className="cabinet-tag danger">
                         {slot.overCapacity} over capacity

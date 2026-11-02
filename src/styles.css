@@ -2612,10 +2612,16 @@ button:disabled {
   color: var(--text-dim);
 }
 
-.cabinet-tag.size-mix,
+/* Shelf tags and warning chips share the same two warning levels. */
+.cabinet-tag.warn,
 .cabinet-conflict.size-mix {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.cabinet-tag.danger {
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .cabinet-record {

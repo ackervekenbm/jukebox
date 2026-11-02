@@ -354,9 +354,14 @@ export function planCabinet(input: CabinetPlanInput): CabinetPlan {
     if (plan.overCapacity > 0) {
       conflicts.push({ type: 'over-capacity', slotId: plan.slot.id, count: plan.overCapacity })
     }
-    if (plan.records.length > 1 && plan.sizeClass === 'mixed') {
-      conflicts.push({ type: 'size-mix', slotId: plan.slot.id })
-    }
+  }
+
+  // Mixed sizes only break the rule when the sizes are meant to be kept apart;
+  // with that option off, mixing is the expected layout. One warning for the
+  // whole cabinet, with how many shelves it affects.
+  if (options.separateSizeClasses) {
+    const mixed = slotPlans.filter((plan) => plan.records.length > 1 && plan.sizeClass === 'mixed')
+    if (mixed.length > 0) conflicts.push({ type: 'size-mix', count: mixed.length })
   }
 
   const artistSlots = new Map<string, Set<string>>()
@@ -386,7 +391,7 @@ export function conflictLabel(conflict: CabinetConflict): string {
     case 'over-capacity':
       return `${conflict.count} over capacity`
     case 'size-mix':
-      return 'Mixed record sizes'
+      return `Mixed record sizes on ${conflict.count} ${conflict.count === 1 ? 'shelf' : 'shelves'}`
     case 'artist-split':
       return `${conflict.artist} spans slots`
     case 'unplaced':

@@ -134,6 +134,42 @@ describe('CabinetScreen', () => {
     expect(screen.queryByText('Old name')).not.toBeInTheDocument()
   })
 
+  it('warns about mixed sizes once, and only when sizes are kept apart', () => {
+    // Alternating 12" and 7" on shelves of 3, 2 and 1: two shelves have to mix.
+    const mixed = ['A', 'B', 'C', 'D', 'E', 'F'].map((artist, index) => ({
+      ...release(artist, artist.toLowerCase()),
+      formatText: index % 2 ? 'Vinyl · 7"' : 'Vinyl · 12"',
+    }))
+    const cabinet = cabinetOf([3, 2, 1])
+    const show = (separateSizeClasses: boolean) => {
+      const options = { sort: 'chronological' as const, separateSizeClasses }
+      mock.state = {
+        cabinets: [cabinet],
+        cabinet,
+        options,
+        plan: planCabinet({ releases: mixed, cabinet, options }),
+        status: 'synced',
+        dirty: false,
+        error: null,
+        ...actions,
+      }
+      return render(
+        <CabinetScreen username="alice" token="tok" releases={mixed} onClose={vi.fn()} />,
+      )
+    }
+
+    const apart = show(true)
+    const warnings = screen.getByRole('list', { name: 'Cabinet warnings' })
+    expect(within(warnings).getAllByText(/Mixed record sizes/)).toHaveLength(1)
+    expect(within(warnings).getByText('Mixed record sizes on 2 shelves')).toBeInTheDocument()
+    expect(screen.getAllByText('Mixed sizes')).toHaveLength(2)
+    apart.unmount()
+
+    show(false)
+    expect(screen.queryByText(/Mixed record sizes/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Mixed sizes')).not.toBeInTheDocument()
+  })
+
   it('tags an empty shelf with no size at all', () => {
     // Two records over three shelves: the planner fills two, the third stays empty.
     setState([75, 75, 75])
