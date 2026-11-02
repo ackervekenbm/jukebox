@@ -2320,20 +2320,10 @@ button:disabled {
 .cabinet-name {
   flex: 1;
   min-width: 0;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 4px 8px;
-  margin-left: -8px;
+  margin: 0;
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--text);
-}
-
-.cabinet-name:hover,
-.cabinet-name:focus {
-  border-color: var(--border);
-  background: var(--bg-elevated);
 }
 
 .cabinet-sync {
@@ -2464,23 +2454,8 @@ button:disabled {
   flex-wrap: wrap;
 }
 
-.cabinet-slot-label {
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 4px 8px;
-  margin-left: -8px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.cabinet-slot-label:hover,
-.cabinet-slot-label:focus {
-  border-color: var(--border);
-  background: var(--panel);
+.cabinet-slot-tools .icon-btn {
+  margin-left: auto;
 }
 
 .cabinet-slot-capacity {

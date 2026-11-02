@@ -36,12 +36,10 @@ interface CabinetScreenProps {
 export function CabinetScreen({ username, token, releases, onClose }: CabinetScreenProps) {
   useScrollLock(true)
   const {
-    cabinet,
     options,
     plan,
     status,
     error,
-    setName,
     addSlot,
     updateSlot,
     removeSlot,
@@ -107,12 +105,7 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
 
         <div className="card-scroll">
           <header className="cabinet-head">
-            <input
-              className="cabinet-name"
-              value={cabinet.name}
-              onChange={(event) => setName(event.target.value)}
-              aria-label="Cabinet name"
-            />
+            <h2 className="cabinet-name">Record Cabinet</h2>
             <span className={`cabinet-sync ${status}`} aria-live="polite">
               {STATUS_TEXT[status]}
             </span>
@@ -208,8 +201,17 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
           )}
 
           <div className="cabinet-slots">
-            {plan.slots.map((slot) => {
+            {plan.slots.length === 0 && (
+              <p className="cabinet-empty cabinet-no-shelves">
+                No shelves yet. Add a shelf to start laying out your records.
+              </p>
+            )}
+
+            {plan.slots.map((slot, index) => {
               const isExpanded = expanded.has(slot.slot.id)
+              // Shelves are numbered by position, so the numbers stay 1…n after
+              // a shelf is removed.
+              const shelfName = `Shelf ${index + 1}`
               return (
                 <section key={slot.slot.id} className="cabinet-slot">
                   <button
@@ -219,7 +221,7 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
                     aria-expanded={isExpanded}
                     aria-controls={`cabinet-slot-${slot.slot.id}`}
                   >
-                    <span className="cabinet-slot-toggle-label">{slot.slot.label}</span>
+                    <span className="cabinet-slot-toggle-label">{shelfName}</span>
                     <span className="cabinet-slot-count" title="Record spaces used">
                       {slot.used.toLocaleString()} / {slot.slot.capacity.toLocaleString()}
                     </span>
@@ -241,18 +243,12 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
                   {isExpanded && (
                     <div id={`cabinet-slot-${slot.slot.id}`} className="cabinet-slot-body">
                       <div className="cabinet-slot-tools">
-                        <input
-                          className="cabinet-slot-label"
-                          value={slot.slot.label}
-                          onChange={(event) => updateSlot(slot.slot.id, { label: event.target.value })}
-                          aria-label="Shelf name"
-                        />
                         <label className="cabinet-slot-capacity">
                           <span>Capacity</span>
                           <input
                             type="number"
                             min={1}
-                            aria-label={`Capacity of ${slot.slot.label}`}
+                            aria-label={`Capacity of ${shelfName}`}
                             value={slot.slot.capacity}
                             onChange={(event) => {
                               const capacity = Math.max(1, Math.round(Number(event.target.value) || 1))
@@ -264,9 +260,8 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
                           type="button"
                           className="icon-btn"
                           onClick={() => removeSlot(slot.slot.id)}
-                          disabled={cabinet.slots.length <= 1}
                           title="Remove shelf"
-                          aria-label={`Remove ${slot.slot.label}`}
+                          aria-label={`Remove ${shelfName}`}
                         >
                           <TrashIcon />
                         </button>

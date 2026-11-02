@@ -83,8 +83,9 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   enters the browser bundle).
 - `src/utils/cabinet.ts` — the shelf-layout engine (`planCabinet`): shelves
   follow the selected artist/title/year order, keeping artists together.
-  Optionally it groups 12" and 7"/10" onto separate shelves (size class read
-  from each release's format text); that mode orders the size groups by their
+  Optionally it groups 12" and 7"/10" onto separate shelves (size class:
+  an explicit inch size in the format text wins, otherwise vinyl formats are
+  12" and anything else — CD, cassette, file — is "other"); that mode orders the size groups by their
   earliest record so the cabinet still starts with the earliest artist. It
   counts a gatefold sleeve as two capacity spaces and reports size-mix /
   artist-split / unplaced conflicts. Layout is fully automatic — there are no

@@ -57,7 +57,6 @@ function cabinetOf(capacities: number[]): Cabinet {
 }
 
 const actions = {
-  setName: vi.fn(),
   addSlot: vi.fn(),
   updateSlot: vi.fn(),
   removeSlot: vi.fn(),
@@ -68,7 +67,10 @@ const actions = {
 }
 
 function setState(capacities: number[], status = 'synced') {
-  const cabinet = cabinetOf(capacities)
+  setCabinet(cabinetOf(capacities), status)
+}
+
+function setCabinet(cabinet: Cabinet, status = 'synced') {
   mock.state = {
     cabinets: [cabinet],
     cabinet,
@@ -97,22 +99,58 @@ describe('CabinetScreen', () => {
   it('shows the cabinet, both shelves and the placed count', () => {
     renderScreen()
 
-    expect(screen.getByLabelText('Cabinet name')).toHaveValue('Cabinet')
+    expect(screen.getByRole('heading', { name: 'Record Cabinet' })).toBeInTheDocument()
     expect(screen.getAllByText('Shelf 1')).toHaveLength(1)
     expect(screen.getAllByText('Shelf 2')).toHaveLength(1)
     expect(screen.getByText(/2 releases · 2 placed/)).toBeInTheDocument()
     expect(screen.queryByText(/without a slot/)).not.toBeInTheDocument()
   })
 
-  it('renames the cabinet and shelves', () => {
+  it('has no name fields for the cabinet or its shelves', () => {
+    renderScreen()
+    fireEvent.click(screen.getByRole('button', { name: /Shelf 1/ }))
+
+    expect(screen.queryByLabelText('Cabinet name')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Shelf name')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Capacity of Shelf 1')).toBeInTheDocument()
+  })
+
+  it('numbers shelves by position, whatever their ids and stored labels', () => {
+    setCabinet({
+      id: 'main',
+      name: 'Old name',
+      slots: [
+        { id: 'slot-1', label: 'Kitchen', capacity: 75 },
+        { id: 'slot-3', label: 'Shelf 3', capacity: 75 },
+      ],
+    })
     renderScreen()
 
-    fireEvent.change(screen.getByLabelText('Cabinet name'), { target: { value: 'Loft' } })
-    expect(actions.setName).toHaveBeenCalledWith('Loft')
+    expect(screen.getByRole('button', { name: /Shelf 1/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Shelf 2/ })).toBeInTheDocument()
+    expect(screen.queryByText('Kitchen')).not.toBeInTheDocument()
+    expect(screen.queryByText('Shelf 3')).not.toBeInTheDocument()
+    expect(screen.queryByText('Old name')).not.toBeInTheDocument()
+  })
 
+  it('removes the last shelf too', () => {
+    setState([75])
+    renderScreen()
     fireEvent.click(screen.getByRole('button', { name: /Shelf 1/ }))
-    fireEvent.change(screen.getAllByLabelText('Shelf name')[0], { target: { value: 'Wall A' } })
-    expect(actions.updateSlot).toHaveBeenCalledWith('slot-1', { label: 'Wall A' })
+
+    const remove = screen.getByRole('button', { name: 'Remove Shelf 1' })
+    expect(remove).toBeEnabled()
+    fireEvent.click(remove)
+    expect(actions.removeSlot).toHaveBeenCalledWith('slot-1')
+  })
+
+  it('says what to do when there are no shelves', () => {
+    setState([])
+    renderScreen()
+
+    expect(screen.getByText(/No shelves yet/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add shelf' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Without a shelf/ })).toHaveTextContent('2 records')
   })
 
   it('adds a shelf', () => {

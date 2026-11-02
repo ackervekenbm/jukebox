@@ -9,7 +9,8 @@ export const slotSchema = z.object({
 export const cabinetSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
-  slots: z.array(slotSchema).min(1),
+  // Empty is valid: removing every shelf is how you start the layout over.
+  slots: z.array(slotSchema),
 })
 
 export const cabinetDocSchema = z.object({

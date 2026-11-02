@@ -35,16 +35,24 @@ function inchesOf(display: DisplayRelease): number | null {
   return max
 }
 
+/** Discogs format names for records cut on a disc, as opposed to CD, cassette or file. */
+const VINYL_FORMATS = new Set(['vinyl', 'lathe cut', 'acetate', 'flexi-disc', 'shellac'])
+
+function isVinyl(display: DisplayRelease): boolean {
+  return display.formatNames.some((name) => VINYL_FORMATS.has(name.trim().toLowerCase()))
+}
+
 /**
- * The size bucket a release belongs to. Discogs describes sizes in the format
- * descriptions ("12\"", "7\"", "LP"), so we read the largest explicit inch
- * measurement and fall back to "other" rather than guessing — a CD collection
- * then gets its own shelf instead of being filed with the vinyl.
+ * The size bucket a release belongs to. Discogs usually leaves the size off an
+ * LP ("Vinyl · LP · Album"), so vinyl counts as 12" unless the format states a
+ * smaller size ("7\"", "10\""); with several sizes in one release the largest
+ * wins. Only releases that aren't vinyl at all (CD, cassette, file) are "other",
+ * so they get their own shelf instead of being filed with the records.
  */
 export function sizeClassOf(display: DisplayRelease): SizeClass {
   const inches = inchesOf(display)
-  if (inches === null) return 'other'
-  return inches >= 12 ? '12-inch' : 'small'
+  if (inches !== null) return inches >= 12 ? '12-inch' : 'small'
+  return isVinyl(display) ? '12-inch' : 'other'
 }
 
 /**

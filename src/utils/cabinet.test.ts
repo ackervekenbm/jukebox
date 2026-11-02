@@ -20,6 +20,7 @@ let counter = 0
 function fake(input: FakeInput): DisplayRelease {
   const id = input.id ?? ++counter
   const year = input.year ?? 2020
+  const formatText = input.formatText ?? 'Vinyl · 12" · LP'
   return {
     key: `${id}-${id}`,
     instanceId: id,
@@ -33,8 +34,9 @@ function fake(input: FakeInput): DisplayRelease {
     styles: [],
     labels: [],
     country: '',
-    formatNames: ['Vinyl'],
-    formatText: input.formatText ?? 'Vinyl · 12" · LP',
+    // Like real data: the format name is what the format text starts with.
+    formatNames: [formatText.split(' · ')[0]],
+    formatText,
     coverImage: '',
     thumb: '',
     release: {} as DiscogsCollectionRelease,
@@ -67,9 +69,37 @@ describe('sizeClassOf', () => {
     )
   })
 
-  it('falls back to other when no size is stated', () => {
-    expect(sizeClassOf(fake({ artist: 'A', title: 'T', formatText: 'CD · Album' }))).toBe('other')
-    expect(sizeClassOf(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · LP' }))).toBe('other')
+  it('counts vinyl without a stated size as 12 inch', () => {
+    expect(sizeClassOf(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · LP · Album' }))).toBe(
+      '12-inch',
+    )
+    expect(sizeClassOf(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · Single' }))).toBe(
+      '12-inch',
+    )
+  })
+
+  it('only files records as small when a smaller size is stated', () => {
+    expect(sizeClassOf(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · 7" · 45 RPM' }))).toBe(
+      'small',
+    )
+    expect(
+      sizeClassOf({ ...fake({ artist: 'A', title: 'T', formatText: 'Shellac · 10"' }), formatNames: ['Shellac'] }),
+    ).toBe('small')
+  })
+
+  it('keeps formats that are not vinyl apart as other', () => {
+    const cd = { ...fake({ artist: 'A', title: 'T', formatText: 'CD · Album' }), formatNames: ['CD'] }
+    const tape = { ...fake({ artist: 'A', title: 'T', formatText: 'Cassette · Album' }), formatNames: ['Cassette'] }
+    expect(sizeClassOf(cd)).toBe('other')
+    expect(sizeClassOf(tape)).toBe('other')
+  })
+
+  it('treats a box set with vinyl inside as vinyl', () => {
+    const box = {
+      ...fake({ artist: 'A', title: 'T', formatText: 'Box Set / Vinyl · LP' }),
+      formatNames: ['Box Set', 'Vinyl'],
+    }
+    expect(sizeClassOf(box)).toBe('12-inch')
   })
 
   it('uses the largest stated size in a multi-disc set', () => {

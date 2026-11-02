@@ -27,7 +27,25 @@ export function defaultCabinetSlot(index: number): Slot {
 
 /** A starter cabinet: two shelves, roughly the size of a real LP shelf. */
 export function defaultCabinet(): Cabinet {
-  return { id: 'main', name: 'Cabinet', slots: [defaultCabinetSlot(1), defaultCabinetSlot(2)] }
+  return {
+    id: 'main',
+    name: 'Record Cabinet',
+    slots: [defaultCabinetSlot(1), defaultCabinetSlot(2)],
+  }
+}
+
+/**
+ * An id for a new shelf that no existing shelf uses: one past the highest
+ * `slot-<n>`. Counting the shelves instead would reuse an id after a shelf in
+ * the middle was removed, and two shelves would then share placements.
+ */
+export function nextSlotId(slots: Slot[]): string {
+  let highest = 0
+  for (const slot of slots) {
+    const match = /^slot-(\d+)$/.exec(slot.id)
+    if (match) highest = Math.max(highest, Number(match[1]))
+  }
+  return `slot-${highest + 1}`
 }
 
 /** The synced document for a computed layout, stamped with the current time. */
@@ -71,7 +89,6 @@ export interface UseCabinetResult {
   status: CabinetStatus
   dirty: boolean
   error: string | null
-  setName: (name: string) => void
   addSlot: (capacity?: number) => void
   updateSlot: (slotId: string, patch: Partial<Slot>) => void
   removeSlot: (slotId: string) => void
@@ -223,13 +240,6 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
     persist(doc, revision, true)
   }, [dirty, enabled, doc, revision, username, persist])
 
-  const setName = useCallback((name: string) => {
-    setCabinets((current) =>
-      current.map((entry, index) => (index === 0 ? { ...entry, name } : entry)),
-    )
-    setDirty(true)
-  }, [])
-
   const addSlot = useCallback((capacity?: number) => {
     setCabinets((current) => {
       const first = current[0]
@@ -237,15 +247,16 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
         typeof capacity === 'number' && Number.isFinite(capacity) && capacity > 0
           ? Math.max(1, Math.round(capacity))
           : DEFAULT_SHELF_CAPACITY
-      const nextIndex = first.slots.length + 1
+      // The label is stored for the sync schema; the screen numbers shelves by
+      // position instead.
       return [
         {
           ...first,
           slots: [
             ...first.slots,
             {
-              id: `slot-${nextIndex}`,
-              label: `Shelf ${nextIndex}`,
+              id: nextSlotId(first.slots),
+              label: `Shelf ${first.slots.length + 1}`,
               capacity: cap,
             },
           ],
@@ -275,7 +286,6 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
   const removeSlot = useCallback((slotId: string) => {
     setCabinets((current) => {
       const first = current[0]
-      if (first.slots.length <= 1) return current
       return [
         { ...first, slots: first.slots.filter((slot) => slot.id !== slotId) },
         ...current.slice(1),
@@ -323,7 +333,6 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
     status,
     dirty,
     error,
-    setName,
     addSlot,
     updateSlot,
     removeSlot,
