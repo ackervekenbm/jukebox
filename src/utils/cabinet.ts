@@ -2,7 +2,7 @@
 // Copyright (C) 2025-2026 ackervekenbm
 
 import type { Cabinet, Slot } from '../shared/cabinetDoc'
-import type { DisplayRelease } from './collection'
+import { compareReleases, compareYears, sortYear, type DisplayRelease } from './collection'
 import { compareSortKeys, makeSortKey } from './sortName'
 
 /** Physical size buckets the planner keeps apart where it can. */
@@ -124,21 +124,28 @@ interface SortedRecord {
   artistKey: string
 }
 
+/**
+ * Shelf order, built from the main view's sort rules: artists by their filing
+ * name (articles and accents ignored), and inside an artist the main view's
+ * year-then-title order, so a shelf reads like the artist's row on screen.
+ * Years are the original (master) year, as in the main view.
+ */
 function compareSortedRecords(
   a: SortedRecord,
   b: SortedRecord,
   sort: CabinetSortMode,
 ): number {
-  const yearOf = (record: SortedRecord) =>
-    record.display.year > 0 ? record.display.year : Number.MAX_SAFE_INTEGER
   const artistOrder = compareSortKeys(a.artistKey, b.artistKey)
-  const titleOrder = compareSortKeys(a.display.titleKey, b.display.titleKey)
-  const yearOrder = yearOf(a) - yearOf(b)
   const keyOrder = a.display.key.localeCompare(b.display.key)
 
-  if (sort === 'title') return titleOrder || yearOrder || artistOrder || keyOrder
-  if (sort === 'year') return yearOrder || artistOrder || titleOrder || keyOrder
-  return artistOrder || yearOrder || titleOrder || keyOrder
+  if (sort === 'title') {
+    return compareReleases(a.display, b.display, 'byName') || artistOrder || keyOrder
+  }
+  if (sort === 'year') {
+    const yearOrder = compareYears(sortYear(a.display), sortYear(b.display))
+    return yearOrder || artistOrder || compareReleases(a.display, b.display, 'byName') || keyOrder
+  }
+  return artistOrder || compareReleases(a.display, b.display, 'chronological') || keyOrder
 }
 
 function sortKeyed(

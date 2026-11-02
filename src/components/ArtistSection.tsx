@@ -8,8 +8,12 @@ import type {
   ArtistSortMode,
   PressingGroup,
 } from '../utils/collection'
-import { countUniqueAlbums, groupPressings, sortPressingGroups } from '../utils/collection'
-import { compareSortKeys } from '../utils/sortName'
+import {
+  compareReleases,
+  countUniqueAlbums,
+  groupPressings,
+  sortPressingGroups,
+} from '../utils/collection'
 import { ReleaseCard } from './ReleaseCard'
 import { StackCard } from './StackCard'
 import { ChevronIcon } from './icons'
@@ -32,21 +36,10 @@ export function ArtistSection({
 }: ArtistSectionProps) {
   const [collapsed, setCollapsed] = useState(false)
 
-  const sorted = useMemo(() => {
-    const list = [...artist.releases]
-    const yearOf = (display: (typeof list)[number]) => display.originalYear || display.year || 0
-    if (sortMode === 'chronological') {
-      list.sort(
-        (a, b) =>
-          yearOf(a) - yearOf(b) || compareSortKeys(a.titleKey, b.titleKey),
-      )
-    } else {
-      list.sort(
-        (a, b) => compareSortKeys(a.titleKey, b.titleKey) || yearOf(a) - yearOf(b),
-      )
-    }
-    return list
-  }, [artist.releases, sortMode])
+  const sorted = useMemo(
+    () => [...artist.releases].sort((a, b) => compareReleases(a, b, sortMode)),
+    [artist.releases, sortMode],
+  )
 
   const albumGroups = useMemo(
     () => (grouped ? sortPressingGroups(groupPressings(sorted), sortMode) : []),

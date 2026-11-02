@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2025-2026 ackervekenbm
 
-import type { DisplayRelease } from '../utils/collection'
+import { sortYear, type DisplayRelease } from '../utils/collection'
 import { useScrollLock } from '../hooks/useScrollLock'
 import { useCabinet, type CabinetStatus } from '../hooks/useCabinet'
 import { SIZE_CLASS_LABELS, conflictLabel, spaceUnitsOf } from '../utils/cabinet'
@@ -81,7 +81,7 @@ export function CabinetScreen({ username, token, releases, onClose }: CabinetScr
         <span className="cabinet-record-title">{record.title}</span>
         <span className="cabinet-record-artist">{record.artistName}</span>
       </span>
-      {record.year > 0 && <span className="cabinet-record-year">{record.year}</span>}
+      {sortYear(record) > 0 && <span className="cabinet-record-year">{sortYear(record)}</span>}
       {spaceUnitsOf(record) > 1 && (
         <span className="cabinet-record-space" title="Gatefold — takes two spaces">
           2 spaces

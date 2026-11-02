@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest'
 import type { DiscogsCollectionRelease } from '../types/discogs'
-import type { DisplayRelease } from './collection'
+import { compareReleases, type DisplayRelease } from './collection'
 import { makeSortKey } from './sortName'
 import { planCabinet, sizeClassOf, spaceUnitsOf } from './cabinet'
 
@@ -116,6 +116,37 @@ describe('spaceUnitsOf', () => {
 
   it('counts a standard sleeve as one space', () => {
     expect(spaceUnitsOf(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · 12" · LP' }))).toBe(1)
+  })
+})
+
+describe('planCabinet sorting', () => {
+  // One artist: a 2015 reissue of a 1971 album, a 1980 album and an undated one.
+  const reissue = { ...fake({ id: 1, artist: 'The Band', title: 'Zulu', year: 2015 }), originalYear: 1971 }
+  const eighties = fake({ id: 2, artist: 'The Band', title: 'Alpha', year: 1980 })
+  const undated = { ...fake({ id: 3, artist: 'The Band', title: 'Mid', year: 0 }), originalYear: 0 }
+  const other = fake({ id: 4, artist: 'Abba', title: 'Waterloo', year: 1974 })
+  const shelf = (sort: 'artist' | 'title' | 'year') =>
+    planCabinet({
+      releases: [undated, eighties, reissue, other],
+      cabinet: cabinetWith([10]),
+      options: { sort, separateSizeClasses: false },
+    }).slots[0].records.map((record) => record.display.title)
+
+  it('files an artist the way the main view lists it', () => {
+    // "The Band" files under B, after Abba; inside it, the main view's order.
+    const mainView = [undated, eighties, reissue]
+      .sort((a, b) => compareReleases(a, b, 'chronological'))
+      .map((d) => d.title)
+    expect(shelf('artist')).toEqual(['Waterloo', ...mainView])
+    expect(mainView).toEqual(['Zulu', 'Alpha', 'Mid'])
+  })
+
+  it('sorts by original year, not pressing year, with undated records last', () => {
+    expect(shelf('year')).toEqual(['Zulu', 'Waterloo', 'Alpha', 'Mid'])
+  })
+
+  it('sorts by title like the main view\'s A–Z', () => {
+    expect(shelf('title')).toEqual(['Alpha', 'Mid', 'Waterloo', 'Zulu'])
   })
 })
 

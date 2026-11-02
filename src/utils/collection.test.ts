@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import {
   activeFilterCount,
   artistDisplayName,
+  compareReleases,
   computeCollectionStats,
   countUniqueAlbums,
   creditedArtists,
@@ -502,6 +503,31 @@ describe('groupPressings', () => {
     const input = [one, two]
     groupPressings(input)
     expect(input.map((d) => d.id)).toEqual([1, 2])
+  })
+})
+
+describe('compareReleases', () => {
+  // A 2015 reissue of a 1971 album, a 1980 album, and one with no year at all.
+  const reissue = toDisplayRelease(
+    release({ id: 1, instance_id: 1, basic_information: { ...basic, title: 'Zulu', master_id: 71, year: 2015 } }),
+    { 71: 1971 },
+  )
+  const eighties = toDisplayRelease(
+    release({ id: 2, instance_id: 2, basic_information: { ...basic, title: 'Alpha', master_id: 80, year: 1980 } }),
+    { 80: 1980 },
+  )
+  const undated = toDisplayRelease(
+    release({ id: 3, instance_id: 3, basic_information: { ...basic, title: 'Mid', master_id: null, year: 0 } }),
+  )
+  const order = (mode: 'chronological' | 'byName') =>
+    [undated, eighties, reissue].sort((a, b) => compareReleases(a, b, mode)).map((d) => d.title)
+
+  it('orders by original year, not pressing year, with undated releases last', () => {
+    expect(order('chronological')).toEqual(['Zulu', 'Alpha', 'Mid'])
+  })
+
+  it('orders by title in name mode', () => {
+    expect(order('byName')).toEqual(['Alpha', 'Mid', 'Zulu'])
   })
 })
 
