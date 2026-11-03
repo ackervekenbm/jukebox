@@ -2611,7 +2611,8 @@ button:disabled {
   font-weight: 600;
 }
 
-.cabinet-conflict-hint {
+/* Two classes, so it wins over .cabinet-hint's margin: 0 further down. */
+.cabinet-hint.cabinet-conflict-hint {
   margin-top: 8px;
 }
 

@@ -241,6 +241,23 @@ describe('CabinetScreen', () => {
       expect(screen.queryByText(/keep every size on shelves of its own/)).not.toBeInTheDocument()
     })
 
+    it('says how many shelves are missing when there are fewer shelves than sizes', () => {
+      // An LP, a single and a CD on one shelf: no capacity can keep them apart.
+      const cd = release('Gamma', 'Disc', { formatNames: ['CD'], formatText: 'CD · Album' })
+      const single = release('Delta', 'Seven', { formatText: 'Vinyl · 7"' })
+      const cabinet = cabinetOf([75])
+      setState(
+        cabinet,
+        planOf(cabinet, [{ records: [onShelf(releases[0]), onShelf(single), onShelf(cd)], sizeClass: 'mixed' }], {
+          conflicts: [{ type: 'size-mix', count: 1 }],
+        }),
+      )
+      renderScreen(vi.fn(), [releases[0], single, cd])
+      expect(
+        screen.getByText('Each size needs a shelf of its own: add 2 more shelves to keep them apart.'),
+      ).toBeInTheDocument()
+    })
+
     it('tags an empty shelf with no size at all', () => {
       const cabinet = cabinetOf([75, 75])
       setState(cabinet, planOf(cabinet, [{ records: [onShelf(releases[0])] }]))
