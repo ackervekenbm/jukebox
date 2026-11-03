@@ -83,10 +83,10 @@ docker tag jukebox:latest registry.example.com/jukebox:latest
 docker push registry.example.com/jukebox:latest
 ```
 
-## Building for a Raspberry Pi on another machine
+## Building for an arm64 host on another machine
 
-Build on the Pi itself if you can: it is slower than a desktop, but needs no
-emulation. To build on an amd64 machine instead:
+Build on the host itself if you can: a small ARM board is slower than a
+desktop, but needs no emulation. To build on an amd64 machine instead:
 
 1. **Docker Engine on Linux only:** teach the kernel to run arm64 programs
    through QEMU emulation. Docker Desktop already can, so skip this step there.
@@ -110,28 +110,28 @@ emulation. To build on an amd64 machine instead:
    docker buildx build --platform linux/arm64 -t jukebox:latest --load .
    ```
 
-3. **Copy the image to the Pi** (or push it to a registry, above). This pipes it
-   over SSH, so the Pi user needs to run `docker` without a password prompt
+3. **Copy the image to the host** (or push it to a registry, above). This pipes it
+   over SSH, so your user there needs to run `docker` without a password prompt
    (membership in the `docker` group, or passwordless `sudo`):
 
    ```bash
-   docker save jukebox:latest | gzip | ssh pi 'gunzip | docker load'
+   docker save jukebox:latest | gzip | ssh server 'gunzip | docker load'
    ```
 
-   If your Pi user needs a password for `sudo docker`, copy the file first:
+   If your user there needs a password for `sudo docker`, copy the file first:
 
    ```bash
    docker save jukebox:latest | gzip > jukebox.tar.gz
-   scp jukebox.tar.gz pi:
-   ssh -t pi 'gunzip -c jukebox.tar.gz | sudo docker load'
+   scp jukebox.tar.gz server:
+   ssh -t server 'gunzip -c jukebox.tar.gz | sudo docker load'
    ```
 
-4. **Start it on the Pi without `--build`**, from a checkout of the same commit
+4. **Start it on the host without `--build`**, from a checkout of the same commit
    (for the compose file), so compose uses the loaded image instead of building
    again:
 
    ```bash
-   docker compose up -d       # add sudo if your Pi user isn't in the docker group
+   docker compose up -d       # add sudo if your user isn't in the docker group
    ```
 
 ## Updating

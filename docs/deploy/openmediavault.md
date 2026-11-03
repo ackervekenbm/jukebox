@@ -2,8 +2,8 @@
 
 Part of the [deployment guides](README.md).
 
-The reference deployment: a Raspberry Pi running **OpenMediaVault** with
-omv-extras and the **Compose** plugin, on a 64-bit OS. One container, managed
+The reference deployment: **OpenMediaVault** with omv-extras and the
+**Compose** plugin, on a 64-bit OS. One container, managed
 entirely from the OMV web UI.
 
 OMV's own web UI uses port **80** (and **443** if you turned on its SSL), so the
@@ -12,16 +12,15 @@ port, `3000`, is fixed: only the host side is yours.
 
 ## Prerequisites
 
-- **OpenMediaVault itself.** On a Pi it goes on top of **Raspberry Pi OS Lite
-  (64-bit)**; the desktop version isn't supported. Follow the omv-extras guide
-  [Installing OMV8 on a Raspberry Pi](https://wiki.omv-extras.org/doku.php?id=omv8:raspberry_pi_install),
-  whose install script also sets up **omv-extras**. On other hardware, see the
+- **OpenMediaVault itself**: see the
   [OMV installation docs](https://docs.openmediavault.org/en/stable/installation/index.html).
+  On ARM boards, the [omv-extras wiki](https://wiki.omv-extras.org/) has an
+  install guide per board, whose script also sets up **omv-extras**.
 - **omv-extras** with the docker repo enabled in **System → omv-extras**.
 - **`openmediavault-compose`** installed (**System → Plugins**). It installs the
   Docker engine too. **Services → Compose** then has, among others, the
   *Settings*, *Files*, *Services* and *Schedule* tabs used below.
-- **A 64-bit OS**, i.e. the 64-bit Raspberry Pi OS image
+- **A 64-bit OS** (`amd64` or `arm64`)
   ([why](README.md#the-contract-every-route-shares)).
 - **Two shared folders.** Create them first in **Storage → Shared Folders →
   Create** (`+`), e.g. `compose` and `data` on your data disk, then pick them in
@@ -68,10 +67,10 @@ port, `3000`, is fixed: only the host side is yours.
 6. **Save**.
 7. Select the entry → **Check** if you want compose to validate the file, then
    **Up**. That pulls the image and starts the container.
-8. Open `http://<pi-ip>:8080`.
+8. Open `http://<host-ip>:8080`.
 
 Verify: **Services → Compose → Services** lists the container as running, and
-`http://<pi-ip>:8080/api/health` returns `{"ok":true,"db":true}`.
+`http://<host-ip>:8080/api/health` returns `{"ok":true,"db":true}`.
 
 ## What that file does
 

@@ -74,11 +74,11 @@ All settings are environment variables; the full list is in
 
 **64-bit only.** The image is published for `amd64` and `arm64` only, and the
 SQLite library (`better-sqlite3`) ships no 32-bit ARM build. Installs never
-compile anything, so there is no fallback either. On a Raspberry Pi, `uname -m`
-must say `aarch64`, not `armv7l`. On 32-bit Raspberry Pi OS the image fails with
+compile anything, so there is no fallback either. On an ARM board, `uname -m`
+must say `aarch64`, not `armv7l`. On a 32-bit OS the image fails with
 `exec format error`, and a source checkout builds but stops at start-up with
-`Cannot find module …/better_sqlite3.node`. Install the 64-bit Raspberry Pi OS
-image.
+`Cannot find module …/better_sqlite3.node`. Install the 64-bit version of the
+OS; the hardware usually supports it.
 
 ## Common mistakes
 

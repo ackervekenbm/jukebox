@@ -18,7 +18,7 @@ ghcr.io/ackervekenbm/jukebox
   `docker` group (`sudo usermod -aG docker $USER`, then log in again; that group
   is equivalent to root on this machine). Otherwise put `sudo` in front of each
   `docker` command.
-- A 64-bit `amd64` or `arm64` host. On a Raspberry Pi that means the 64-bit OS
+- A 64-bit `amd64` or `arm64` host. On an ARM board that means a 64-bit OS
   ([why](README.md#the-contract-every-route-shares)).
 - No source, Node or login: the image is public.
 
@@ -32,7 +32,7 @@ ghcr.io/ackervekenbm/jukebox
 | `:<full-sha>-amd64`, `:<full-sha>-arm64` | One commit, one architecture |
 
 `:latest` and `:<sha7>` are multi-arch: Docker picks the right architecture for
-the host, so the same compose file works on an x86 box and on a Raspberry Pi.
+the host, so the same compose file works on an x86 box and on an ARM board.
 Images are only built from `main`, and only when app paths change (`src/**`,
 `Dockerfile`, `package.json`, …): a docs-only merge leaves `:latest` as it was
 and gets no tag of its own.
