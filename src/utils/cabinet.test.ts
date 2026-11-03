@@ -445,6 +445,43 @@ describe('planCabinet', () => {
     expect(plan.conflicts).toEqual([])
   })
 
+  it('keeps the reading order when the sizes have to share a shelf', () => {
+    // Seven shelves of 70; 430 LPs need a little more than six shelves, so the
+    // 40 singles can't have a shelf of their own and share the seventh. Like
+    // the real cabinet that showed the bug: every shelf is nearly full.
+    const artist = (i: number) => `Artist ${String(i).padStart(3, '0')}`
+    const lps = Array.from({ length: 430 }, (_, i) =>
+      fake({ artist: artist(i), title: 'lp', formatText: 'Vinyl · LP' }),
+    )
+    const singles = Array.from({ length: 40 }, (_, i) =>
+      fake({ artist: artist(i * 3), title: 'single', formatText: 'Vinyl · 7"' }),
+    )
+    const plan = planCabinet({
+      releases: [...singles, ...lps],
+      cabinet: cabinetWith([70, 70, 70, 70, 70, 70, 70]),
+      options: { sort: 'chronological', separateSizeClasses: true },
+    })
+
+    // Shelves 1–6 are LPs only; the seventh holds the last LPs, then singles.
+    expect(plan.slots.slice(0, 6).map((slot) => slot.sizeClass)).toEqual(Array(6).fill('12-inch'))
+    const seventh = plan.slots[6].records.map((record) => sizeClassOf(record.display))
+    const firstSingle = seventh.indexOf('small')
+    expect(firstSingle).toBeGreaterThan(0)
+    expect(seventh.slice(0, firstSingle).every((size) => size === '12-inch')).toBe(true)
+    expect(seventh.slice(firstSingle).every((size) => size === 'small')).toBe(true)
+
+    // Reading the shelves in turn gives the LPs A–Z, then the singles A–Z.
+    const read = plan.slots.flatMap((slot) => slot.records.map((record) => record.display))
+    const lpOrder = read.filter((display) => display.title === 'lp').map((display) => display.artistName)
+    const singleOrder = read.filter((display) => display.title === 'single').map((display) => display.artistName)
+    expect(lpOrder).toEqual([...lpOrder].sort())
+    expect(singleOrder).toEqual([...singleOrder].sort())
+    expect(read.findIndex((display) => display.title === 'single')).toBe(430)
+
+    expect(plan.unplaced).toEqual([])
+    expect(plan.conflicts).toEqual([{ type: 'size-mix', count: 1 }])
+  })
+
   it('mixes sizes only when the shelves cannot keep them apart, with one warning', () => {
     // Three 12" and three 7" on shelves of 4 and 2: the 7"s need three spaces
     // and the second shelf has two, so one 7" joins the 12"s.
@@ -458,6 +495,12 @@ describe('planCabinet', () => {
     })
     expect(plan.slots.map((slot) => slot.sizeClass)).toEqual(['mixed', 'small'])
     expect(plan.unplaced).toEqual([])
+    // The LPs, then the singles, in order: nothing back-filled out of order.
+    expect(plan.slots.map((slot) => slot.records.map((record) => record.display.artistName))).toEqual([
+      ['A', 'C', 'E', 'B'],
+      ['D', 'F'],
+    ])
+    expect(plan.conflicts.map((conflict) => conflict.type)).toEqual(['size-mix'])
     const sizeMix = plan.conflicts.filter((conflict) => conflict.type === 'size-mix')
     expect(sizeMix).toEqual([{ type: 'size-mix', count: 1 }])
     expect(conflictLabel(sizeMix[0])).toBe('Mixed sizes on 1 shelf')
@@ -630,8 +673,13 @@ describe('planCabinet', () => {
       options: { sort: 'chronological', separateSizeClasses: true },
     })
     expect(plan.unplaced).toEqual([])
-    expect(plan.slots[0].records).toHaveLength(5)
-    expect(plan.slots[1].records).toHaveLength(10)
+    // Three sizes on two shelves can't be kept apart: they follow each other,
+    // spread evenly, so the order reads straight through.
+    const read = (index: number) => plan.slots[index].records.map((record) => record.display.title)
+    // (The groups go in the order of their first artist: A, then O, then S.)
+    expect(read(0)).toEqual(['a', 'b', 'c', 'o12', 'o13', 'o14', 'o15', 's4'])
+    expect(read(1)).toEqual(['s5', 's6', 's7', 's8', 's9', 's10', 's11'])
+    expect(plan.conflicts).toEqual([{ type: 'size-mix', count: 1 }])
   })
 
   it('reports an artist split across slots', () => {

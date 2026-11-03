@@ -108,8 +108,13 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   on separate shelves: each size group (ordered by its earliest record, so the
   cabinet still starts with the earliest artist) gets its own run of shelves
   (`shelfShares`: enough to fit, spare shelves to the fullest groups) and is
-  spread evenly over it; only when the shelves can't hold the groups apart
-  does one walk over all shelves mix them.
+  spread evenly over it. When the shelves can't hold the groups apart, the
+  groups still follow each other in order (spread evenly when that fits,
+  else each shelf filled before the next, so nothing is stranded), so only
+  the shelf where one size ends and the next begins is shared. A
+  shelf's records are always listed in that planned order (size group, then
+  artist, then Year/A–Z), never re-sorted on their own, so reading the shelves
+  in turn never jumps back in the alphabet.
   Shelf space (`spaceUnitsOf`): one per disc of the release's largest
   vinyl size (2×LP = 2; a bonus 7" in an LP adds nothing), or 2 for a
   gatefold, whichever is larger. Gatefold detection (`mentionsGatefold`)
