@@ -445,6 +445,37 @@ describe('planCabinet', () => {
     expect(plan.conflicts).toEqual([])
   })
 
+  it('keeps the reading order when the sizes have to share a shelf', () => {
+    // Seven shelves of 70; 430 LPs need a little more than six shelves, so the
+    // 40 singles can't have a shelf of their own and share the seventh. Like
+    // the real cabinet that showed the bug: every shelf is nearly full.
+    const artist = (i: number) => `Artist ${String(i).padStart(3, '0')}`
+    const lps = Array.from({ length: 430 }, (_, i) =>
+      fake({ artist: artist(i), title: 'lp', formatText: 'Vinyl · LP' }),
+    )
+    const singles = Array.from({ length: 40 }, (_, i) =>
+      fake({ artist: artist(i * 3), title: 'single', formatText: 'Vinyl · 7"' }),
+    )
+    const plan = planCabinet({
+      releases: [...singles, ...lps],
+      cabinet: cabinetWith([70, 70, 70, 70, 70, 70, 70]),
+      options: { sort: 'chronological', separateSizeClasses: true },
+    })
+
+    // Shelves 1–6 are LPs only, spread evenly; the seventh holds the last
+    // 22 LPs, then the 40 singles.
+    expect(plan.slots.map((slot) => slot.records.length)).toEqual([68, 68, 68, 68, 68, 68, 62])
+    expect(plan.slots.slice(0, 6).map((slot) => slot.sizeClass)).toEqual(Array(6).fill('12-inch'))
+    // Reading the shelves in turn gives every LP A–Z, then every single A–Z:
+    // shelf 7 holds the last 22 LPs, not singles first with LPs after them.
+    const read = plan.slots.flatMap((slot) => slot.records.map((record) => record.display.key))
+    const bySinglesArtist = [...singles].sort((a, b) => a.artistName.localeCompare(b.artistName))
+    expect(read).toEqual([...lps, ...bySinglesArtist].map((display) => display.key))
+
+    expect(plan.unplaced).toEqual([])
+    expect(plan.conflicts).toEqual([{ type: 'size-mix', count: 1 }])
+  })
+
   it('mixes sizes only when the shelves cannot keep them apart, with one warning', () => {
     // Three 12" and three 7" on shelves of 4 and 2: the 7"s need three spaces
     // and the second shelf has two, so one 7" joins the 12"s.
@@ -458,10 +489,171 @@ describe('planCabinet', () => {
     })
     expect(plan.slots.map((slot) => slot.sizeClass)).toEqual(['mixed', 'small'])
     expect(plan.unplaced).toEqual([])
-    const sizeMix = plan.conflicts.filter((conflict) => conflict.type === 'size-mix')
-    expect(sizeMix).toEqual([{ type: 'size-mix', count: 1 }])
-    expect(conflictLabel(sizeMix[0])).toBe('Mixed sizes on 1 shelf')
+    // The LPs, then the singles, in order: nothing back-filled out of order.
+    expect(plan.slots.map((slot) => slot.records.map((record) => record.display.artistName))).toEqual([
+      ['A', 'C', 'E', 'B'],
+      ['D', 'F'],
+    ])
+    expect(plan.conflicts).toEqual([{ type: 'size-mix', count: 1 }])
+    expect(conflictLabel(plan.conflicts[0])).toBe('Mixed sizes on 1 shelf')
     expect(conflictLabel({ type: 'size-mix', count: 2 })).toBe('Mixed sizes on 2 shelves')
+  })
+
+  it('shares as few size boundaries as it must', () => {
+    // A 10" single, two LPs and a CD on two shelves of 5: three sizes, two
+    // shelves. Two neighbouring sizes share one shelf and the third keeps the
+    // other, so only one shelf is mixed, not two (chaining all three put a
+    // size boundary on each shelf).
+    const releases = [
+      fake({ artist: 'C', title: 'c', formatText: 'Vinyl · LP' }),
+      fake({ artist: 'B', title: 'b', formatText: 'Vinyl · 10" · EP' }),
+      fake({ artist: 'D', title: 'd-lp', formatText: 'Vinyl · LP' }),
+      fake({ artist: 'D', title: 'd-cd', formatText: 'CD · Album' }),
+    ]
+    const plan = planCabinet({
+      releases,
+      cabinet: cabinetWith([5, 5]),
+      options: { sort: 'chronological', separateSizeClasses: true },
+    })
+    expect(plan.conflicts).toEqual([{ type: 'size-mix', count: 1 }])
+    // Still in order: the single (B), then the LPs, then the CD.
+    expect(plan.slots.flatMap((slot) => slot.records.map((record) => record.display.title))).toEqual([
+      'b',
+      'c',
+      'd-lp',
+      'd-cd',
+    ])
+  })
+
+  it('picks the way of filling that places every record', () => {
+    // 8 spaces of records on shelves of 1, 4, 2 and 1. Filling each shelf in
+    // turn would leave only one-space gaps for the last gatefold; spreading
+    // and back-filling places everything, so that layout wins.
+    const releases = [
+      fake({ id: 1, artist: 'B', title: 'b1', formatText: 'CD · Album' }),
+      fake({ id: 2, artist: 'B', title: 'b2', formatText: 'CD · Album' }),
+      fake({ id: 3, artist: 'B', title: 'b3', formatText: 'CD · Album' }),
+      fake({ id: 4, artist: 'D', title: 'd1', year: 2001, formatText: 'Vinyl · LP · Gatefold' }),
+      fake({ id: 5, artist: 'D', title: 'd2', year: 2002, formatText: 'Vinyl · 7"' }),
+      fake({ id: 6, artist: 'D', title: 'd3', year: 2003, formatText: 'Vinyl · LP · Gatefold' }),
+    ]
+    const plan = planCabinet({ releases, cabinet: cabinetWith([1, 4, 2, 1]) })
+    expect(plan.unplaced).toEqual([])
+    expect(plan.slots.reduce((total, slot) => total + slot.used, 0)).toBe(8)
+  })
+
+  it('falls back to the size-skipping walk when only it fits every record', () => {
+    // Shelves of 4 and 3 holding exactly 7 spaces: two CDs, an LP and two
+    // gatefold LPs. Every layout that keeps the order strands a gatefold; the
+    // size-skipping walk fits them all, so it wins, out of order as it is.
+    const releases = [
+      fake({ id: 0, artist: 'C', title: 'c', year: 2000, formatText: 'CD · Album' }),
+      fake({ id: 1, artist: 'D', title: 'd1', year: 2001, formatText: 'Vinyl · LP · Gatefold' }),
+      fake({ id: 2, artist: 'A', title: 'a-cd', year: 2002, formatText: 'CD · Album' }),
+      fake({ id: 3, artist: 'D', title: 'd3', year: 2003, formatText: 'Vinyl · LP · Gatefold' }),
+      fake({ id: 4, artist: 'A', title: 'a-lp', year: 2004, formatText: 'Vinyl · LP' }),
+    ]
+    const plan = planCabinet({
+      releases,
+      cabinet: cabinetWith([4, 3]),
+      options: { sort: 'chronological', separateSizeClasses: true },
+    })
+    expect(plan.unplaced).toEqual([])
+    expect(plan.slots.map((slot) => slot.used)).toEqual([4, 3])
+  })
+
+  it('places everything in a tight cabinet without size separation', () => {
+    // 6 spaces of records in 6, A–Z within each artist, two of them gatefolds.
+    const releases = [
+      fake({ id: 1, artist: 'A', title: 'a4', formatText: 'Vinyl · LP · Gatefold' }),
+      fake({ id: 2, artist: 'B', title: 'b3', formatText: 'Vinyl · LP' }),
+      fake({ id: 3, artist: 'C', title: 'c1', formatText: 'Vinyl · LP' }),
+      fake({ id: 4, artist: 'C', title: 'c2', formatText: 'Vinyl · LP · Gatefold' }),
+    ]
+    const plan = planCabinet({
+      releases,
+      cabinet: cabinetWith([1, 4, 1]),
+      options: { sort: 'byName', separateSizeClasses: false },
+    })
+    expect(plan.unplaced).toEqual([])
+    expect(plan.slots.map((slot) => slot.used)).toEqual([1, 4, 1])
+  })
+
+  it('keeps the reading order with the A–Z sort as well', () => {
+    // Artist A's titles run the other way round from their years, so A–Z and
+    // Year give different shelves. Two LPs' worth too many for the singles to
+    // get the second shelf: the LPs (A–Z), then A's singles (A–Z), share the
+    // first.
+    const releases = [
+      fake({ artist: 'A', title: 'zebra', year: 1970, formatText: 'Vinyl · LP' }),
+      fake({ artist: 'A', title: 'apple', year: 1980, formatText: 'Vinyl · LP' }),
+      fake({ artist: 'B', title: 'b-lp', year: 1990, formatText: 'Vinyl · LP' }),
+      fake({ artist: 'A', title: 'yellow', year: 1971, formatText: 'Vinyl · 7"' }),
+      fake({ artist: 'A', title: 'banana', year: 1985, formatText: 'Vinyl · 7"' }),
+    ]
+    const layout = (sort: 'byName' | 'chronological') =>
+      planCabinet({
+        releases,
+        cabinet: cabinetWith([4, 1]),
+        options: { sort, separateSizeClasses: true },
+      }).slots.map((slot) => slot.records.map((record) => record.display.title))
+    expect(layout('byName')).toEqual([['apple', 'zebra', 'b-lp', 'banana'], ['yellow']])
+    expect(layout('chronological')).toEqual([['zebra', 'apple', 'b-lp', 'yellow'], ['banana']])
+  })
+
+  it('sets a record bigger than every shelf aside, and lays out the rest as usual', () => {
+    // A 12-LP box set on shelves of 6 fits nowhere. It counts as without a
+    // shelf, and doesn't push the records after it out of order.
+    const lps = 'ABCDEFGHI'.split('').map((artist) => fake({ artist, title: artist, formatText: 'Vinyl · LP' }))
+    const box = fake({
+      artist: 'E',
+      title: 'box',
+      formatText: 'Vinyl · LP · Box Set',
+      formats: [{ name: 'Vinyl', qty: '12', descriptions: ['LP'] }],
+    })
+    const singles = ['S', 'T'].map((artist) => fake({ artist, title: artist, formatText: 'Vinyl · 7"' }))
+    const plan = planCabinet({
+      releases: [...lps, box, ...singles],
+      cabinet: cabinetWith([6, 6, 6]),
+      options: { sort: 'chronological', separateSizeClasses: true },
+    })
+    expect(plan.unplaced.map((display) => display.title)).toEqual(['box'])
+    // The LPs spread over two shelves, the singles keep the third.
+    expect(plan.slots.map((slot) => slot.sizeClass)).toEqual(['12-inch', '12-inch', 'small'])
+    expect(plan.conflicts).toEqual([{ type: 'unplaced', count: 1 }])
+  })
+
+  it('spreads over uneven shelves by their size, instead of packing them', () => {
+    // 26 LPs on shelves of 21 and 12: an equal share (13) is more than the
+    // small shelf holds, so the share follows each shelf's size instead.
+    const releases = Array.from({ length: 26 }, (_, i) =>
+      fake({ artist: `A${String(i).padStart(2, '0')}`, title: 't', formatText: 'Vinyl · LP' }),
+    )
+    const plan = planCabinet({ releases, cabinet: cabinetWith([21, 12]) })
+    expect(plan.conflicts).toEqual([])
+    expect(plan.slots.map((slot) => slot.used)).toEqual([17, 9])
+  })
+
+  it('prefers the layout with fewer mixed shelves when everything else is equal', () => {
+    // A 10" single, two gatefold LPs and a CD by one artist on shelves of 4, 1
+    // and 5 (year 0 is undated: those sort last, which puts the CD and one LP
+    // at the end). Two layouts place everything in order; the one with one
+    // mixed shelf wins over the one with two.
+    const releases = [
+      fake({ id: 0, artist: 'ABBA', title: 'The D', year: 0, formatText: 'CD · Album' }),
+      fake({ id: 1, artist: 'ABBA', title: 'C', year: 1980, formatText: 'Vinyl · LP · Gatefold' }),
+      fake({ id: 2, artist: 'ABBA', title: 'C', year: 0, formatText: 'Vinyl · LP · Gatefold' }),
+      fake({ id: 3, artist: 'ABBA', title: 'B', year: 1980, formatText: 'Vinyl · 10"' }),
+    ]
+    const plan = planCabinet({
+      releases,
+      cabinet: cabinetWith([4, 1, 5]),
+      options: { sort: 'byName', separateSizeClasses: true },
+    })
+    expect(plan.unplaced).toEqual([])
+    expect(plan.conflicts.filter((conflict) => conflict.type !== 'artist-split')).toEqual([
+      { type: 'size-mix', count: 1 },
+    ])
   })
 
   it('reports records back-filled onto an earlier shelf as out of order', () => {
@@ -630,8 +822,13 @@ describe('planCabinet', () => {
       options: { sort: 'chronological', separateSizeClasses: true },
     })
     expect(plan.unplaced).toEqual([])
-    expect(plan.slots[0].records).toHaveLength(5)
-    expect(plan.slots[1].records).toHaveLength(10)
+    // Three sizes on two shelves can't all be kept apart. The fewest share:
+    // the LPs and CDs share the first shelf, in order, and the singles keep
+    // the second to themselves. (Groups go by their first artist: A, O, S.)
+    const read = (index: number) => plan.slots[index].records.map((record) => record.display.title)
+    expect(read(0)).toEqual(['a', 'b', 'c', 'o12', 'o13', 'o14', 'o15'])
+    expect(read(1)).toEqual(['s4', 's5', 's6', 's7', 's8', 's9', 's10', 's11'])
+    expect(plan.conflicts).toEqual([{ type: 'size-mix', count: 1 }])
   })
 
   it('reports an artist split across slots', () => {

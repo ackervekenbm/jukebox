@@ -226,6 +226,10 @@ describe('CabinetScreen', () => {
         '2 records out of order',
       ])
       expect(within(shelfHeader('Shelf 1')).getByText('Mixed sizes')).toBeInTheDocument()
+      // The warning says how to get the sizes apart.
+      expect(
+        screen.getByText('To keep every size on shelves of its own, add a shelf or make one bigger.'),
+      ).toBeInTheDocument()
       unmount()
 
       // With sizes not kept apart, a mixed shelf is the expected layout.
@@ -234,6 +238,24 @@ describe('CabinetScreen', () => {
       })
       renderScreen()
       expect(screen.queryByText('Mixed sizes')).not.toBeInTheDocument()
+      expect(screen.queryByText(/keep every size on shelves of its own/)).not.toBeInTheDocument()
+    })
+
+    it('says how many shelves are missing when there are fewer shelves than sizes', () => {
+      // An LP, a single and a CD on one shelf: no capacity can keep them apart.
+      const cd = release('Gamma', 'Disc', { formatNames: ['CD'], formatText: 'CD · Album' })
+      const single = release('Delta', 'Seven', { formatText: 'Vinyl · 7"' })
+      const cabinet = cabinetOf([75])
+      setState(
+        cabinet,
+        planOf(cabinet, [{ records: [onShelf(releases[0]), onShelf(single), onShelf(cd)], sizeClass: 'mixed' }], {
+          conflicts: [{ type: 'size-mix', count: 1 }],
+        }),
+      )
+      renderScreen(vi.fn(), [releases[0], single, cd])
+      expect(
+        screen.getByText('Each size needs a shelf of its own: add at least 2 more shelves to keep them apart.'),
+      ).toBeInTheDocument()
     })
 
     it('tags an empty shelf with no size at all', () => {
@@ -459,7 +481,7 @@ describe('CabinetScreen', () => {
     const body = document.getElementById('cabinet-unplaced')
     expect(body).toHaveClass('cabinet-slot-body')
     expect(within(body!).getByText('Second')).toBeInTheDocument()
-    expect(within(body!).getByText(/add a shelf or raise a capacity/)).toBeInTheDocument()
+    expect(within(body!).getByText(/add a shelf or make one bigger/)).toBeInTheDocument()
 
     fireEvent.click(toggle)
     expect(screen.queryByText('Second')).not.toBeInTheDocument()

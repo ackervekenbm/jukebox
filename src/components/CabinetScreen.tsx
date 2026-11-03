@@ -157,6 +157,15 @@ export function CabinetScreen({
     )
   }
 
+  // How to get the sizes apart: every size needs at least a shelf of its own,
+  // so with fewer shelves than sizes no capacity helps.
+  const sizesInCabinet = new Set(releases.map((record) => sizeClassOf(record))).size
+  const shelvesShort = sizesInCabinet - plan.slots.length
+  const sizeMixHint =
+    shelvesShort > 0
+      ? `Each size needs a shelf of its own: add at least ${plural(shelvesShort, 'more shelf', 'more shelves')} to keep them apart.`
+      : 'To keep every size on shelves of its own, add a shelf or make one bigger.'
+
   // Releases, not copies: two copies of one pressing share a sleeve.
   const gatefoldCount = new Set(
     releases.filter((record) => isGatefold(record, sleeves)).map((record) => record.id),
@@ -491,6 +500,11 @@ export function CabinetScreen({
               ))}
             </ul>
           )}
+          {/* Sharing a shelf is the best layout this much space allows; say how
+              to get the sizes fully apart, since the chip alone reads like an error. */}
+          {plan.conflicts.some((conflict) => conflict.type === 'size-mix') && (
+            <p className="cabinet-hint cabinet-conflict-hint">{sizeMixHint}</p>
+          )}
 
           <div className="cabinet-slots">
             {plan.slots.length === 0 && (
@@ -592,7 +606,7 @@ export function CabinetScreen({
                 {unplacedExpanded && (
                   <div id="cabinet-unplaced" className="cabinet-slot-body">
                     <p className="cabinet-hint">
-                      These do not fit anywhere yet — add a shelf or raise a capacity.
+                      These do not fit anywhere yet — add a shelf or make one bigger.
                     </p>
                     <ul className="cabinet-records">
                       {plan.unplaced.map((record) => recordRow(record))}

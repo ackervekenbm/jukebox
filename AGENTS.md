@@ -105,11 +105,19 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   vinyl formats count: a vinyl format is 12" unless it states a smaller size,
   the largest wins (an LP with a bonus 7" is 12"), and a release with no vinyl
   — CD, cassette, file, a 3" CD — is "other". Optionally it keeps the sizes
-  on separate shelves: each size group (ordered by its earliest record, so the
-  cabinet still starts with the earliest artist) gets its own run of shelves
-  (`shelfShares`: enough to fit, spare shelves to the fullest groups) and is
-  spread evenly over it; only when the shelves can't hold the groups apart
-  does one walk over all shelves mix them.
+  on separate shelves: each size group (ordered by its earliest record) gets
+  its own run of shelves (`shelfShares`). Without room for that, as few
+  neighbouring groups as possible share a run (`groupRuns`), one after the
+  other, so only the shelf between two sizes is mixed. Each shelf lists its
+  records in that planned order (size group, artist, Year/A–Z), never
+  re-sorted on its own, so the shelves read straight through. `allocate`
+  tries each arrangement with an equal spread, a spread in proportion to shelf
+  size and shelf by shelf, back-fills, and keeps the best: fewest unplaced,
+  then fewest out of order, then (sizes kept apart) fewest mixed shelves, then
+  the first listed (the equal spread, so a working layout doesn't move). The
+  last candidate is the plain size-apart layout or size-skipping walk over
+  every record, so no record ends up unplaced that it would place. Records
+  bigger than every shelf are left out up front.
   Shelf space (`spaceUnitsOf`): one per disc of the release's largest
   vinyl size (2×LP = 2; a bonus 7" in an LP adds nothing), or 2 for a
   gatefold, whichever is larger. Gatefold detection (`mentionsGatefold`)
