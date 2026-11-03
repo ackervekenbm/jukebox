@@ -9,6 +9,7 @@ import {
   fetchMasterYears,
   fetchReleaseDetails,
 } from './discogs'
+import { discogsBudget } from './rateLimit'
 import type {
   DiscogsCollectionFolderResponse,
   DiscogsFoldersResponse,
@@ -76,6 +77,7 @@ function mockFetch(handler: (url: string, init?: RequestInit) => unknown): void 
 
 beforeEach(() => {
   vi.useFakeTimers()
+  discogsBudget.reset()
 })
 
 afterEach(() => {
@@ -134,7 +136,7 @@ describe.skipIf(masterYears.length === 0)('Discogs contract: master years', () =
     })
 
     const promise = fetchMasterYears(ids, 'tok')
-    await vi.advanceTimersByTimeAsync(200)
+    await vi.runAllTimersAsync()
 
     const result = await promise
     expect(Object.keys(result)).toHaveLength(ids.length)
