@@ -110,15 +110,17 @@ desktop, but needs no emulation. To build on an amd64 machine instead:
    docker buildx build --platform linux/arm64 -t jukebox:latest --load .
    ```
 
-3. **Copy the image to the host** (or push it to a registry, above). This pipes it
-   over SSH, so your user there needs to run `docker` without a password prompt
+3. **Copy the image to the host** (or push it to a registry, above). This
+   pipes it over SSH (`server` below is the host's SSH name or `user@address`),
+   so your user on the host needs to run `docker` without a password prompt
    (membership in the `docker` group, or passwordless `sudo`):
 
    ```bash
    docker save jukebox:latest | gzip | ssh server 'gunzip | docker load'
    ```
 
-   If your user there needs a password for `sudo docker`, copy the file first:
+   If your user on the host needs a password for `sudo docker`, copy the file
+   first:
 
    ```bash
    docker save jukebox:latest | gzip > jukebox.tar.gz

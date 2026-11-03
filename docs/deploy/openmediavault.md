@@ -12,10 +12,15 @@ port, `3000`, is fixed: only the host side is yours.
 
 ## Prerequisites
 
-- **OpenMediaVault itself**: see the
-  [OMV installation docs](https://docs.openmediavault.org/en/stable/installation/index.html).
-  On ARM boards, the [omv-extras wiki](https://wiki.omv-extras.org/) has an
-  install guide per board, whose script also sets up **omv-extras**.
+- **OpenMediaVault itself**, on a minimal 64-bit Debian-based OS without a
+  desktop environment (desktop images aren't supported). On x86, follow the
+  [OMV installation docs](https://docs.openmediavault.org/en/stable/installation/index.html),
+  then add omv-extras with its
+  [install script](https://github.com/OpenMediaVault-Plugin-Developers/installScript).
+  On ARM boards, use the [omv-extras wiki](https://wiki.omv-extras.org/)'s guide
+  for your board, e.g.
+  [Installing OMV8 on a Raspberry Pi](https://wiki.omv-extras.org/doku.php?id=omv8:raspberry_pi_install)
+  (on the board's 64-bit *Lite* image); its script also sets up omv-extras.
 - **omv-extras** with the docker repo enabled in **System → omv-extras**.
 - **`openmediavault-compose`** installed (**System → Plugins**). It installs the
   Docker engine too. **Services → Compose** then has, among others, the
@@ -67,10 +72,10 @@ port, `3000`, is fixed: only the host side is yours.
 6. **Save**.
 7. Select the entry → **Check** if you want compose to validate the file, then
    **Up**. That pulls the image and starts the container.
-8. Open `http://<host-ip>:8080`.
+8. Open `http://<server-ip>:8080`.
 
 Verify: **Services → Compose → Services** lists the container as running, and
-`http://<host-ip>:8080/api/health` returns `{"ok":true,"db":true}`.
+`http://<server-ip>:8080/api/health` returns `{"ok":true,"db":true}`.
 
 ## What that file does
 
