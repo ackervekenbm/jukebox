@@ -34,6 +34,7 @@ import { StorageStats } from './components/StorageStats'
 import { CabinetScreen } from './components/CabinetScreen'
 import { useScrollLock } from './hooks/useScrollLock'
 import { useDatabaseState } from './hooks/useDatabaseState'
+import { useDiscogsWaitNote } from './hooks/useDiscogsWait'
 import { SearchBar } from './components/SearchBar'
 import { FiltersButton, FilterPanel } from './components/FilterMenu'
 import { ViewsButton, ViewsPanel } from './components/ViewsMenu'
@@ -133,6 +134,8 @@ export default function App() {
     refresh,
     wipeCache,
   } = useCollection(settings)
+  // Why a sync isn't moving: pausing for Discogs' rate limit, or no answer for a while.
+  const syncWait = useDiscogsWaitNote(status === 'loading', progress?.loaded)
 
   useEffect(() => {
     applyTheme(theme)
@@ -514,7 +517,12 @@ export default function App() {
         <div className="full-state">
           <RecordPlayer size={150} />
           <p>Loading your collection…</p>
-          {progress && <p className="progress-text">{progressText(progress)}</p>}
+          {progress && (
+            <p className="progress-text">
+              {progressText(progress)}
+              {syncWait && ` — ${syncWait}`}
+            </p>
+          )}
         </div>
       )}
 
@@ -591,8 +599,13 @@ export default function App() {
           </header>
 
           {status === 'loading' && releases.length > 0 && (
-            <div className="sync-banner" aria-live="polite">
-              Syncing…
+            <div className="sync-banner">
+              {/* Announced: that it syncs, and why it waits. The count is not:
+                  it moves about once a second while years come in. */}
+              <span role="status">
+                Syncing…
+                {syncWait && ` (${syncWait})`}
+              </span>
               {progress && <span> {progressText(progress)}</span>}
             </div>
           )}

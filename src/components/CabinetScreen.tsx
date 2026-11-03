@@ -4,6 +4,7 @@
 import { sortYear, type DisplayRelease } from '../utils/collection'
 import { useScrollLock } from '../hooks/useScrollLock'
 import { useCabinet, type CabinetStatus, type RemovedSlot } from '../hooks/useCabinet'
+import { useDiscogsWaitNote } from '../hooks/useDiscogsWait'
 import {
   SIZE_CLASS_LABELS,
   conflictLabel,
@@ -143,6 +144,9 @@ export function CabinetScreen({
 
   const placed = Object.keys(plan.placements).length
   const totalCapacity = plan.slots.reduce((total, slot) => total + slot.slot.capacity, 0)
+  // Why the release-notes check isn't moving, if it isn't.
+  const scanWait = useDiscogsWaitNote(gatefoldScan !== null, gatefoldScan?.done)
+
   // Screen readers hear the scan start and end, not every step of it.
   const [scanAnnouncement, setScanAnnouncement] = useState('')
   const [scanWasRunning, setScanWasRunning] = useState(false)
@@ -379,7 +383,7 @@ export function CabinetScreen({
                     scan runs. The status below announces only start and end. */}
                 <span className="cabinet-setting-hint">
                   {gatefoldScan
-                    ? `Checking release notes: ${gatefoldScan.done.toLocaleString()} of ${gatefoldScan.total.toLocaleString()} records`
+                    ? `Checking release notes: ${gatefoldScan.done.toLocaleString()} of ${gatefoldScan.total.toLocaleString()} records${scanWait ? ` — ${scanWait}` : ''}`
                     : gatefoldScanError
                       ? gatefoldScanError
                       : !collectionReady
@@ -388,6 +392,8 @@ export function CabinetScreen({
                 </span>
                 <span className="cabinet-visually-hidden" role="status" aria-label="Release notes check">
                   {scanAnnouncement}
+                  {/* A pause is worth hearing too: it explains why nothing moves. */}
+                  {scanWait && ` Now ${scanWait}.`}
                 </span>
                 {gatefoldScan && (
                   <progress

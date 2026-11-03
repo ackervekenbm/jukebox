@@ -64,9 +64,18 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
 
 - `src/hooks/useCollection.ts` — load orchestration: stale-while-revalidate.
   Content-first: the release grid commits to the UI immediately; master-year
-  enrichment runs in the background and streams in batches.
-- `src/api/discogs.ts` — raw Discogs calls, ~60 req/min budget. Master-year
-  fetch uses staggered batches of 6 + 6.6s pauses; 429s retry via `Retry-After`.
+  enrichment runs in the background and streams in as each year arrives.
+- `src/api/discogs.ts` — raw Discogs calls, ~60 req/min budget. Every call
+  goes through the shared `discogsBudget` (`src/api/rateLimit.ts`): it reads
+  `X-Discogs-Ratelimit-Remaining` from each answer, estimates how much of the
+  moving minute has come back, and holds new requests before Discogs refuses
+  them (background lookups keep a reserve of 10, requests the user waits for
+  2); a 429 pauses every caller for its `Retry-After` (or 5 s). Per-id lookups
+  (`fetchEach`: master years, release notes) keep up to 6 in flight, start one
+  every ~1.2 s, and report each result and progress as soon as it's back, so a
+  slow or retried lookup only holds its own slot. `useDiscogsWait` turns a
+  budget pause or 15 s without progress into a note on the progress text
+  (sync banner, cabinet).
   All calls go through the same-origin `/discogs` proxy (vite dev forwards to
   the API server; the container runs it in Express) — the app must never call
   `api.discogs.com` cross-origin, because Discogs' 429s carry no CORS headers
