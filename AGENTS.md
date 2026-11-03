@@ -105,25 +105,19 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   vinyl formats count: a vinyl format is 12" unless it states a smaller size,
   the largest wins (an LP with a bonus 7" is 12"), and a release with no vinyl
   — CD, cassette, file, a 3" CD — is "other". Optionally it keeps the sizes
-  on separate shelves: each size group (ordered by its earliest record, so the
-  cabinet still starts with the earliest artist) gets its own run of shelves
-  (`shelfShares`: enough to fit, spare shelves to the fullest groups) and is
-  spread evenly over it. When the shelves can't hold every group apart, as
-  few neighbouring groups as possible share a run (`groupRuns`), and inside a
-  run the groups follow each other in order, so only the shelf where one size
-  ends and the next begins is shared. Each candidate layout is tried with an
-  equal spread (first, so a layout that already worked doesn't move), a spread
-  in proportion to each shelf's size (uneven shelves), and shelf by shelf
-  (sizes that must share), then back-filled; the best wins: fewest records
-  without a shelf, then fewest out of order, then (sizes kept apart) fewest
-  mixed shelves, then the first listed. The old size-skipping walk is the last
-  candidate and wins only when strictly better by the same rules, so the
-  planner never strands a record the old one placed. A record bigger than
-  every shelf (a big box set) is set aside as unplaced before planning, so it
-  can't make a walk give up on everything after it. A
-  shelf's records are always listed in that planned order (size group, then
-  artist, then Year/A–Z), never re-sorted on their own, so reading the shelves
-  in turn never jumps back in the alphabet.
+  on separate shelves: each size group (ordered by its earliest record) gets
+  its own run of shelves (`shelfShares`). Without room for that, as few
+  neighbouring groups as possible share a run (`groupRuns`), one after the
+  other, so only the shelf between two sizes is mixed. Each shelf lists its
+  records in that planned order (size group, artist, Year/A–Z), never
+  re-sorted on its own, so the shelves read straight through. `allocate`
+  tries each arrangement with an equal spread, a spread in proportion to shelf
+  size and shelf by shelf, back-fills, and keeps the best: fewest unplaced,
+  then fewest out of order, then (sizes kept apart) fewest mixed shelves, then
+  the first listed (the equal spread, so a working layout doesn't move). The
+  last candidate is the plain size-apart layout or size-skipping walk over
+  every record, so no record ends up unplaced that it would place. Records
+  bigger than every shelf are left out up front.
   Shelf space (`spaceUnitsOf`): one per disc of the release's largest
   vinyl size (2×LP = 2; a bonus 7" in an LP adds nothing), or 2 for a
   gatefold, whichever is larger. Gatefold detection (`mentionsGatefold`)

@@ -228,7 +228,7 @@ describe('CabinetScreen', () => {
       expect(within(shelfHeader('Shelf 1')).getByText('Mixed sizes')).toBeInTheDocument()
       // The warning says how to get the sizes apart.
       expect(
-        screen.getByText('To keep every size on shelves of its own, add a shelf or raise a capacity.'),
+        screen.getByText('To keep every size on shelves of its own, add a shelf or make one bigger.'),
       ).toBeInTheDocument()
       unmount()
 
@@ -254,7 +254,7 @@ describe('CabinetScreen', () => {
       )
       renderScreen(vi.fn(), [releases[0], single, cd])
       expect(
-        screen.getByText('Each size needs a shelf of its own: add 2 more shelves to keep them apart.'),
+        screen.getByText('Each size needs a shelf of its own: add at least 2 more shelves to keep them apart.'),
       ).toBeInTheDocument()
     })
 
@@ -481,7 +481,7 @@ describe('CabinetScreen', () => {
     const body = document.getElementById('cabinet-unplaced')
     expect(body).toHaveClass('cabinet-slot-body')
     expect(within(body!).getByText('Second')).toBeInTheDocument()
-    expect(within(body!).getByText(/add a shelf or raise a capacity/)).toBeInTheDocument()
+    expect(within(body!).getByText(/add a shelf or make one bigger/)).toBeInTheDocument()
 
     fireEvent.click(toggle)
     expect(screen.queryByText('Second')).not.toBeInTheDocument()

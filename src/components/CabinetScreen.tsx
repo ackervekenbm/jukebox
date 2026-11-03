@@ -163,8 +163,8 @@ export function CabinetScreen({
   const shelvesShort = sizesInCabinet - plan.slots.length
   const sizeMixHint =
     shelvesShort > 0
-      ? `Each size needs a shelf of its own: add ${plural(shelvesShort, 'more shelf', 'more shelves')} to keep them apart.`
-      : 'To keep every size on shelves of its own, add a shelf or raise a capacity.'
+      ? `Each size needs a shelf of its own: add at least ${plural(shelvesShort, 'more shelf', 'more shelves')} to keep them apart.`
+      : 'To keep every size on shelves of its own, add a shelf or make one bigger.'
 
   // Releases, not copies: two copies of one pressing share a sleeve.
   const gatefoldCount = new Set(
@@ -606,7 +606,7 @@ export function CabinetScreen({
                 {unplacedExpanded && (
                   <div id="cabinet-unplaced" className="cabinet-slot-body">
                     <p className="cabinet-hint">
-                      These do not fit anywhere yet — add a shelf or raise a capacity.
+                      These do not fit anywhere yet — add a shelf or make one bigger.
                     </p>
                     <ul className="cabinet-records">
                       {plan.unplaced.map((record) => recordRow(record))}

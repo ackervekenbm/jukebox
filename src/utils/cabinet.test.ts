@@ -466,28 +466,11 @@ describe('planCabinet', () => {
     // 22 LPs, then the 40 singles.
     expect(plan.slots.map((slot) => slot.records.length)).toEqual([68, 68, 68, 68, 68, 68, 62])
     expect(plan.slots.slice(0, 6).map((slot) => slot.sizeClass)).toEqual(Array(6).fill('12-inch'))
-    // Exactly the LPs that don't fit on six shelves, then every single, in
-    // order: not singles first with leftover LPs squeezed in after them.
-    const onShelf = plan.slots.flatMap((slot) => slot.records.map((record) => record.display))
-    const lpsOnSix = plan.slots.slice(0, 6).reduce((total, slot) => total + slot.records.length, 0)
-    expect(plan.slots[6].records.map((record) => record.display.key)).toEqual([
-      ...lps.slice(lpsOnSix).map((display) => display.key),
-      ...[...singles].sort((a, b) => a.artistName.localeCompare(b.artistName)).map((display) => display.key),
-    ])
-    expect(onShelf).toHaveLength(470)
-    const seventh = plan.slots[6].records.map((record) => sizeClassOf(record.display))
-    const firstSingle = seventh.indexOf('small')
-    expect(firstSingle).toBeGreaterThan(0)
-    expect(seventh.slice(0, firstSingle).every((size) => size === '12-inch')).toBe(true)
-    expect(seventh.slice(firstSingle).every((size) => size === 'small')).toBe(true)
-
-    // Reading the shelves in turn gives the LPs A–Z, then the singles A–Z.
-    const read = plan.slots.flatMap((slot) => slot.records.map((record) => record.display))
-    const lpOrder = read.filter((display) => display.title === 'lp').map((display) => display.artistName)
-    const singleOrder = read.filter((display) => display.title === 'single').map((display) => display.artistName)
-    expect(lpOrder).toEqual([...lpOrder].sort())
-    expect(singleOrder).toEqual([...singleOrder].sort())
-    expect(read.findIndex((display) => display.title === 'single')).toBe(430)
+    // Reading the shelves in turn gives every LP A–Z, then every single A–Z:
+    // shelf 7 holds the last 22 LPs, not singles first with LPs after them.
+    const read = plan.slots.flatMap((slot) => slot.records.map((record) => record.display.key))
+    const bySinglesArtist = [...singles].sort((a, b) => a.artistName.localeCompare(b.artistName))
+    expect(read).toEqual([...lps, ...bySinglesArtist].map((display) => display.key))
 
     expect(plan.unplaced).toEqual([])
     expect(plan.conflicts).toEqual([{ type: 'size-mix', count: 1 }])
@@ -511,10 +494,8 @@ describe('planCabinet', () => {
       ['A', 'C', 'E', 'B'],
       ['D', 'F'],
     ])
-    expect(plan.conflicts.map((conflict) => conflict.type)).toEqual(['size-mix'])
-    const sizeMix = plan.conflicts.filter((conflict) => conflict.type === 'size-mix')
-    expect(sizeMix).toEqual([{ type: 'size-mix', count: 1 }])
-    expect(conflictLabel(sizeMix[0])).toBe('Mixed sizes on 1 shelf')
+    expect(plan.conflicts).toEqual([{ type: 'size-mix', count: 1 }])
+    expect(conflictLabel(plan.conflicts[0])).toBe('Mixed sizes on 1 shelf')
     expect(conflictLabel({ type: 'size-mix', count: 2 })).toBe('Mixed sizes on 2 shelves')
   })
 
@@ -544,10 +525,10 @@ describe('planCabinet', () => {
     ])
   })
 
-  it('never leaves a gatefold without a shelf when the old way had room for it', () => {
+  it('picks the way of filling that places every record', () => {
     // 8 spaces of records on shelves of 1, 4, 2 and 1. Filling each shelf in
     // turn would leave only one-space gaps for the last gatefold; spreading
-    // and back-filling it places everything, so that layout wins.
+    // and back-filling places everything, so that layout wins.
     const releases = [
       fake({ id: 1, artist: 'B', title: 'b1', formatText: 'CD · Album' }),
       fake({ id: 2, artist: 'B', title: 'b2', formatText: 'CD · Album' }),
@@ -561,10 +542,10 @@ describe('planCabinet', () => {
     expect(plan.slots.reduce((total, slot) => total + slot.used, 0)).toBe(8)
   })
 
-  it('falls back to the old placement when only it fits every record', () => {
+  it('falls back to the size-skipping walk when only it fits every record', () => {
     // Shelves of 4 and 3 holding exactly 7 spaces: two CDs, an LP and two
     // gatefold LPs. Every layout that keeps the order strands a gatefold; the
-    // old size-skipping walk fits them all, so it wins, out of order as it is.
+    // size-skipping walk fits them all, so it wins, out of order as it is.
     const releases = [
       fake({ id: 0, artist: 'C', title: 'c', year: 2000, formatText: 'CD · Album' }),
       fake({ id: 1, artist: 'D', title: 'd1', year: 2001, formatText: 'Vinyl · LP · Gatefold' }),
@@ -621,8 +602,8 @@ describe('planCabinet', () => {
   })
 
   it('sets a record bigger than every shelf aside, and lays out the rest as usual', () => {
-    // A 12-LP box set on shelves of 6 fits nowhere. Left in, it made every
-    // walk give up past it and the rest got squeezed in out of order.
+    // A 12-LP box set on shelves of 6 fits nowhere. It counts as without a
+    // shelf, and doesn't push the records after it out of order.
     const lps = 'ABCDEFGHI'.split('').map((artist) => fake({ artist, title: artist, formatText: 'Vinyl · LP' }))
     const box = fake({
       artist: 'E',
@@ -654,9 +635,10 @@ describe('planCabinet', () => {
   })
 
   it('prefers the layout with fewer mixed shelves when everything else is equal', () => {
-    // A reviewer's case: a 10" single, two gatefold LPs and a CD by one artist
-    // on shelves of 4, 1 and 5. Two layouts place everything in order; the
-    // one with one mixed shelf wins over one with two.
+    // A 10" single, two gatefold LPs and a CD by one artist on shelves of 4, 1
+    // and 5 (year 0 is undated: those sort last, which puts the CD and one LP
+    // at the end). Two layouts place everything in order; the one with one
+    // mixed shelf wins over the one with two.
     const releases = [
       fake({ id: 0, artist: 'ABBA', title: 'The D', year: 0, formatText: 'CD · Album' }),
       fake({ id: 1, artist: 'ABBA', title: 'C', year: 1980, formatText: 'Vinyl · LP · Gatefold' }),

@@ -303,14 +303,17 @@ interface Allocation {
  */
 type Fill = 'proportional' | 'equal' | 'capacity'
 
+const unitsIn = (records: SortedRecord[], unitsOf: Map<string, number>) =>
+  records.reduce((total, record) => total + (unitsOf.get(record.display.key) ?? 1), 0)
+
 /**
  * Walks an artist-sorted run of records over a run of shelves in order,
- * filling each shelf as `fill` says before moving on. Artists are kept together: staying with the same
- * artist may overshoot the even share, capacity is the hard limit. With
- * `skipOtherSizes`, a shelf that already holds another size is passed over
- * while a later one has room (the old placement, kept as a last resort: it can
- * place a record the ordered layouts can't, at the cost of the order). Returns
- * the records that found no shelf.
+ * filling each shelf as `fill` says before moving on. Artists are kept
+ * together: staying with the same artist may go past a shelf's share;
+ * capacity is the hard limit. With `skipOtherSizes`, a shelf that already
+ * holds another size is passed over while a later one has room (the
+ * size-skipping walk: it can place a record the ordered layouts can't, at the
+ * cost of the order). Returns the records that found no shelf.
  */
 function fillRun(
   records: SortedRecord[],
@@ -324,7 +327,7 @@ function fillRun(
   const overflow: SortedRecord[] = []
   if (slots.length === 0) return [...records]
   const { placements, used, classOfSlot } = state
-  const runUnits = records.reduce((total, record) => total + (unitsOf.get(record.display.key) ?? 1), 0)
+  const runUnits = unitsIn(records, unitsOf)
   const runCapacity = slots.reduce((total, slot) => total + slot.capacity, 0)
   const targetOf = (slot: Slot) =>
     fill === 'proportional'
@@ -367,9 +370,6 @@ function fillRun(
   }
   return overflow
 }
-
-const unitsIn = (records: SortedRecord[], unitsOf: Map<string, number>) =>
-  records.reduce((total, record) => total + (unitsOf.get(record.display.key) ?? 1), 0)
 
 /**
  * How many consecutive shelves each size group gets when sizes are kept apart,
@@ -422,7 +422,11 @@ function shelfShares(groups: SortedRecord[][], slots: Slot[], unitsOf: Map<strin
 }
 
 /** How many records sit on an earlier shelf than their place in the order. */
-function countOutOfOrder(order: SortedRecord[], placements: Map<string, string>, slots: Slot[]): number {
+function countOutOfOrder(
+  order: SortedRecord[],
+  placements: Map<string, string>,
+  slots: Slot[],
+): number {
   const shelfIndex = new Map(slots.map((slot, index) => [slot.id, index]))
   let furthest = -1
   let count = 0
@@ -472,13 +476,12 @@ function groupRuns(groups: SortedRecord[][]): SortedRecord[][][] {
  * calling them unplaced. Those back-filled records can land on an earlier
  * shelf than their place in the order, which planCabinet reports.
  *
- * In a tight cabinet the even spread can strand records that filling each
- * shelf in turn would have placed, and the other way round, so each candidate
- * layout is tried both ways and the best one wins: fewest records without a
- * shelf, then fewest out of order, then (with sizes kept apart) fewest mixed
- * shelves, then the one listed first (fewest shared sizes; equal spread,
- * then proportional, then shelf by shelf). The old size-skipping walk is listed last, so it only wins when it
- * is strictly better by those same rules.
+ * Tight cabinets differ in which way of filling places everything, so each
+ * candidate layout is tried three ways (an equal spread, a spread in
+ * proportion to shelf size, shelf by shelf) and the best wins: fewest records
+ * without a shelf, then fewest out of order, then (with sizes kept apart)
+ * fewest mixed shelves, then the one listed first. The size-skipping walk is
+ * listed last, so it only wins when it is strictly better by the same rules.
  */
 function allocate(
   groups: SortedRecord[][],
@@ -494,13 +497,24 @@ function allocate(
   // layouts leave it out, so it can't make a walk give up on everything after
   // it; it simply counts as unplaced.
   const largest = Math.max(...slots.map((slot) => slot.capacity))
-  const fits = (record: SortedRecord) => (unitsOf.get(record.display.key) ?? 1) <= largest
-  const oversized = all.filter((record) => !fits(record)).map((record) => record.display)
-  const placeable = groups.map((group) => group.filter(fits)).filter((group) => group.length > 0)
+  const fitsSomeShelf = (record: SortedRecord) => (unitsOf.get(record.display.key) ?? 1) <= largest
+  const oversized = all.filter((record) => !fitsSomeShelf(record)).map((record) => record.display)
+  const placeable = groups
+    .map((group) => group.filter(fitsSomeShelf))
+    .filter((group) => group.length > 0)
   const placeableAll = placeable.flat()
 
   // Every arrangement of runs and shelves worth trying, preferred first.
   type Run = { records: SortedRecord[]; slots: Slot[] }
+  /** Gives each run its share of consecutive shelves. */
+  const toRuns = (runs: SortedRecord[][], shares: number[]): Run[] => {
+    let start = 0
+    return runs.map((records, index) => {
+      const run = { records, slots: slots.slice(start, start + shares[index]) }
+      start += shares[index]
+      return run
+    })
+  }
   const arrangements: Run[][] = []
   const partitions =
     separateSizeClasses && placeable.length > 1 ? groupRuns(placeable) : [[placeableAll]]
@@ -510,44 +524,31 @@ function allocate(
       continue
     }
     const shares = shelfShares(runs, slots, unitsOf)
-    if (!shares) continue
-    let start = 0
-    arrangements.push(
-      runs.map((records, index) => {
-        const run = { records, slots: slots.slice(start, start + shares[index]) }
-        start += shares[index]
-        return run
-      }),
-    )
+    if (shares) arrangements.push(toRuns(runs, shares))
   }
 
-  // Each arrangement spread equally (as before, so a layout that already
-  // worked doesn't move), spread in proportion to the shelves (when a small
-  // shelf can't take an equal share), and filled shelf by shelf (when sizes
-  // must share and spreading strands a record).
+  // Each arrangement spread equally (first, so a layout that already works
+  // doesn't move), spread in proportion to the shelves (when a small shelf
+  // can't take an equal share), and filled shelf by shelf (when sizes must
+  // share and spreading strands a record). `dropped` are the records an
+  // attempt left out up front, which count as unplaced.
   const fills: Fill[] = ['equal', 'proportional', 'capacity']
   const attempts: { arrangement: Run[]; fill: Fill; skip: boolean; dropped: DisplayRelease[] }[] =
     arrangements.flatMap((arrangement) =>
       fills.map((fill) => ({ arrangement, fill, skip: false, dropped: oversized })),
     )
-  // Last, exactly what the planner did before: each size apart when that fits,
-  // else the size-skipping walk, over every record. It only wins when it is
-  // strictly better, and being here means no record is ever left without a
-  // shelf where the old layout found one.
-  const legacyShares =
-    separateSizeClasses && groups.length > 1 ? shelfShares(groups, slots, unitsOf) : null
-  if (legacyShares) {
-    let start = 0
-    const arrangement = groups.map((records, index) => {
-      const run = { records, slots: slots.slice(start, start + legacyShares[index]) }
-      start += legacyShares[index]
-      return run
-    })
-    attempts.push({ arrangement, fill: 'equal', skip: false, dropped: [] })
-  } else {
-    const skip = separateSizeClasses && groups.length > 1
-    attempts.push({ arrangement: [{ records: all, slots }], fill: 'equal', skip, dropped: [] })
-  }
+  // Last, the plain layout over every record, oversized ones included (they
+  // come back unplaced through the back-fill): each size apart when that fits,
+  // else the size-skipping walk. It wins only when strictly better, which in
+  // practice means it alone places some record, so the ordered layouts never
+  // leave a record unplaced that it would have placed.
+  const separate = separateSizeClasses && groups.length > 1
+  const plainShares = separate ? shelfShares(groups, slots, unitsOf) : null
+  attempts.push(
+    plainShares
+      ? { arrangement: toRuns(groups, plainShares), fill: 'equal', skip: false, dropped: [] }
+      : { arrangement: [{ records: all, slots }], fill: 'equal', skip: separate, dropped: [] },
+  )
 
   // With sizes kept apart, a layout that mixes fewer shelves is better too.
   const mixedShelves = (state: Allocation) => {
