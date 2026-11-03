@@ -20,7 +20,7 @@ vi.mock('./api/discogs', () => ({
     items: api.releases.length,
   })),
   fetchCollectionValue: vi.fn(async () => null),
-  fetchReleaseTracklist: vi.fn(async () => ({ tracks: [] })),
+  fetchReleaseDetails: vi.fn(async () => ({ tracks: [], notes: '' })),
   fetchMasterYears: vi.fn(async () => ({})),
 }))
 

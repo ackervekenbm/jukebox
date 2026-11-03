@@ -1,7 +1,7 @@
 import express, { type ErrorRequestHandler, type Request, type Response } from 'express'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { cabinetDocSchema, etagForRevision, parseEtag } from '../shared/cabinetDoc'
+import { cabinetDocSchema, etagForRevision, parseEtag, type CabinetDoc } from '../shared/cabinetDoc'
 import { AuthError, parseToken, resolveUsername } from './auth'
 import { dbReady, getCabinetRow, putCabinetRow, ConflictError } from './db'
 import { discogsProxy } from './discogsProxy'
@@ -66,8 +66,24 @@ export function createApp(): express.Express {
     }
 
     try {
-      const row = putCabinetRow(username, JSON.stringify(parsed.data), expected)
-      res.json({ username, doc: parsed.data, etag: etagForRevision(row.revision) })
+      // An app version from before sleeve calls existed saves without them;
+      // keep the stored ones rather than wiping the user's calls. Current
+      // clients always send the field (`{}` when there are none).
+      let saved: CabinetDoc = parsed.data
+      const row = putCabinetRow(
+        username,
+        (current) => {
+          if (parsed.data.sleeves === undefined && current) {
+            const stored = cabinetDocSchema.safeParse(JSON.parse(current.doc))
+            if (stored.success && stored.data.sleeves) {
+              saved = { ...parsed.data, sleeves: stored.data.sleeves }
+            }
+          }
+          return JSON.stringify(saved)
+        },
+        expected,
+      )
+      res.json({ username, doc: saved, etag: etagForRevision(row.revision) })
     } catch (err) {
       if (err instanceof ConflictError) {
         const current = err.current

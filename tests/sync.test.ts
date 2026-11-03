@@ -222,4 +222,57 @@ describe('PUT /api/sync/cabinet', () => {
     const get = await request(app).get('/api/sync/cabinet').set(alice)
     expect(get.body.doc.cabinets[0].slots).toEqual([])
   })
+
+  it('keeps the manual sleeve calls, and rejects ones that are not true/false', async () => {
+    const doc = { ...sampleDoc(), sleeves: { '9160941': true, '42': false } }
+    const res = await request(app).put('/api/sync/cabinet').set(alice).set('If-Match', '*').send(doc)
+    expect(res.status).toBe(200)
+    const get = await request(app).get('/api/sync/cabinet').set(alice)
+    expect(get.body.doc.sleeves).toEqual({ '9160941': true, '42': false })
+
+    const bad = await request(app)
+      .put('/api/sync/cabinet')
+      .set(alice)
+      .set('If-Match', '*')
+      .send({ ...sampleDoc(), sleeves: { '1': 'gatefold' } })
+    expect(bad.status).toBe(400)
+
+    const notAnId = await request(app)
+      .put('/api/sync/cabinet')
+      .set(alice)
+      .set('If-Match', '*')
+      .send({ ...sampleDoc(), sleeves: { abc: true } })
+    expect(notAnId.status).toBe(400)
+  })
+
+  it('keeps the sleeve calls when an older app saves without them', async () => {
+    const withCalls = { ...sampleDoc(), sleeves: { '9160941': true } }
+    await request(app).put('/api/sync/cabinet').set(alice).set('If-Match', '*').send(withCalls)
+
+    // A cached copy of the app from before sleeve calls existed moves a shelf.
+    const old = sampleDoc({ '1-1': 's2' })
+    const res = await request(app).put('/api/sync/cabinet').set(alice).set('If-Match', '*').send(old)
+    expect(res.status).toBe(200)
+    expect(res.body.doc.sleeves).toEqual({ '9160941': true })
+
+    const get = await request(app).get('/api/sync/cabinet').set(alice)
+    expect(get.body.doc.placements).toEqual({ '1-1': 's2' })
+    expect(get.body.doc.sleeves).toEqual({ '9160941': true })
+  })
+
+  it('clears the sleeve calls when a current app saves none', async () => {
+    await request(app)
+      .put('/api/sync/cabinet')
+      .set(alice)
+      .set('If-Match', '*')
+      .send({ ...sampleDoc(), sleeves: { '9160941': true } })
+    await request(app)
+      .put('/api/sync/cabinet')
+      .set(alice)
+      .set('If-Match', '*')
+      .send({ ...sampleDoc(), sleeves: {} })
+
+    const get = await request(app).get('/api/sync/cabinet').set(alice)
+    expect(get.body.doc.sleeves).toEqual({})
+  })
 })

@@ -24,6 +24,10 @@ export const cabinetDocSchema = z.object({
   placements: z.record(z.string(), z.string()),
   overrides: z.record(z.string(), z.string()),
   unplaced: z.array(z.string()),
+  // The user's own sleeve calls, release id → gatefold or not. Optional so
+  // documents saved before it existed stay valid; the server keeps the stored
+  // calls when a save from such an older app leaves the field out.
+  sleeves: z.record(z.string().regex(/^\d+$/), z.boolean()).optional(),
   updatedAt: z.iso.datetime(),
 })
 

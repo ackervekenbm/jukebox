@@ -8,9 +8,10 @@ export const DB_NAME = 'vinyl-vault'
 /**
  * Schema version. Bump when a store is added or a row shape changes so every
  * browser re-runs the upgrade below. v5 added the listenLog store, v6 the
- * cabinet store.
+ * cabinet store, v7 the releaseSleeves store (release notes for the gatefold
+ * check).
  */
-export const VERSION = 6
+export const VERSION = 7
 
 /** Every object store the app uses; the upgrade creates any that are missing. */
 const STORES = [
@@ -20,7 +21,38 @@ const STORES = [
   'collectionValue',
   'listenLog',
   'cabinet',
+  'releaseSleeves',
 ]
+
+/**
+ * Where the shared connection stands when another tab gets in the way of an
+ * upgrade:
+ * - 'blocked' — this tab needs a newer schema, and a tab still on the old one
+ *   holds the database open; nothing loads until that tab closes.
+ * - 'outdated' — another tab opened a newer schema; this tab closed its
+ *   connection to let it, and must reload.
+ */
+export type DatabaseState = 'ok' | 'blocked' | 'outdated'
+
+let state: DatabaseState = 'ok'
+const listeners = new Set<(state: DatabaseState) => void>()
+
+function setState(next: DatabaseState) {
+  state = next
+  for (const listener of listeners) listener(next)
+}
+
+export function getDatabaseState(): DatabaseState {
+  return state
+}
+
+/** Calls `listener` whenever the state changes; returns the unsubscribe. */
+export function subscribeDatabaseState(listener: (state: DatabaseState) => void): () => void {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
 
 /**
  * One shared connection (and one shared upgrade) for the whole app: idb opens
@@ -35,4 +67,20 @@ export const dbPromise = openDB(DB_NAME, VERSION, {
       }
     }
   },
+  blocked() {
+    setState('blocked')
+  },
+  blocking() {
+    // Step aside, so the newer tab's upgrade isn't blocked by this one.
+    void dbPromise.then((db) => db.close())
+    setState('outdated')
+  },
 })
+
+// A blocked upgrade goes through once the old tab closes.
+void dbPromise.then(
+  () => {
+    if (state === 'blocked') setState('ok')
+  },
+  () => {},
+)

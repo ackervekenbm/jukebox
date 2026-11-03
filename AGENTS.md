@@ -96,8 +96,24 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   cabinet still starts with the earliest artist) gets its own run of shelves
   (`shelfShares`: enough to fit, spare shelves to the fullest groups) and is
   spread evenly over it; only when the shelves can't hold the groups apart
-  does one walk over all shelves mix them. It counts a gatefold sleeve as two
-  capacity spaces. A last pass back-fills records that found no room into any
+  does one walk over all shelves mix them.
+  Shelf space (`spaceUnitsOf`): one per disc of the release's largest
+  vinyl size (2×LP = 2; a bonus 7" in an LP adds nothing), or 2 for a
+  gatefold, whichever is larger. Gatefold detection (`mentionsGatefold`)
+  reads only vinyl formats — their descriptions and free `text` — and
+  else the release **notes**; it knows other languages (Klappcover, pochette
+  ouvrante, …) and skips denials ("not a gatefold", "unlike the original
+  gatefold") and gatefold items ("gatefold poster"). The collection listing
+  has no notes, so `src/hooks/useGatefoldNotes.ts` fetches `/releases/{id}`
+  (the shared `fetchEach` batcher in `src/api/discogs.ts`, same pacing as
+  master years; a 401/403 stops the whole run) for single vinyl discs the user
+  hasn't decided, only while the cabinet is open and the collection has
+  loaded. It caches the notes **text**, not a yes/no, so improving the
+  detector needs no refetch; the release-detail screen stores notes too. The
+  user's own call (`sleeves` in the synced doc, release id → boolean) wins
+  over detection and is dropped when it agrees with it again; the server keeps
+  the stored calls when an older client saves without the field.
+  A last pass back-fills records that found no room into any
   space left, which can put them on an earlier shelf than their place in the
   order. Conflicts: over-capacity, size-mix (one for the cabinet, only when
   sizes are kept apart), artist-split (per size run when sizes are kept
@@ -126,12 +142,16 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   values, collection counts), so the committed copies are a frozen baseline for
   offline PR CI, not a mirror of the API.
 - `src/db/database.ts` — one shared `openDB` connection for IndexedDB
-  `vinyl-vault` (idb lib), six stores: `collection` (1 row/username),
+  `vinyl-vault` (idb lib), seven stores: `collection` (1 row/username),
   `masterYears` (1 row), `collectionValue` (1 row/username), `releaseDetails`
   (unbounded tracklist cache — the app's main space grower), `listenLog`
-  (random-pick history, capped at 200 entries/username) and `cabinet` (one
-  cabinet doc + revision/`dirty` flag per username). Bump `VERSION` there
-  to invalidate caches after a shape change. `src/db/collection.ts`,
+  (random-pick history, capped at 200 entries/username), `cabinet` (one
+  cabinet doc + revision/`dirty` flag per username) and `releaseSleeves`
+  (release id → its notes text, for the gatefold check; kept for good). Bump
+  `VERSION` there to invalidate caches after a shape change. Upgrades with
+  other tabs open: `blocked` (an older tab holds the database) and `blocking`
+  (a newer tab wants it; this one closes its connection) set a state that
+  `useDatabaseState` turns into an app-wide banner. `src/db/collection.ts`,
   `src/db/listenLog.ts` and `src/db/cabinet.ts` are the typed store APIs;
   `settings.ts`, `views.ts`, `cabinetOptions.ts` and `picker.ts` in the same
   folder are the localStorage counterparts.

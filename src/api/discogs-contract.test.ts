@@ -7,7 +7,7 @@ import {
   fetchCollectionValue,
   fetchFolders,
   fetchMasterYears,
-  fetchReleaseTracklist,
+  fetchReleaseDetails,
 } from './discogs'
 import type {
   DiscogsCollectionFolderResponse,
@@ -149,14 +149,18 @@ describe.skipIf(masterYears.length === 0)('Discogs contract: master years', () =
   })
 })
 
-describe.skipIf(releaseFixture === undefined)('Discogs contract: release tracklist', () => {
-  it('parses the real release tracklist', async () => {
+describe.skipIf(releaseFixture === undefined)('Discogs contract: release details', () => {
+  it('parses the real release tracklist and notes', async () => {
     const data = releaseFixture as DiscogsRelease
     mockFetch(() => json(data))
 
-    const tracks = await fetchReleaseTracklist(data.id, 'tok')
+    const { tracks, notes } = await fetchReleaseDetails(data.id, 'tok')
 
     expect(tracks).toEqual(data.tracklist)
+    // Notes are free text when Discogs has them, absent otherwise; either way
+    // the parser hands the gatefold check a string.
+    expect(['string', 'undefined']).toContain(typeof data.notes)
+    expect(notes).toBe((data.notes ?? '').slice(0, 4000))
     expect(tracks.length).toBeGreaterThan(0)
     for (const track of tracks) {
       expect(typeof track.position).toBe('string')

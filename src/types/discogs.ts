@@ -21,6 +21,8 @@ export interface DiscogsLabelRef {
 export interface DiscogsFormat {
   name: string
   qty: string
+  /** Free text next to the format, e.g. "180 g", "Red Marbled", sometimes "Gatefold". */
+  text?: string
   descriptions?: string[]
 }
 
@@ -91,6 +93,8 @@ export interface DiscogsRelease {
   title: string
   year: number
   tracklist: DiscogsTrack[]
+  /** Free-form release notes; often the only place a gatefold sleeve is mentioned. */
+  notes?: string
 }
 
 /**

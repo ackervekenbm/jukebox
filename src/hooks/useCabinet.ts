@@ -4,7 +4,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Cabinet, CabinetDoc, Slot } from '../shared/cabinetDoc'
 import type { DisplayRelease } from '../utils/collection'
-import { planCabinet, type CabinetPlan, type CabinetSortMode } from '../utils/cabinet'
+import {
+  detectedGatefold,
+  planCabinet,
+  type CabinetPlan,
+  type CabinetSortMode,
+  type SleeveFacts,
+} from '../utils/cabinet'
+import { useGatefoldNotes, type GatefoldScanProgress } from './useGatefoldNotes'
 import { clearCabinet, getCabinet, putCabinet } from '../db/cabinet'
 import { loadCabinetOptions, saveCabinetOptions, type CabinetOptions } from '../db/cabinetOptions'
 import {
@@ -79,13 +86,18 @@ function cabinetsOf(doc: CabinetDoc): Cabinet[] {
 }
 
 /** The synced document for a computed layout, stamped with the current time. */
-export function buildCabinetDoc(cabinets: Cabinet[], plan: CabinetPlan): CabinetDoc {
+export function buildCabinetDoc(
+  cabinets: Cabinet[],
+  plan: CabinetPlan,
+  sleeves: Record<string, boolean> = {},
+): CabinetDoc {
   return {
     schemaVersion: 1,
     cabinets,
     placements: plan.placements,
     overrides: {},
     unplaced: plan.unplaced.map((record: DisplayRelease) => record.key),
+    sleeves,
     updatedAt: new Date().toISOString(),
   }
 }
@@ -109,6 +121,8 @@ export interface UseCabinetArgs {
   releases: DisplayRelease[]
   /** The cabinet only loads and syncs while its screen is on. */
   enabled: boolean
+  /** The collection has loaded (not enriching, no error); the gatefold scan waits for it. */
+  collectionReady?: boolean
 }
 
 export interface RemovedSlot {
@@ -121,6 +135,12 @@ export interface UseCabinetResult {
   cabinet: Cabinet
   options: CabinetOptions
   plan: CabinetPlan
+  /** What is known about sleeves: release notes and the user's own calls. */
+  sleeves: SleeveFacts
+  /** The release-notes gatefold scan, null when idle. */
+  gatefoldScan: GatefoldScanProgress | null
+  /** Why the release-notes scan stopped early, else null. */
+  gatefoldScanError: string | null
   status: CabinetStatus
   dirty: boolean
   error: string | null
@@ -132,24 +152,56 @@ export interface UseCabinetResult {
   restoreSlot: (removed: RemovedSlot) => void
   setSort: (sort: CabinetSortMode) => void
   setSeparateSizeClasses: (separate: boolean) => void
+  /** Flip a record between gatefold and standard sleeve, overriding detection. */
+  toggleGatefold: (display: DisplayRelease) => void
   retry: () => void
   reset: () => Promise<void>
 }
 
-export function useCabinet({ username, token, releases, enabled }: UseCabinetArgs): UseCabinetResult {
+export function useCabinet({
+  username,
+  token,
+  releases,
+  enabled,
+  collectionReady = true,
+}: UseCabinetArgs): UseCabinetResult {
   const [cabinets, setCabinets] = useState<Cabinet[]>(() => [defaultCabinet()])
+  const [overrides, setOverrides] = useState<Record<string, boolean>>({})
   const [options, setOptions] = useState<CabinetOptions>(() => loadCabinetOptions())
   const [revision, setRevision] = useState(0)
   const [dirty, setDirty] = useState(false)
   const [status, setStatus] = useState<CabinetStatus>('local')
   const [error, setError] = useState<string | null>(null)
 
+  const {
+    notes,
+    progress: gatefoldScan,
+    error: gatefoldScanError,
+  } = useGatefoldNotes({
+    releases,
+    token,
+    enabled,
+    paused: !collectionReady,
+    overrides,
+  })
+  const sleeves = useMemo<SleeveFacts>(() => ({ notes, overrides }), [notes, overrides])
+
   const cabinet = cabinets[0]
   const plan = useMemo(
-    () => planCabinet({ releases, cabinet, options }),
-    [releases, cabinet, options],
+    () => planCabinet({ releases, cabinet, options, sleeves }),
+    [releases, cabinet, options, sleeves],
   )
-  const doc = useMemo(() => buildCabinetDoc(cabinets, plan), [cabinets, plan])
+  const doc = useMemo(
+    () => buildCabinetDoc(cabinets, plan, overrides),
+    [cabinets, plan, overrides],
+  )
+
+  // Detection can only be checked against the live facts, so the toggle reads
+  // them through a ref rather than closing over a stale copy.
+  const sleevesRef = useRef(sleeves)
+  useEffect(() => {
+    sleevesRef.current = sleeves
+  }, [sleeves])
 
   // Debounced pushes and retries read the live copies through this ref.
   const live = useRef({ token, revision, doc })
@@ -216,6 +268,7 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
             nextDoc = rebaseCabinetDoc(base)
             nextRevision = revisionFromEtag(err.etag, nextRevision)
             setCabinets(nextDoc.cabinets)
+            setOverrides(nextDoc.sleeves ?? {})
             setRevision(nextRevision)
             persist(nextDoc, nextRevision, true)
             continue
@@ -265,10 +318,12 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
       if (cancelled) return
       if (stored) {
         setCabinets(cabinetsOf(stored.doc))
+        setOverrides(stored.doc.sleeves ?? {})
         setRevision(stored.revision)
         setDirty(stored.dirty)
       } else {
         setCabinets([defaultCabinet()])
+        setOverrides({})
         setRevision(0)
         setDirty(false)
       }
@@ -291,11 +346,13 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
         if (stored?.dirty) {
           const rebased = rebaseCabinetDoc({ ...stored.doc, cabinets: cabinetsOf(stored.doc) })
           setCabinets(rebased.cabinets)
+          setOverrides(rebased.sleeves ?? {})
           setRevision(remoteRevision)
           await push(rebased, remoteRevision)
           return
         }
         setCabinets(cabinetsOf(remote.doc))
+        setOverrides(remote.doc.sleeves ?? {})
         setRevision(remoteRevision)
         setStatus('synced')
         persist(remote.doc, remoteRevision, false)
@@ -418,6 +475,26 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
     })
   }, [])
 
+  const toggleGatefold = useCallback(
+    (display: DisplayRelease) => {
+      const id = String(display.id)
+      // Detection only needs the notes, which the ref holds; the overrides are
+      // read from the updater so two quick toggles can't read a stale copy.
+      const detected = detectedGatefold(display, { notes: sleevesRef.current.notes })
+      setOverrides((current) => {
+        const next = !(current[id] ?? detected)
+        const updated = { ...current }
+        // Agreeing with detection drops the call, so a later fix on Discogs
+        // (or in the notes scan) still reaches this record.
+        if (next === detected) delete updated[id]
+        else updated[id] = next
+        return updated
+      })
+      edited()
+    },
+    [edited],
+  )
+
   const retry = useCallback(() => {
     setDirty(true)
     setError(null)
@@ -427,6 +504,7 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
   const reset = useCallback(async () => {
     if (username) await clearCabinet(username)
     setCabinets([defaultCabinet()])
+    setOverrides({})
     setRevision(0)
     setDirty(false)
     setStatus('local')
@@ -438,6 +516,9 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
     cabinet,
     options,
     plan,
+    sleeves,
+    gatefoldScan,
+    gatefoldScanError,
     status,
     dirty,
     error,
@@ -447,6 +528,7 @@ export function useCabinet({ username, token, releases, enabled }: UseCabinetArg
     restoreSlot,
     setSort,
     setSeparateSizeClasses,
+    toggleGatefold,
     retry,
     reset,
   }

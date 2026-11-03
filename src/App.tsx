@@ -33,6 +33,7 @@ import { SettingsForm } from './components/Settings'
 import { StorageStats } from './components/StorageStats'
 import { CabinetScreen } from './components/CabinetScreen'
 import { useScrollLock } from './hooks/useScrollLock'
+import { useDatabaseState } from './hooks/useDatabaseState'
 import { SearchBar } from './components/SearchBar'
 import { FiltersButton, FilterPanel } from './components/FilterMenu'
 import { ViewsButton, ViewsPanel } from './components/ViewsMenu'
@@ -116,6 +117,7 @@ function toRecentPicks(
 }
 
 export default function App() {
+  const databaseState = useDatabaseState()
   const [settings, setSettings] = useState<SettingsType | null>(loadSettings)
   const [theme, setTheme] = useState<ThemeId>(settings?.theme ?? 'midnight')
   const [showSettings, setShowSettings] = useState<boolean>(() => !loadSettings())
@@ -447,6 +449,19 @@ export default function App() {
 
   return (
     <>
+      {databaseState !== 'ok' && (
+        <div className="sync-banner error database-banner" role="alert">
+          {databaseState === 'blocked'
+            ? 'Jukebox is updating its storage. Close Jukebox in your other tabs or windows to continue.'
+            : 'Jukebox was updated in another tab. Reload to continue.'}
+          {databaseState === 'outdated' && (
+            <button type="button" onClick={() => window.location.reload()}>
+              Reload
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Full-screen settings (no saved settings, or opened from menu) */}
       {showSettings && (
         <div
@@ -772,6 +787,7 @@ export default function App() {
           username={settings.username}
           token={settings.token}
           releases={displayReleases}
+          collectionReady={status === 'idle'}
           onClose={() => setShowCabinet(false)}
         />
       )}

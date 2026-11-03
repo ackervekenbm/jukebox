@@ -17,7 +17,32 @@ export const SIZE_CLASS_LABELS: Record<SizeClass, string> = {
 }
 
 const INCH_PATTERN = /(\d+(?:[.,]\d+)?)\s*(?:"|″|”|inch|inches)/gi
-const GATEFOLD_PATTERN = /\bgatefold\b/i
+/**
+ * Ways Discogs entries say "gatefold": English, plus the words pressings from
+ * Germany, France, Italy, Spain, the Netherlands and Japan use, and fold-out
+ * and tri-fold jackets (also thicker than a single sleeve).
+ */
+const GATEFOLD_PATTERN =
+  /gate[- ]?fold|klapp(?:cover|hülle|huelle)|pochette ouvrante|copertina apribile|doble carpeta|carpeta doble|uitklaphoes|fold[- ]?out (?:sleeve|cover|jacket)|tri[- ]?fold|見開き/giu
+/** "not a gatefold", "unlike the original gatefold": the mention denies it. */
+const DENIAL_BEFORE = /\b(?:not|no|non|without|unlike|instead of|rather than|lacks?)\b[^.;:\n]{0,30}$/iu
+/** "gatefold poster", "gatefold insert": a gatefold item, not the jacket. */
+const ITEM_AFTER = /^[\s-]*(?:poster|insert|inner|booklet|print|card|lyric)/iu
+
+/**
+ * Whether a piece of Discogs text says the jacket is a gatefold: a gatefold
+ * word that isn't denied just before it or followed by a gatefold item.
+ */
+export function mentionsGatefold(text: string | undefined): boolean {
+  if (!text) return false
+  for (const match of text.matchAll(GATEFOLD_PATTERN)) {
+    const start = match.index ?? 0
+    const before = text.slice(Math.max(0, start - 60), start)
+    const after = text.slice(start + match[0].length)
+    if (!DENIAL_BEFORE.test(before) && !ITEM_AFTER.test(after)) return true
+  }
+  return false
+}
 
 /** The largest size a piece of format text states, in inches. */
 function statedInches(text: string): number | null {
@@ -63,11 +88,93 @@ export function sizeClassOf(display: DisplayRelease): SizeClass {
 }
 
 /**
- * How much shelf space a release takes. A gatefold sleeve is twice as thick as
- * a standard sleeve, so it uses two of the slots a shelf capacity counts.
+ * What is known about sleeves beyond the collection listing, keyed by release
+ * id. `notes` holds each release's own notes text (fetched once from the full
+ * release, which the collection listing leaves out; '' when it has none), so a
+ * better gatefold search re-reads them without asking Discogs again.
+ * `overrides` is the user's call, and wins over anything detected.
  */
-export function spaceUnitsOf(display: DisplayRelease): number {
-  return GATEFOLD_PATTERN.test(display.formatText) ? 2 : 1
+export interface SleeveFacts {
+  notes?: Record<string, string>
+  overrides?: Record<string, boolean>
+}
+
+/** The vinyl formats of a release; CDs and tapes in a set don't make it thicker. */
+function vinylFormatsOf(display: DisplayRelease) {
+  return (display.release?.basic_information?.formats ?? []).filter((format) =>
+    isVinylName(format.name),
+  )
+}
+
+/** The listing names it: a vinyl format's descriptions or its free text. */
+function formatSaysGatefold(display: DisplayRelease): boolean {
+  const parts = display.formatText
+    .split(' / ')
+    .filter((part) => isVinylName(part.split(' · ')[0] ?? ''))
+  return (
+    parts.some((part) => mentionsGatefold(part)) ||
+    vinylFormatsOf(display).some((format) => mentionsGatefold(format.text))
+  )
+}
+
+/** Gatefold as detected from Discogs data alone, ignoring the user's call. */
+export function detectedGatefold(display: DisplayRelease, facts: SleeveFacts = {}): boolean {
+  return formatSaysGatefold(display) || mentionsGatefold(facts.notes?.[String(display.id)])
+}
+
+export function isGatefold(display: DisplayRelease, facts: SleeveFacts = {}): boolean {
+  return facts.overrides?.[String(display.id)] ?? detectedGatefold(display, facts)
+}
+
+/** Whether the user's own call disagrees with detection (an agreeing one changes nothing). */
+export function isUserCall(display: DisplayRelease, facts: SleeveFacts = {}): boolean {
+  const call = facts.overrides?.[String(display.id)]
+  return call !== undefined && call !== detectedGatefold(display, facts)
+}
+
+/**
+ * Discs that take their own space: the vinyl discs of the release's largest
+ * size ("2×Vinyl, LP" is two). A bonus 7" or flexi tucked in an LP's sleeve
+ * adds nothing. At least one.
+ */
+export function discCountOf(display: DisplayRelease): number {
+  const sized = vinylFormatsOf(display).map((format) => {
+    const qty = Number.parseInt(format.qty, 10)
+    return {
+      inches: statedInches([...(format.descriptions ?? []), format.text ?? ''].join(' ')) ?? 12,
+      discs: Number.isFinite(qty) && qty > 0 ? qty : 1,
+    }
+  })
+  const largest = Math.max(0, ...sized.map((format) => format.inches))
+  const discs = sized
+    .filter((format) => format.inches === largest)
+    .reduce((total, format) => total + format.discs, 0)
+  return Math.max(1, discs)
+}
+
+/**
+ * How much shelf space a release takes. A gatefold sleeve is twice as thick as
+ * a standard one, and every extra disc adds a space; a release takes whichever
+ * is larger, so a gatefold double LP still takes two.
+ */
+export function spaceUnitsOf(display: DisplayRelease, facts: SleeveFacts = {}): number {
+  return Math.max(discCountOf(display), isGatefold(display, facts) ? 2 : 1)
+}
+
+/**
+ * Whether fetching the release's notes could change its shelf space: a single
+ * vinyl disc whose listing doesn't already say gatefold, that the user hasn't
+ * decided themselves, and that hasn't been checked yet.
+ */
+export function needsNotesCheck(display: DisplayRelease, facts: SleeveFacts = {}): boolean {
+  const id = String(display.id)
+  return (
+    isVinyl(display) &&
+    discCountOf(display) < 2 &&
+    !formatSaysGatefold(display) &&
+    facts.overrides?.[id] === undefined &&
+    facts.notes?.[id] === undefined
+  )
 }
 
 /**
@@ -92,7 +199,7 @@ export const DEFAULT_PLAN_OPTIONS: CabinetPlanOptions = {
 export interface PlannedRecord {
   key: string
   display: DisplayRelease
-  /** Shelf space used, counting a gatefold as two. */
+  /** Shelf space used: two for a gatefold, one per disc for a multi-disc set. */
   units: number
 }
 
@@ -133,6 +240,7 @@ export interface CabinetPlanInput {
   releases: DisplayRelease[]
   cabinet: Cabinet
   options?: CabinetPlanOptions
+  sleeves?: SleeveFacts
 }
 
 interface SortedRecord {
@@ -366,7 +474,7 @@ function allocate(
 }
 
 export function planCabinet(input: CabinetPlanInput): CabinetPlan {
-  const { releases, cabinet, options = DEFAULT_PLAN_OPTIONS } = input
+  const { releases, cabinet, options = DEFAULT_PLAN_OPTIONS, sleeves } = input
 
   const artistKeys = new Map<string, string>()
   const sizeOf = new Map<string, SizeClass>()
@@ -376,7 +484,7 @@ export function planCabinet(input: CabinetPlanInput): CabinetPlan {
       artistKeys.set(display.artistName, makeSortKey(display.artistName))
     }
     sizeOf.set(display.key, sizeClassOf(display))
-    unitsOf.set(display.key, spaceUnitsOf(display))
+    unitsOf.set(display.key, spaceUnitsOf(display, sleeves))
   }
 
   const byKey = new Map<string, DisplayRelease>()

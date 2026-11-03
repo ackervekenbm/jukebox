@@ -3,8 +3,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { DiscogsTrack } from '../types/discogs'
-import { fetchReleaseTracklist } from '../api/discogs'
-import { getReleaseTracklist, setReleaseTracklist } from '../db/collection'
+import { fetchReleaseDetails } from '../api/discogs'
+import { getReleaseTracklist, setReleaseNotes, setReleaseTracklist } from '../db/collection'
 
 interface UseReleaseTracklistResult {
   tracks: DiscogsTrack[] | null
@@ -41,10 +41,13 @@ export function useReleaseTracklist(
         if (cached) {
           setTracks(cached)
         } else if (token) {
-          const fetched = await fetchReleaseTracklist(releaseId, token, controller.signal)
+          const fetched = await fetchReleaseDetails(releaseId, token, controller.signal)
           if (controller.signal.aborted) return
-          setTracks(fetched)
-          setReleaseTracklist(releaseId, fetched).catch(() => {})
+          setTracks(fetched.tracks)
+          setReleaseTracklist(releaseId, fetched.tracks).catch(() => {})
+          // The same request carries the notes, so the cabinet's gatefold check
+          // for this release comes free.
+          setReleaseNotes(releaseId, fetched.notes).catch(() => {})
         }
       } catch (err) {
         if (controller.signal.aborted) return

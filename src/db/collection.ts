@@ -27,6 +27,7 @@ const STORE = 'collection'
 const MASTER_STORE = 'masterYears'
 const DETAIL_STORE = 'releaseDetails'
 const VALUE_STORE = 'collectionValue'
+const SLEEVE_STORE = 'releaseSleeves'
 const MASTER_KEY = 'all'
 
 export async function getCachedCollection(username: string): Promise<CachedCollection | undefined> {
@@ -69,6 +70,35 @@ export async function getReleaseTracklist(releaseId: number): Promise<DiscogsTra
 export async function setReleaseTracklist(releaseId: number, tracks: DiscogsTrack[]): Promise<void> {
   const db = await dbPromise
   await db.put(DETAIL_STORE, tracks, releaseId)
+}
+
+// Each release's notes text ('' when it has none), one row per release id,
+// for the cabinet's gatefold check. The text rather than a yes/no is kept, so
+// a better check re-reads it without asking Discogs again. One row per release
+// lets the cabinet's scan and the release-detail screen record notes side by
+// side.
+export async function getReleaseNotes(): Promise<Record<string, string>> {
+  const db = await dbPromise
+  const [keys, values] = await Promise.all([
+    db.getAllKeys(SLEEVE_STORE),
+    db.getAll(SLEEVE_STORE),
+  ])
+  const result: Record<string, string> = {}
+  keys.forEach((key, index) => {
+    const value = values[index]
+    if (typeof value === 'string') result[String(key)] = value
+  })
+  return result
+}
+
+export async function setReleaseNotes(releaseId: number, notes: string): Promise<void> {
+  const db = await dbPromise
+  await db.put(SLEEVE_STORE, notes, releaseId)
+}
+
+export async function clearReleaseNotes(): Promise<void> {
+  const db = await dbPromise
+  await db.clear(SLEEVE_STORE)
 }
 
 export async function clearReleaseDetails(): Promise<void> {

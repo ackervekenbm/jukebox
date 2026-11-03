@@ -89,6 +89,7 @@ const actions = {
   restoreSlot: vi.fn(),
   setSort: vi.fn(),
   setSeparateSizeClasses: vi.fn(),
+  toggleGatefold: vi.fn(),
   retry: vi.fn(),
   reset: vi.fn(),
 }
@@ -99,6 +100,9 @@ function setState(cabinet: Cabinet, plan: CabinetPlan, overrides: Record<string,
     cabinet,
     options: { sort: 'chronological', separateSizeClasses: true },
     plan,
+    sleeves: {},
+    gatefoldScan: null,
+    gatefoldScanError: null,
     status: 'synced',
     dirty: false,
     error: null,
@@ -263,7 +267,7 @@ describe('CabinetScreen', () => {
       fireEvent.click(shelfHeader('Shelf 1'))
       fireEvent.click(screen.getByRole('button', { name: 'Remove Shelf 1' }))
 
-      const message = screen.getByRole('status')
+      const message = screen.getByRole('status', { name: 'Removed shelf' })
       expect(message).toHaveTextContent('Shelf 1 removed')
       fireEvent.click(within(message).getByRole('button', { name: 'Undo' }))
       expect(actions.restoreSlot).toHaveBeenCalledWith(expect.objectContaining(removed))
@@ -276,12 +280,12 @@ describe('CabinetScreen', () => {
       renderScreen()
       fireEvent.click(shelfHeader('Shelf 1'))
       fireEvent.click(screen.getByRole('button', { name: 'Remove Shelf 1' }))
-      expect(screen.getByRole('status')).toHaveTextContent('Shelf 1 removed')
+      expect(screen.getByRole('status', { name: 'Removed shelf' })).toHaveTextContent('Shelf 1 removed')
 
       act(() => {
         vi.advanceTimersByTime(8000)
       })
-      expect(screen.getByRole('status')).toBeEmptyDOMElement()
+      expect(screen.getByRole('status', { name: 'Removed shelf' })).toBeEmptyDOMElement()
     })
 
     it('moves focus to the shelf that takes its place', () => {
@@ -459,6 +463,143 @@ describe('CabinetScreen', () => {
 
     const row = screen.getByText('Folded').closest('li')!
     expect(within(row).getByText('2 spaces')).toBeInTheDocument()
+  })
+
+  it('toggles a record between gatefold and standard sleeve', () => {
+    renderScreen()
+    fireEvent.click(screen.getByRole('button', { name: /Shelf 1/ }))
+
+    const toggle = screen.getByRole('button', { name: 'Gatefold: First' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(toggle)
+    expect(actions.toggleGatefold).toHaveBeenCalledWith(releases[0])
+  })
+
+  it('shows a gatefold found in the release notes, and why it takes two spaces', () => {
+    const cabinet = cabinetOf([75, 75])
+    const sleeves = { notes: { [String(releases[0].id)]: 'Gatefold sleeve.' } }
+    mock.state = {
+      cabinets: [cabinet],
+      cabinet,
+      options: { sort: 'chronological', separateSizeClasses: true },
+      plan: planCabinet({ releases, cabinet, sleeves }),
+      sleeves,
+      gatefoldScan: null,
+      status: 'synced',
+      dirty: false,
+      error: null,
+      ...actions,
+    }
+    renderScreen()
+    expect(screen.getByText('1 gatefold')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Shelf 1/ }))
+
+    const toggle = screen.getByRole('button', { name: 'Gatefold: First' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    expect(toggle).toHaveAccessibleDescription(/according to Discogs/)
+    expect(within(toggle).queryByText('you')).not.toBeInTheDocument()
+    expect(within(toggle.closest('li')!).getByText('2 spaces')).toBeInTheDocument()
+
+    // The chips come after the year (right-aligned under it, on the artist's
+    // line), so the years line up; the Gatefold button comes last so it lines
+    // up too.
+    const row = toggle.closest('li')!
+    const tags = row.querySelector('.cabinet-record-tags')!
+    expect(tags.parentElement).toBe(row)
+    expect(tags.previousElementSibling).toHaveClass('cabinet-record-year')
+    expect(tags.lastElementChild).toBe(toggle)
+  })
+
+  it('reports the release-notes check while it runs', () => {
+    const state = mock.state as { gatefoldScan: unknown }
+    state.gatefoldScan = { done: 12, total: 40 }
+    renderScreen()
+
+    expect(screen.getByText('Checking release notes: 12 of 40 records')).toBeInTheDocument()
+    const bar = screen.getByRole('progressbar', { name: 'Release notes checked' })
+    expect(bar).toHaveAttribute('value', '12')
+    expect(bar).toHaveAttribute('max', '40')
+  })
+
+  it('says the check waits for the collection to load', () => {
+    render(
+      <CabinetScreen
+        username="alice"
+        token="tok"
+        releases={releases}
+        collectionReady={false}
+        onClose={vi.fn()}
+      />,
+    )
+    expect(screen.getByText(/checked once your collection has loaded/)).toBeInTheDocument()
+  })
+
+  it('marks a sleeve the user decided with a visible "you"', () => {
+    // Discogs has no gatefold for First; the user said it is one.
+    const cabinet = cabinetOf([75])
+    const sleeves = { overrides: { [String(releases[0].id)]: true } }
+    setState(cabinet, planOf(cabinet, [{ records: [onShelf(releases[0], 2)] }]), { sleeves })
+    renderScreen()
+    fireEvent.click(shelfHeader('Shelf 1'))
+
+    const toggle = screen.getByRole('button', { name: /^Gatefold: First/ })
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    expect(within(toggle).getByText('you')).toBeInTheDocument()
+    expect(toggle).toHaveAccessibleDescription(/marked by you/)
+  })
+
+  it('says a multi-disc release takes its space for its discs', () => {
+    const double = release('Gamma', 'Double', {
+      formatText: 'Vinyl · LP',
+      release: {
+        basic_information: { formats: [{ name: 'Vinyl', qty: '2', descriptions: ['LP'] }] },
+      } as unknown as DiscogsCollectionRelease,
+    })
+    const cabinet = cabinetOf([75])
+    setState(cabinet, planOf(cabinet, [{ records: [onShelf(double, 2)] }]))
+    renderScreen(vi.fn(), [double])
+    fireEvent.click(shelfHeader('Shelf 1'))
+
+    const row = screen.getByText('Double').closest('li')!
+    expect(within(row).getByText('2 discs')).toBeInTheDocument()
+    expect(within(row).getByRole('button', { name: /^Gatefold: Double/ })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('has no Gatefold button for a CD', () => {
+    const cd = release('Gamma', 'Disc', { formatNames: ['CD'], formatText: 'CD · Album' })
+    const cabinet = cabinetOf([75])
+    setState(cabinet, planOf(cabinet, [{ records: [onShelf(cd)] }]))
+    renderScreen(vi.fn(), [cd])
+    fireEvent.click(shelfHeader('Shelf 1'))
+    expect(screen.queryByRole('button', { name: /^Gatefold/ })).not.toBeInTheDocument()
+  })
+
+  it('says when Discogs refused the token for the release notes', () => {
+    setDefault()
+    ;(mock.state as Record<string, unknown>).gatefoldScanError =
+      'Discogs refused the token, so release notes were not checked.'
+    renderScreen()
+    expect(screen.getByText(/refused the token/)).toBeInTheDocument()
+  })
+
+  it('announces the release-notes check starting and finishing, not every step', () => {
+    const state = mock.state as { gatefoldScan: unknown }
+    state.gatefoldScan = { done: 0, total: 40 }
+    const { rerender } = render(
+      <CabinetScreen username="alice" token="tok" releases={releases} onClose={vi.fn()} />,
+    )
+    const announcer = screen.getByRole('status', { name: 'Release notes check' })
+    expect(announcer).toHaveTextContent('Checking release notes for gatefold sleeves.')
+    // The visible count is not a live region.
+    expect(screen.getByText(/Checking release notes: 0 of 40/)).not.toHaveAttribute('aria-live')
+
+    state.gatefoldScan = { done: 20, total: 40 }
+    rerender(<CabinetScreen username="alice" token="tok" releases={releases} onClose={vi.fn()} />)
+    expect(announcer).toHaveTextContent('Checking release notes for gatefold sleeves.')
+
+    state.gatefoldScan = null
+    rerender(<CabinetScreen username="alice" token="tok" releases={releases} onClose={vi.fn()} />)
+    expect(announcer).toHaveTextContent('Release notes checked.')
   })
 
   it('offers a retry when a sync fails', () => {

@@ -18,6 +18,16 @@ import {
   withUniqueSlotIds,
 } from './useCabinet'
 
+// The release-notes scan has its own tests; here it reports whatever notes the
+// test sets, and never touches the network.
+const scan = vi.hoisted(() => ({ notes: {} as Record<string, string>, paused: [] as boolean[] }))
+vi.mock('./useGatefoldNotes', () => ({
+  useGatefoldNotes: ({ paused }: { paused: boolean }) => {
+    scan.paused.push(paused)
+    return { notes: scan.notes, progress: null, error: null }
+  },
+}))
+
 let nextId = 0
 
 function release(artist: string, title: string): DisplayRelease {
@@ -62,6 +72,8 @@ const useIt = (overrides: Partial<Parameters<typeof useCabinet>[0]> = {}) =>
 
 beforeEach(() => {
   vi.restoreAllMocks()
+  scan.notes = {}
+  scan.paused = []
 })
 
 afterEach(() => {
@@ -245,6 +257,123 @@ describe('useCabinet', () => {
     const ids = result.current.cabinet.slots.map((slot) => slot.id)
     expect(ids).toEqual(['slot-1', 'slot-3', 'slot-4'])
     expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  describe('gatefolds', () => {
+    const synced = async () => {
+      vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
+      vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+      vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: null, etag: '"r0"' })
+    }
+
+    it('counts a gatefold the release notes found as two spaces', async () => {
+      await synced()
+      scan.notes = { [String(releases[0].id)]: 'Gatefold sleeve.' }
+      const { result } = renderHook(() => useIt())
+      await waitFor(() => expect(result.current.status).toBe('synced'))
+
+      const units = result.current.plan.slots.flatMap((slot) => slot.records.map((record) => record.units))
+      expect(units.sort()).toEqual([1, 2])
+    })
+
+    it('stores a manual call in the synced document, and drops it when it agrees with Discogs again', async () => {
+      await synced()
+      const { result } = renderHook(() => useIt())
+      await waitFor(() => expect(result.current.status).toBe('synced'))
+      const id = String(releases[0].id)
+
+      act(() => result.current.toggleGatefold(releases[0]))
+      expect(result.current.sleeves.overrides).toEqual({ [id]: true })
+      expect(result.current.dirty).toBe(true)
+
+      act(() => result.current.toggleGatefold(releases[0]))
+      expect(result.current.sleeves.overrides).toEqual({})
+    })
+
+    it('lets the user overrule a gatefold Discogs reports', async () => {
+      await synced()
+      scan.notes = { [String(releases[0].id)]: 'Gatefold sleeve.' }
+      const { result } = renderHook(() => useIt())
+      await waitFor(() => expect(result.current.status).toBe('synced'))
+
+      act(() => result.current.toggleGatefold(releases[0]))
+      expect(result.current.sleeves.overrides).toEqual({ [String(releases[0].id)]: false })
+      const units = result.current.plan.slots.flatMap((slot) => slot.records.map((record) => record.units))
+      expect(units).toEqual([1, 1])
+    })
+
+    it('restores manual calls from the stored document', async () => {
+      const stored = { ...docWith('Record Cabinet'), sleeves: { [String(releases[1].id)]: true } }
+      vi.spyOn(store, 'getCabinet').mockResolvedValue({ username: 'alice', doc: stored, revision: 1, dirty: false })
+      vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+
+      const { result } = renderHook(() => useIt({ token: null }))
+      await waitFor(() => expect(result.current.sleeves.overrides).toEqual(stored.sleeves))
+    })
+
+    it('holds the release-notes scan until the collection has loaded', () => {
+      vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
+      const { rerender } = renderHook(({ ready }) => useIt({ token: null, collectionReady: ready }), {
+        initialProps: { ready: false },
+      })
+      expect(scan.paused.at(-1)).toBe(true)
+      rerender({ ready: true })
+      expect(scan.paused.at(-1)).toBe(false)
+    })
+
+    it('toggles a call made before the notes agreed with it back to standard, in one press', async () => {
+      // Marked as gatefold, then the notes said so too: the call no longer
+      // disagrees, so one press makes it a standard sleeve, as the button shows.
+      await synced()
+      const id = String(releases[0].id)
+      const stored = { ...docWith('Record Cabinet'), sleeves: { [id]: true } }
+      vi.spyOn(store, 'getCabinet').mockResolvedValue({ username: 'alice', doc: stored, revision: 1, dirty: false })
+      scan.notes = { [id]: 'Gatefold sleeve.' }
+      const { result } = renderHook(() => useIt({ token: null }))
+      await waitFor(() => expect(result.current.sleeves.overrides).toEqual({ [id]: true }))
+
+      act(() => result.current.toggleGatefold(releases[0]))
+      expect(result.current.sleeves.overrides).toEqual({ [id]: false })
+    })
+
+    it('keeps a toggle made while a push is in flight', async () => {
+      vi.useFakeTimers()
+      await synced()
+      let release: () => void = () => {}
+      const pushSpy = vi
+        .spyOn(syncApi, 'pushCabinet')
+        .mockImplementationOnce(
+          (_token, doc) =>
+            new Promise((resolve) => {
+              release = () => resolve({ doc, etag: '"r1"' })
+            }),
+        )
+        .mockImplementation(async (_token, doc) => ({ doc, etag: '"r2"' }))
+      const { result } = renderHook(() => useIt())
+      await act(async () => {})
+
+      act(() => result.current.addSlot())
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(800)
+      })
+      act(() => result.current.toggleGatefold(releases[0]))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(800)
+        release()
+      })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(800)
+      })
+
+      expect(pushSpy).toHaveBeenCalledTimes(2)
+      expect(pushSpy.mock.calls[1][1].sleeves).toEqual({ [String(releases[0].id)]: true })
+      expect(result.current.dirty).toBe(false)
+    })
+
+    it('keeps the manual calls through a sync conflict', () => {
+      const local = { ...docWith('Record Cabinet'), sleeves: { '7': true } }
+      expect(rebaseCabinetDoc(local).sleeves).toEqual({ '7': true })
+    })
   })
 
   it('keeps an edit made while a push is in flight, and pushes it next', async () => {
