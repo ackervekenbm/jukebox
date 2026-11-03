@@ -18,12 +18,22 @@ describe('cabinet options', () => {
   })
 
   it('round-trips both options', () => {
-    saveCabinetOptions({ sort: 'year', separateSizeClasses: false })
+    saveCabinetOptions({ sort: 'byName', separateSizeClasses: false })
     expect(JSON.parse(localStorage.getItem(KEY) ?? 'null')).toEqual({
-      sort: 'year',
+      sort: 'byName',
       separateSizeClasses: false,
     })
-    expect(loadCabinetOptions()).toEqual({ sort: 'year', separateSizeClasses: false })
+    expect(loadCabinetOptions()).toEqual({ sort: 'byName', separateSizeClasses: false })
+  })
+
+  it('maps the old whole-cabinet orders onto the main view\'s in-artist order', () => {
+    const stored = (sort: string) => {
+      localStorage.setItem(KEY, JSON.stringify({ sort, separateSizeClasses: true }))
+      return loadCabinetOptions().sort
+    }
+    expect(stored('artist')).toBe('chronological')
+    expect(stored('year')).toBe('chronological')
+    expect(stored('title')).toBe('byName')
   })
 
   it('falls back per field for malformed storage', () => {
@@ -32,5 +42,9 @@ describe('cabinet options', () => {
 
     localStorage.setItem(KEY, JSON.stringify({ sort: 'genre', separateSizeClasses: 'yes' }))
     expect(loadCabinetOptions()).toEqual(DEFAULT_CABINET_OPTIONS)
+
+    // Not fooled by names every object inherits.
+    localStorage.setItem(KEY, JSON.stringify({ sort: 'toString', separateSizeClasses: false }))
+    expect(loadCabinetOptions().sort).toBe(DEFAULT_CABINET_OPTIONS.sort)
   })
 })

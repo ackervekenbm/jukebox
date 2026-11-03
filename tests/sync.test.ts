@@ -194,4 +194,32 @@ describe('PUT /api/sync/cabinet', () => {
     expect(res.body.doc).toBeNull()
     expect(res.body.etag).toBe('"r0"')
   })
+
+  it('rejects a cabinet with two shelves sharing an id', async () => {
+    const doubled = sampleDoc()
+    doubled.cabinets[0].slots = [
+      { id: 's1', label: 'Top left', capacity: 40 },
+      { id: 's1', label: 'Top right', capacity: 40 },
+    ]
+    const res = await request(app)
+      .put('/api/sync/cabinet')
+      .set(alice)
+      .set('If-Match', '*')
+      .send(doubled)
+    expect(res.status).toBe(400)
+  })
+
+  it('accepts a cabinet with every shelf removed', async () => {
+    const empty = sampleDoc()
+    empty.cabinets[0].slots = []
+    const res = await request(app)
+      .put('/api/sync/cabinet')
+      .set(alice)
+      .set('If-Match', '*')
+      .send(empty)
+    expect(res.status).toBe(200)
+
+    const get = await request(app).get('/api/sync/cabinet').set(alice)
+    expect(get.body.doc.cabinets[0].slots).toEqual([])
+  })
 })

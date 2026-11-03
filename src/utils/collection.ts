@@ -377,24 +377,12 @@ export function sortPressingGroups(
   groups: PressingGroup[],
   mode: ArtistSortMode,
 ): PressingGroup[] {
-  const list = [...groups]
-  const yearOf = (group: PressingGroup) => (group.year > 0 ? group.year : Number.MAX_SAFE_INTEGER)
-  if (mode === 'chronological') {
-    list.sort(
-      (a, b) =>
-        yearOf(a) - yearOf(b) ||
-        compareSortKeys(a.primary.titleKey, b.primary.titleKey) ||
-        a.primary.id - b.primary.id,
-    )
-  } else {
-    list.sort(
-      (a, b) =>
-        compareSortKeys(a.primary.titleKey, b.primary.titleKey) ||
-        yearOf(a) - yearOf(b) ||
-        a.primary.id - b.primary.id,
-    )
-  }
-  return list
+  // A group sorts by its own earliest year, so it compares like a release
+  // whose year is that one.
+  const asRelease = (group: PressingGroup) => ({ ...group.primary, originalYear: group.year, year: 0 })
+  return [...groups].sort(
+    (a, b) => compareReleases(asRelease(a), asRelease(b), mode) || a.primary.id - b.primary.id,
+  )
 }
 
 /** One calendar month of additions (or the final catch-all "Undated" bucket). */
@@ -540,6 +528,35 @@ export function effectiveYears(display: DisplayRelease): YearLine[] {
 }
 
 export type ArtistSortMode = 'chronological' | 'byName'
+
+/**
+ * The year releases are sorted by everywhere: the original (master) year,
+ * falling back to the pressing year; 0 when neither is known.
+ */
+export function sortYear(display: Pick<DisplayRelease, 'originalYear' | 'year'>): number {
+  return display.originalYear || display.year || 0
+}
+
+/** Compares two years for oldest-first order, with an unknown year (0) last. */
+export function compareYears(a: number, b: number): number {
+  const known = (year: number) => (year > 0 ? year : Number.MAX_SAFE_INTEGER)
+  return known(a) - known(b)
+}
+
+/**
+ * Orders an artist's releases the way the main view does: by year (oldest
+ * first, undated last) then title, or by title then year. The record cabinet
+ * uses the same rule inside an artist, so the shelf matches the screen.
+ */
+export function compareReleases(
+  a: DisplayRelease,
+  b: DisplayRelease,
+  mode: ArtistSortMode,
+): number {
+  const byYear = compareYears(sortYear(a), sortYear(b))
+  const byTitle = compareSortKeys(a.titleKey, b.titleKey)
+  return mode === 'chronological' ? byYear || byTitle : byTitle || byYear
+}
 
 export interface CountItem {
   name: string

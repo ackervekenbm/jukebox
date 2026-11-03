@@ -9,7 +9,13 @@ export const slotSchema = z.object({
 export const cabinetSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
-  slots: z.array(slotSchema).min(1),
+  // Empty is valid: removing every shelf is how you start the layout over.
+  // Ids must be unique: removing a shelf removes every shelf with its id.
+  slots: z
+    .array(slotSchema)
+    .refine((slots) => new Set(slots.map((slot) => slot.id)).size === slots.length, {
+      message: 'Shelf ids must be unique',
+    }),
 })
 
 export const cabinetDocSchema = z.object({

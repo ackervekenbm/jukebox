@@ -9,7 +9,14 @@ import { makeSortKey } from '../utils/sortName'
 import * as store from '../db/cabinet'
 import * as syncApi from '../api/sync'
 import type { CabinetDoc } from '../shared/cabinetDoc'
-import { buildCabinetDoc, defaultCabinet, rebaseCabinetDoc, useCabinet } from './useCabinet'
+import {
+  buildCabinetDoc,
+  defaultCabinet,
+  nextSlotId,
+  rebaseCabinetDoc,
+  useCabinet,
+  withUniqueSlotIds,
+} from './useCabinet'
 
 let nextId = 0
 
@@ -62,10 +69,19 @@ afterEach(() => {
 })
 
 describe('helpers', () => {
-  it('starts with two shelves at LP capacity', () => {
+  it('starts with two shelves at LP capacity in a record cabinet', () => {
     const cabinet = defaultCabinet()
+    expect(cabinet.name).toBe('Record Cabinet')
     expect(cabinet.slots).toHaveLength(2)
     expect(cabinet.slots.map((slot) => slot.capacity)).toEqual([75, 75])
+  })
+
+  it('gives a new shelf an id no other shelf has', () => {
+    const slot = (id: string) => ({ id, label: id, capacity: 75 })
+    expect(nextSlotId([])).toBe('slot-1')
+    expect(nextSlotId([slot('slot-1'), slot('slot-2')])).toBe('slot-3')
+    // slot-2 was removed: counting shelves would hand out slot-3 a second time.
+    expect(nextSlotId([slot('slot-1'), slot('slot-3')])).toBe('slot-4')
   })
 
   it('stamps the document with the computed placements', () => {
@@ -165,14 +181,15 @@ describe('useCabinet', () => {
     const { result } = renderHook(() => useIt())
     await act(async () => {})
 
-    act(() => result.current.setName('Mine'))
+    act(() => result.current.addSlot())
     await act(async () => {
       await vi.advanceTimersByTimeAsync(800)
     })
 
     expect(pushSpy).toHaveBeenCalledTimes(2)
     expect(pushSpy.mock.calls[1][2]).toBe('"r5"')
-    expect(result.current.cabinet.name).toBe('Mine')
+    // The local edit (a third shelf) survives the rebase.
+    expect(result.current.cabinet.slots).toHaveLength(3)
     expect(result.current.status).toBe('synced')
   })
 
@@ -196,7 +213,7 @@ describe('useCabinet', () => {
     expect(result.current.status).toBe('local')
   })
 
-  it('never removes the last shelf', async () => {
+  it('removes every shelf, so the layout can start over', async () => {
     vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
     vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
     vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: null, etag: '"r0"' })
@@ -206,6 +223,174 @@ describe('useCabinet', () => {
 
     act(() => result.current.removeSlot('slot-1'))
     act(() => result.current.removeSlot('slot-2'))
-    expect(result.current.cabinet.slots).toHaveLength(1)
+    expect(result.current.cabinet.slots).toHaveLength(0)
+    expect(result.current.plan.unplaced).toHaveLength(releases.length)
+
+    act(() => result.current.addSlot())
+    expect(result.current.cabinet.slots.map((slot) => slot.id)).toEqual(['slot-1'])
+  })
+
+  it('never hands out a shelf id twice after removing one in the middle', async () => {
+    vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
+    vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+    vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: null, etag: '"r0"' })
+
+    const { result } = renderHook(() => useIt())
+    await waitFor(() => expect(result.current.status).toBe('synced'))
+
+    act(() => result.current.addSlot())
+    act(() => result.current.removeSlot('slot-2'))
+    act(() => result.current.addSlot())
+
+    const ids = result.current.cabinet.slots.map((slot) => slot.id)
+    expect(ids).toEqual(['slot-1', 'slot-3', 'slot-4'])
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('keeps an edit made while a push is in flight, and pushes it next', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
+    const putSpy = vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+    vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: null, etag: '"r0"' })
+    let release: () => void = () => {}
+    const pushSpy = vi
+      .spyOn(syncApi, 'pushCabinet')
+      .mockImplementationOnce(
+        (_token, doc) =>
+          new Promise((resolve) => {
+            release = () => resolve({ doc, etag: '"r1"' })
+          }),
+      )
+      .mockImplementation(async (_token, doc) => ({ doc, etag: '"r2"' }))
+
+    const { result } = renderHook(() => useIt())
+    await act(async () => {})
+
+    // Remove shelf 2; its push goes out and hangs.
+    act(() => {
+      result.current.removeSlot('slot-2')
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(800)
+    })
+    expect(pushSpy).toHaveBeenCalledTimes(1)
+
+    // Remove shelf 1 while that push is in flight, then let it land.
+    act(() => {
+      result.current.removeSlot('slot-1')
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(800)
+      release()
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(800)
+    })
+
+    // The second removal survives and reaches the server, one push at a time,
+    // from the revision the first push saved.
+    expect(result.current.cabinet.slots).toEqual([])
+    expect(pushSpy).toHaveBeenCalledTimes(2)
+    expect(pushSpy.mock.calls[1][1].cabinets[0].slots).toEqual([])
+    expect(pushSpy.mock.calls[1][2]).toBe('"r1"')
+    expect(result.current.dirty).toBe(false)
+    // The newest copy stored locally is the empty cabinet.
+    expect(putSpy.mock.calls.at(-1)?.[0].doc.cabinets[0].slots).toEqual([])
+  })
+
+  it('keeps a started-over cabinet empty when it loads again', async () => {
+    const empty = { ...docWith('Record Cabinet'), cabinets: [{ id: 'main', name: 'Record Cabinet', slots: [] }] }
+    vi.spyOn(store, 'getCabinet').mockResolvedValue({ username: 'alice', doc: empty, revision: 2, dirty: false })
+    vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+    vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: empty, etag: '"r2"' })
+
+    const { result } = renderHook(() => useIt())
+    await waitFor(() => expect(result.current.status).toBe('synced'))
+    expect(result.current.cabinet.slots).toEqual([])
+    expect(result.current.plan.unplaced).toHaveLength(releases.length)
+  })
+
+  it('keeps a cabinet another device started over empty', async () => {
+    const empty = { ...docWith('Record Cabinet'), cabinets: [{ id: 'main', name: 'Record Cabinet', slots: [] }] }
+    vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
+    vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+    vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: empty, etag: '"r7"' })
+
+    const { result } = renderHook(() => useIt())
+    await waitFor(() => expect(result.current.status).toBe('synced'))
+    expect(result.current.cabinet.slots).toEqual([])
+  })
+
+  it('puts a removed shelf back where it was', async () => {
+    vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
+    vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+    vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: null, etag: '"r0"' })
+    const { result } = renderHook(() => useIt())
+    await waitFor(() => expect(result.current.status).toBe('synced'))
+
+    act(() => result.current.updateSlot('slot-1', { capacity: 30 }))
+    let removed: ReturnType<typeof result.current.removeSlot> = null
+    act(() => {
+      removed = result.current.removeSlot('slot-1')
+    })
+    expect(removed).toEqual({ slot: { id: 'slot-1', label: 'Shelf 1', capacity: 30 }, index: 0 })
+    expect(result.current.cabinet.slots.map((slot) => slot.id)).toEqual(['slot-2'])
+
+    act(() => result.current.restoreSlot(removed!))
+    expect(result.current.cabinet.slots).toEqual([
+      { id: 'slot-1', label: 'Shelf 1', capacity: 30 },
+      { id: 'slot-2', label: 'Shelf 2', capacity: 75 },
+    ])
+  })
+
+  it('gives a restored shelf a fresh id when a new shelf took its old one', async () => {
+    vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
+    vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+    vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: null, etag: '"r0"' })
+    const { result } = renderHook(() => useIt())
+    await waitFor(() => expect(result.current.status).toBe('synced'))
+
+    let removed: ReturnType<typeof result.current.removeSlot> = null
+    act(() => {
+      removed = result.current.removeSlot('slot-2')
+    })
+    act(() => result.current.addSlot())
+    act(() => result.current.restoreSlot(removed!))
+    const ids = result.current.cabinet.slots.map((slot) => slot.id)
+    expect(new Set(ids).size).toBe(3)
+  })
+
+  it('repairs shelves that share an id when the cabinet loads', async () => {
+    const doubled = {
+      ...docWith('Record Cabinet'),
+      cabinets: [
+        {
+          id: 'main',
+          name: 'Record Cabinet',
+          slots: [
+            { id: 'slot-1', label: 'Shelf 1', capacity: 10 },
+            { id: 'slot-2', label: 'Shelf 2', capacity: 20 },
+            { id: 'slot-2', label: 'Shelf 3', capacity: 30 },
+          ],
+        },
+      ],
+    }
+    vi.spyOn(store, 'getCabinet').mockResolvedValue({ username: 'alice', doc: doubled, revision: 1, dirty: false })
+    vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+
+    const { result } = renderHook(() => useIt({ token: null }))
+    await waitFor(() => expect(result.current.cabinet.slots).toHaveLength(3))
+    expect(result.current.cabinet.slots.map((slot) => [slot.id, slot.capacity])).toEqual([
+      ['slot-1', 10],
+      ['slot-2', 20],
+      ['slot-3', 30],
+    ])
+  })
+})
+
+describe('withUniqueSlotIds', () => {
+  it('leaves a cabinet with unique ids untouched', () => {
+    const cabinets = [defaultCabinet()]
+    expect(withUniqueSlotIds(cabinets)[0]).toBe(cabinets[0])
   })
 })
