@@ -239,7 +239,8 @@ port/env/tag tables, in sync with the workflow matrix and the Dockerfile.
 - **Route A — prebuilt image (production).** The stack is the one in
   `docs/deploy/openmediavault.md`: stack name `jukebox`, port `8080`, data in
   the *Data* shared folder, and a `logging:` cap on the container log (add it if
-  the production stack predates it). To update after a merge: **Services →
+  the production stack predates it), plus the `proxy` network from
+  `#caddy-on-omv` step 3. To update after a merge: **Services →
   Compose → Files** → `jukebox` → **Pull** → **Up**.
 - **Route B — build on the Pi** (e.g. local variants): `docs/deploy/from-source-docker.md`.
   It uses the repo's `docker-compose.yml`, which keeps its data in the named
