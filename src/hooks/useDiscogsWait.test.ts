@@ -56,6 +56,46 @@ describe('useStalled', () => {
   })
 })
 
+describe('useDiscogsWaitNote', () => {
+  it('names a rate-limit pause before a slow answer', () => {
+    discogsBudget.observe(new Response('{}', { status: 429, headers: { 'retry-after': '30' } }))
+    void discogsBudget.acquire('interactive').catch(() => {})
+    const { result } = renderHook(() => useDiscogsWaitNote(true, 0))
+    act(() => {
+      vi.advanceTimersByTime(STALL_MS)
+    })
+    expect(result.current).toBe("pausing to stay within Discogs' rate limit")
+  })
+
+  it('starts the stall clock afresh when a job starts', () => {
+    const { result, rerender } = renderHook(({ active }) => useDiscogsWaitNote(active, undefined), {
+      initialProps: { active: true },
+    })
+    act(() => {
+      vi.advanceTimersByTime(STALL_MS)
+    })
+    expect(result.current).toBe('waiting for Discogs to answer')
+    rerender({ active: false })
+    expect(result.current).toBeNull()
+    rerender({ active: true })
+    expect(result.current).toBeNull()
+  })
+
+  it('restarts the clock when the progress first appears', () => {
+    const { result, rerender } = renderHook(({ done }) => useDiscogsWaitNote(true, done), {
+      initialProps: { done: undefined as number | undefined },
+    })
+    act(() => {
+      vi.advanceTimersByTime(STALL_MS - 1)
+    })
+    rerender({ done: 0 })
+    act(() => {
+      vi.advanceTimersByTime(STALL_MS - 1)
+    })
+    expect(result.current).toBeNull()
+  })
+})
+
 describe('useDiscogsPausing', () => {
   it('follows the shared budget holding a request back', async () => {
     const { result } = renderHook(() => useDiscogsPausing())

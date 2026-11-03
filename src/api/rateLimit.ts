@@ -20,15 +20,24 @@ const MAX_429_PAUSE_MS = 30_000
 
 /**
  * How many requests a caller leaves for others before waiting. Background
- * lookups (years, release notes) keep a large reserve, so a record opened
- * meanwhile still gets an answer at once.
+ * lookups (years, release notes) keep the larger reserve, so a record opened
+ * meanwhile still gets an answer at once, and another device on the same
+ * token doesn't push them into 429s. Their own steady pace (~51 a minute)
+ * runs close to it, so they're often held for a second or so; that's normal
+ * pacing, not a pause worth showing (see NOTABLE_WAIT_MS).
  */
 export const RESERVE = { interactive: 2, background: 10 } as const
+
+/**
+ * A hold this long (or any 429 pause) is worth telling the user about; the
+ * second-long nudges of normal pacing are not.
+ */
+export const NOTABLE_WAIT_MS = 3_000
 export type Priority = keyof typeof RESERVE
 
 const abortError = () => new DOMException('Aborted', 'AbortError')
 
-function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
+export function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(abortError())
     const timer = setTimeout(() => {
@@ -50,7 +59,8 @@ export class RequestBudget {
   private observedAt = 0
   private blockedUntil = 0
   private inFlight = 0
-  private waiting = 0
+  /** Requests held back for a notable time, see NOTABLE_WAIT_MS. */
+  private notableWaits = 0
   private listeners = new Set<() => void>()
 
   constructor(private readonly now: () => number = () => Date.now()) {}
@@ -62,7 +72,7 @@ export class RequestBudget {
     this.observedAt = 0
     this.blockedUntil = 0
     this.inFlight = 0
-    this.waiting = 0
+    this.notableWaits = 0
   }
 
   /** Requests estimated to be available now, after those already in flight. */
@@ -81,9 +91,12 @@ export class RequestBudget {
     return Math.ceil((short / this.limit) * WINDOW_MS)
   }
 
-  /** Whether some request is held back right now, for the UI to say so. */
+  /**
+   * Whether a request is held back for a notable time right now (a 429 pause,
+   * or the budget running low), for the UI to say so.
+   */
   isPausing(): boolean {
-    return this.waiting > 0
+    return this.notableWaits > 0
   }
 
   subscribe(listener: () => void): () => void {
@@ -103,13 +116,13 @@ export class RequestBudget {
       if (signal?.aborted) throw abortError()
       const wait = this.delay(priority)
       if (wait <= 0) break
-      this.waiting++
-      if (this.waiting === 1) this.notify()
+      const notable = wait >= NOTABLE_WAIT_MS || this.blockedUntil > this.now()
+      if (notable && ++this.notableWaits === 1) this.notify()
       try {
         await abortableSleep(wait, signal)
       } finally {
-        this.waiting--
-        if (this.waiting === 0) this.notify()
+        // Clamped: reset() may have zeroed the count while this one slept.
+        if (notable && this.notableWaits > 0 && --this.notableWaits === 0) this.notify()
       }
     }
     this.inFlight++
@@ -127,7 +140,10 @@ export class RequestBudget {
     const limit = Number(response.headers.get('x-discogs-ratelimit'))
     if (Number.isFinite(limit) && limit > 0) this.limit = limit
     const remaining = Number(response.headers.get('x-discogs-ratelimit-remaining') ?? NaN)
-    if (Number.isFinite(remaining) && remaining >= 0) {
+    // During a 429 pause, an answer that left Discogs before the 429 can
+    // arrive late with an older, higher count; don't let it undo the pause.
+    const stale = this.blockedUntil > now && remaining > (this.remaining ?? 0)
+    if (Number.isFinite(remaining) && remaining >= 0 && !stale) {
       this.remaining = remaining
       this.observedAt = now
     }

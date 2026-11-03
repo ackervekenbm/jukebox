@@ -11,7 +11,7 @@ import type {
   DiscogsRelease,
   DiscogsTrack,
 } from '../types/discogs'
-import { discogsBudget, type Priority } from './rateLimit'
+import { abortableSleep, discogsBudget, type Priority } from './rateLimit'
 
 // Same-origin /discogs proxy (vite dev + nginx) for all API calls. The app
 // cannot call the API cross-origin: Discogs' 429 rate-limit responses carry no
@@ -300,6 +300,15 @@ async function fetchEach<T>(
   const START_INTERVAL_MS = 1_180
   let done = 0
 
+  // The run's own signal: the caller's abort, or the first refusal (a bad
+  // token fails every lookup), cancels the lookups still waiting or running,
+  // so the error surfaces at once instead of after their retries.
+  const run = new AbortController()
+  const onCallerAbort = () => run.abort()
+  if (signal?.aborted) run.abort()
+  else signal?.addEventListener('abort', onCallerAbort, { once: true })
+  const aborted = () => new DOMException('Aborted', 'AbortError')
+
   async function fetchOne(id: number): Promise<T | undefined> {
     const maxAttempts = 3
     const maxRateLimitAttempts = 4
@@ -308,14 +317,14 @@ async function fetchEach<T>(
     for (;;) {
       let response: Response
       try {
-        response = await discogsFetch(pathOf(id), token, signal, 'background')
+        response = await discogsFetch(pathOf(id), token, run.signal, 'background')
       } catch {
         // Same rule as requestJson: an internal timeout rejects the fetch but
-        // only a caller abort actually cancels the sync.
-        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+        // only an abort of the run actually cancels it.
+        if (run.signal.aborted) throw aborted()
         // Failed after retries: not cached, retried on the next sync.
         if (++attempts >= maxAttempts) return undefined
-        await sleep(1200 * attempts)
+        await abortableSleep(1200 * attempts, run.signal)
         continue
       }
 
@@ -341,7 +350,7 @@ async function fetchEach<T>(
 
       // Other HTTP error (5xx etc.), failed after retries: not cached.
       if (++attempts >= maxAttempts) return undefined
-      await sleep(1200 * attempts)
+      await abortableSleep(1200 * attempts, run.signal)
     }
   }
 
@@ -349,36 +358,54 @@ async function fetchEach<T>(
   let failure: unknown = null
   let lastStart = Number.NEGATIVE_INFINITY
 
-  for (const id of unique) {
-    if (failure) break
-    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-    while (running.size >= MAX_IN_FLIGHT && !failure) await Promise.race(running)
-    if (failure) break
-    const wait = lastStart + START_INTERVAL_MS - Date.now()
-    if (wait > 0) await sleep(wait)
-    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-    lastStart = Date.now()
-
-    const task: Promise<void> = fetchOne(id).then(
-      (value) => {
-        // Each lookup counts the moment it's back, not when its neighbours are.
-        if (value !== undefined) {
-          result[id] = value
-          onResult?.(id, value)
+  try {
+    for (const id of unique) {
+      while (running.size >= MAX_IN_FLIGHT && !failure) await Promise.race(running)
+      if (failure || run.signal.aborted) break
+      const wait = lastStart + START_INTERVAL_MS - Date.now()
+      if (wait > 0) {
+        try {
+          await abortableSleep(wait, run.signal)
+        } catch {
+          break
         }
-        onProgress?.(++done, unique.length)
-      },
-      (err: unknown) => {
-        // A refused token or an abort ends the whole run; the first one wins.
-        failure ??= err
-      },
-    )
-    const tracked = task.finally(() => running.delete(tracked))
-    running.add(tracked)
+      }
+      if (failure || run.signal.aborted) break
+      lastStart = Date.now()
+
+      const task: Promise<void> = fetchOne(id).then(
+        (value) => {
+          // Each lookup counts the moment it's back, not when its neighbours are.
+          if (value !== undefined) {
+            result[id] = value
+            onResult?.(id, value)
+          }
+          onProgress?.(++done, unique.length)
+        },
+        (err: unknown) => {
+          // A refused token or an abort ends the whole run; the first one wins,
+          // and the others are cancelled rather than left to finish.
+          failure ??= err
+          run.abort()
+        },
+      )
+      // A callback that throws ends the run the same way, instead of escaping
+      // through Promise.race while the other lookups carry on.
+      const tracked: Promise<void> = task
+        .catch((err: unknown) => {
+          failure ??= err
+          run.abort()
+        })
+        .finally(() => running.delete(tracked))
+      running.add(tracked)
+    }
+    await Promise.all(running)
+  } finally {
+    signal?.removeEventListener('abort', onCallerAbort)
   }
 
-  await Promise.all(running)
   if (failure) throw failure
+  if (signal?.aborted) throw aborted()
   return result
 }
 

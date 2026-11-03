@@ -110,7 +110,11 @@ describe('fetchFolders', () => {
     })
 
     const promise = fetchFolders('alice', 'tok')
-    await vi.runAllTimersAsync()
+    // The budget holds the retry for the Retry-After second, then until the
+    // two requests a user-facing call keeps in reserve have come back (~2 s).
+    await vi.advanceTimersByTimeAsync(1_999)
+    expect(calls).toBe(1)
+    await vi.advanceTimersByTimeAsync(1)
     await expect(promise).resolves.toEqual([])
     expect(calls).toBe(2)
   })
@@ -189,8 +193,13 @@ describe('fetchMasterYears', () => {
     })
 
     const promise = fetchMasterYears([1], 'tok')
-    await vi.runAllTimersAsync()
+    // Past the Retry-After second, a background lookup also waits for its
+    // larger reserve (10) to come back before trying again (~10 s).
+    await vi.advanceTimersByTimeAsync(9_999)
+    expect(calls).toBe(1)
+    await vi.advanceTimersByTimeAsync(1)
     await expect(promise).resolves.toEqual({ 1: 1980 })
+    expect(calls).toBe(2)
   })
 
   it('drops masters that stay rate-limited (not cached for retry)', async () => {
@@ -339,9 +348,55 @@ describe('fetchReleaseNotes', () => {
     const outcome = expect(promise).rejects.toMatchObject({ name: 'DiscogsError', status: 401 })
     await vi.runAllTimersAsync()
     await outcome
-    // The first refusal stops the run. A lookup already on its way while the
-    // refusal was read may still go out, but no new ones start.
-    expect(calls).toBeLessThanOrEqual(2)
+    // The first refusal stops the run: no other lookup starts.
+    expect(calls).toBe(1)
+  })
+
+  it('cancels lookups still waiting when one is refused, so the error comes at once', async () => {
+    let calls = 0
+    mockFetch((url) => {
+      calls++
+      // Release 1 is slow and then refused; the others are throttled for 30 s.
+      if (url.endsWith('/releases/1')) {
+        return new Promise<Response>((resolve) =>
+          setTimeout(() => resolve(json({ message: 'You must authenticate.' }, 401)), 3_000),
+        )
+      }
+      return json({ message: 'throttled' }, 429, { 'Retry-After': '30' })
+    })
+
+    const promise = fetchReleaseNotes([1, 2, 3], 'bad')
+    const outcome = expect(promise).rejects.toMatchObject({ name: 'DiscogsError', status: 401 })
+    // Three seconds in, the refusal arrives while 2 waits to retry and 3 waits
+    // to start, both behind release 2's 30 s pause. Neither waits it out.
+    await vi.advanceTimersByTimeAsync(3_000)
+    await outcome
+    expect(calls).toBe(2)
+  })
+
+  it('stops at once when the caller gives up', async () => {
+    const controller = new AbortController()
+    mockFetch(() => json({ message: 'throttled' }, 429, { 'Retry-After': '30' }))
+
+    const promise = fetchReleaseNotes([1, 2, 3], 'tok', undefined, controller.signal)
+    const outcome = expect(promise).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.advanceTimersByTimeAsync(100)
+    controller.abort()
+    await vi.advanceTimersByTimeAsync(0)
+    await outcome
+  })
+
+  it('ends the run when a result callback throws, instead of losing the error', async () => {
+    mockFetch((url) => {
+      const id = Number(/\/releases\/(\d+)$/.exec(url)?.[1])
+      return json({ id, title: 'X', year: 2000, tracklist: [], notes: '' })
+    })
+    const promise = fetchReleaseNotes([1, 2], 'tok', undefined, undefined, () => {
+      throw new Error('broken listener')
+    })
+    const outcome = expect(promise).rejects.toThrow('broken listener')
+    await vi.runAllTimersAsync()
+    await outcome
   })
 })
 

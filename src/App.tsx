@@ -135,7 +135,11 @@ export default function App() {
     wipeCache,
   } = useCollection(settings)
   // Why a sync isn't moving: pausing for Discogs' rate limit, or no answer for a while.
-  const syncWait = useDiscogsWaitNote(status === 'loading', progress?.loaded)
+  // Keyed on phase and count, so moving from pages to years restarts the clock.
+  const syncWait = useDiscogsWaitNote(
+    status === 'loading',
+    progress ? `${progress.phase}:${progress.loaded}` : null,
+  )
 
   useEffect(() => {
     applyTheme(theme)
@@ -604,7 +608,7 @@ export default function App() {
                   it moves about once a second while years come in. */}
               <span role="status">
                 Syncing…
-                {syncWait && ` (${syncWait})`}
+                {syncWait && ` — ${syncWait}`}
               </span>
               {progress && <span> {progressText(progress)}</span>}
             </div>

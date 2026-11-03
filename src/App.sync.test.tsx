@@ -4,6 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import App from './App'
+import { discogsBudget } from './api/rateLimit'
 import { artist, release } from './test/factories'
 
 // A sync stuck in the years phase: one year back, then nothing.
@@ -35,10 +36,6 @@ vi.mock('./api/discogs', () => ({
   ),
 }))
 
-const wait = vi.hoisted(() => ({ note: null as string | null }))
-vi.mock('./hooks/useDiscogsWait', () => ({
-  useDiscogsWaitNote: (active: boolean) => (active ? wait.note : null),
-}))
 
 beforeEach(() => {
   localStorage.setItem(
@@ -49,15 +46,19 @@ beforeEach(() => {
 
 afterEach(() => {
   localStorage.clear()
-  wait.note = null
+  discogsBudget.reset()
 })
 
 describe('the sync banner', () => {
   it('announces the sync and why it waits, but not every step of the count', async () => {
-    wait.note = 'waiting for Discogs to answer'
+    // A real 429 pause in the shared budget, with a request held behind it.
+    discogsBudget.observe(new Response('{}', { status: 429, headers: { 'retry-after': '30' } }))
+    void discogsBudget.acquire('interactive').catch(() => {})
     render(<App />)
 
-    const announced = await screen.findByText('Syncing… (waiting for Discogs to answer)')
+    const announced = await screen.findByText(
+      "Syncing… — pausing to stay within Discogs' rate limit",
+    )
     expect(announced).toHaveAttribute('role', 'status')
     expect(announced).not.toHaveTextContent('1 / 2')
     expect(await screen.findByText(/Retrieving original release years… 1 \/ 2/)).toBeInTheDocument()

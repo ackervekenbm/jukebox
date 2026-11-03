@@ -17,9 +17,12 @@ vi.mock('../hooks/useCabinet', () => ({
 }))
 
 // Why a Discogs job waits has its own tests; here it says whatever a test sets.
-const wait = vi.hoisted(() => ({ note: null as string | null }))
+const wait = vi.hoisted(() => ({ note: null as string | null, calls: [] as unknown[][] }))
 vi.mock('../hooks/useDiscogsWait', () => ({
-  useDiscogsWaitNote: (active: boolean) => (active ? wait.note : null),
+  useDiscogsWaitNote: (active: boolean, progress: unknown) => {
+    wait.calls.push([active, progress])
+    return active ? wait.note : null
+  },
 }))
 
 let nextId = 0
@@ -125,6 +128,7 @@ function setDefault() {
 
 beforeEach(() => {
   wait.note = null
+  wait.calls = []
   vi.clearAllMocks()
   setDefault()
 })
@@ -595,6 +599,8 @@ describe('CabinetScreen', () => {
     expect(screen.getByRole('status', { name: 'Release notes check' })).toHaveTextContent(
       "Now pausing to stay within Discogs' rate limit.",
     )
+    // Asked about the running check, keyed on its count.
+    expect(wait.calls.at(-1)).toEqual([true, 12])
   })
 
   it('says when Discogs refused the token for the release notes', () => {

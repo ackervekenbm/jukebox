@@ -2,7 +2,7 @@
 // Copyright (C) 2025-2026 ackervekenbm
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { RESERVE, RequestBudget } from './rateLimit'
+import { NOTABLE_WAIT_MS, RESERVE, RequestBudget } from './rateLimit'
 
 let now = 0
 const budget = () => new RequestBudget(() => now)
@@ -42,6 +42,16 @@ describe('RequestBudget', () => {
     expect(RESERVE.background).toBeGreaterThan(RESERVE.interactive)
   })
 
+  it('holds the lookups\' own steady pace only briefly', () => {
+    // ~51 a minute leaves Discogs reporting ~9 left, with one more on its way:
+    // a nudge of about two seconds, under what counts as a pause.
+    const b = budget()
+    b.observe(answer(9))
+    void b.acquire('interactive')
+    expect(b.delay('background')).toBe(2_000)
+    expect(b.delay('background')).toBeLessThan(NOTABLE_WAIT_MS)
+  })
+
   it('counts the budget back up as the moving window clears', () => {
     const b = budget()
     b.observe(answer(0))
@@ -78,10 +88,65 @@ describe('RequestBudget', () => {
     const b = budget()
     b.observe(answer(null, 429))
     expect(b.delay('interactive')).toBe(5_000)
-    now += 5_000
-    // The window has partly cleared, but background still keeps its reserve.
+    now += 4_000
+    // Still paused, for everyone.
+    expect(b.delay('background')).toBe(1_000)
+    now += 1_000
+    // Five seconds of the window have cleared: enough for a request the user
+    // waits for; background keeps its larger reserve a little longer.
     expect(b.delay('interactive')).toBe(0)
-    expect(b.delay('background')).toBeGreaterThan(0)
+    expect(b.delay('background')).toBe(5_000)
+  })
+
+  it('ignores an older, higher count that arrives late during a 429 pause', () => {
+    const b = budget()
+    b.observe(answer(null, 429, { 'retry-after': '10' }))
+    // A 200 that left Discogs before the 429 shows up afterwards.
+    b.observe(answer(25))
+    now += 10_000
+    expect(b.available()).toBe(10)
+    // Once the pause is over, a fresh count is taken as usual.
+    b.observe(answer(25))
+    expect(b.available()).toBe(25)
+  })
+
+  it('does not call the brief holds of normal pacing a pause', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+    const b = new RequestBudget()
+    const changes: boolean[] = []
+    b.subscribe(() => changes.push(b.isPausing()))
+    // Nine left: background is one short, about a second's wait.
+    b.observe(answer(9))
+    const brief = b.acquire('background')
+    expect(b.isPausing()).toBe(false)
+    await vi.advanceTimersByTimeAsync(1_000)
+    await brief
+    b.release()
+    expect(changes).toEqual([])
+
+    // Run dry: the wait is long enough to be worth saying.
+    b.observe(answer(0))
+    const long = b.acquire('background')
+    expect(b.isPausing()).toBe(true)
+    // Ten short of its reserve: about ten seconds.
+    await vi.advanceTimersByTimeAsync(10_000)
+    await long
+    expect(b.isPausing()).toBe(false)
+    expect(changes).toEqual([true, false])
+  })
+
+  it('keeps its pause count sane when reset while a request waits', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+    const b = new RequestBudget()
+    b.observe(answer(null, 429, { 'retry-after': '3' }))
+    const waiting = b.acquire('interactive')
+    b.reset()
+    await vi.advanceTimersByTimeAsync(3_000)
+    await waiting
+    expect(b.isPausing()).toBe(false)
+    b.observe(answer(null, 429, { 'retry-after': '3' }))
+    void b.acquire('interactive')
+    expect(b.isPausing()).toBe(true)
   })
 
   it('says when it is holding a request back, and when it lets go', async () => {
