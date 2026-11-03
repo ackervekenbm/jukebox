@@ -226,6 +226,10 @@ describe('CabinetScreen', () => {
         '2 records out of order',
       ])
       expect(within(shelfHeader('Shelf 1')).getByText('Mixed sizes')).toBeInTheDocument()
+      // The warning says how to get the sizes apart.
+      expect(
+        screen.getByText('To keep every size on shelves of its own, add a shelf or raise a capacity.'),
+      ).toBeInTheDocument()
       unmount()
 
       // With sizes not kept apart, a mixed shelf is the expected layout.
@@ -234,6 +238,7 @@ describe('CabinetScreen', () => {
       })
       renderScreen()
       expect(screen.queryByText('Mixed sizes')).not.toBeInTheDocument()
+      expect(screen.queryByText(/keep every size on shelves of its own/)).not.toBeInTheDocument()
     })
 
     it('tags an empty shelf with no size at all', () => {

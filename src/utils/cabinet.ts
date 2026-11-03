@@ -301,8 +301,11 @@ interface Allocation {
  * Walks an artist-sorted run of records over a run of shelves in order. With
  * `spread`, each shelf is filled to an even share of the run before moving on;
  * without it, to capacity. Artists are kept together: staying with the same
- * artist may overshoot the even share, capacity is the hard limit. Returns the
- * records that found no shelf.
+ * artist may overshoot the even share, capacity is the hard limit. With
+ * `skipOtherSizes`, a shelf that already holds another size is passed over
+ * while a later one has room (the old placement, kept as a last resort: it can
+ * place a record the ordered layouts can't, at the cost of the order). Returns
+ * the records that found no shelf.
  */
 function fillRun(
   records: SortedRecord[],
@@ -311,6 +314,7 @@ function fillRun(
   sizeOf: Map<string, SizeClass>,
   unitsOf: Map<string, number>,
   spread: boolean,
+  skipOtherSizes = false,
 ): SortedRecord[] {
   const overflow: SortedRecord[] = []
   if (slots.length === 0) return [...records]
@@ -331,7 +335,9 @@ function fillRun(
         current++
         continue
       }
-      const moveOn = space >= target && !sameArtist
+      const moveOn =
+        (space >= target && !sameArtist) ||
+        (skipOtherSizes && space > 0 && classOfSlot.get(slot.id) !== size)
       if (moveOn && hasRoomAfter(slots, used, current, units)) {
         current++
         continue
@@ -404,19 +410,62 @@ function shelfShares(groups: SortedRecord[][], slots: Slot[], unitsOf: Map<strin
   return fits(padded) ? padded : null
 }
 
+/** How many records sit on an earlier shelf than their place in the order. */
+function countOutOfOrder(order: SortedRecord[], placements: Map<string, string>, slots: Slot[]): number {
+  const shelfIndex = new Map(slots.map((slot, index) => [slot.id, index]))
+  let furthest = -1
+  let count = 0
+  for (const record of order) {
+    const slotId = placements.get(record.display.key)
+    if (slotId === undefined) continue
+    const index = shelfIndex.get(slotId) ?? 0
+    if (index < furthest) count++
+    else furthest = index
+  }
+  return count
+}
+
+/**
+ * The ways to split the size groups into consecutive runs that each get their
+ * own shelves, fewest shared boundaries first: every size apart, then two
+ * neighbours sharing, …, then all in one run. Each extra share costs at most
+ * one mixed shelf, and the order stays the same.
+ */
+function groupRuns(groups: SortedRecord[][]): SortedRecord[][][] {
+  const partitions: SortedRecord[][][] = []
+  const k = groups.length
+  // Each of the k−1 gaps between groups is either a cut or a share.
+  for (let mask = 0; mask < 1 << Math.max(0, k - 1); mask++) {
+    const runs: SortedRecord[][] = [[...groups[0]]]
+    for (let gap = 0; gap < k - 1; gap++) {
+      if (mask & (1 << gap)) runs[runs.length - 1].push(...groups[gap + 1])
+      else runs.push([...groups[gap + 1]])
+    }
+    partitions.push(runs)
+  }
+  return partitions.sort((a, b) => b.length - a.length)
+}
+
 /**
  * Places every record on a shelf in the main view's order, spreading the
  * collection evenly. With sizes kept apart, each size group gets its own run of
  * shelves (see `shelfShares`) and is spread evenly over that run. When the
- * shelves can't hold the groups apart, the groups still follow each other in
- * order, each shelf filled before the next: a shelf where one size ends and
- * the next begins is shared, and the reading order never jumps back.
+ * shelves can't hold every group apart, as few neighbouring groups as possible
+ * share a run; inside a run the groups follow each other in order, so only the
+ * shelf where one size ends and the next begins is shared, and the reading
+ * order never jumps back.
  *
  * Shelf capacity is measured in record spaces, so a gatefold consumes two.
  * Keeping artists together can leave records with no room in their run; a last
  * pass puts them in any space left (preferring a shelf of the same size) before
  * calling them unplaced. Those back-filled records can land on an earlier
  * shelf than their place in the order, which planCabinet reports.
+ *
+ * In a tight cabinet the even spread can strand records that filling each
+ * shelf in turn would have placed, and the other way round, so each candidate
+ * layout is tried both ways and the best one wins: fewest records without a
+ * shelf, then fewest out of order, then the one listed first (fewest shared
+ * sizes, spread before filled).
  */
 function allocate(
   groups: SortedRecord[][],
@@ -425,34 +474,76 @@ function allocate(
   unitsOf: Map<string, number>,
   separateSizeClasses: boolean,
 ): { placements: Map<string, string>; unplaced: DisplayRelease[] } {
-  const fresh = (): Allocation => ({ placements: new Map(), used: new Map(), classOfSlot: new Map() })
-  let state = fresh()
   const all = groups.flat()
-  if (slots.length === 0) return { placements: state.placements, unplaced: all.map((r) => r.display) }
+  if (slots.length === 0) return { placements: new Map(), unplaced: all.map((r) => r.display) }
 
-  let overflow: SortedRecord[] = []
-  const shares = separateSizeClasses && groups.length > 1 ? shelfShares(groups, slots, unitsOf) : null
-  if (shares) {
-    let start = 0
-    groups.forEach((group, index) => {
-      const run = slots.slice(start, start + shares[index])
-      start += shares[index]
-      overflow.push(...fillRun(group, run, state, sizeOf, unitsOf, true))
-    })
-  } else {
-    // No separate shelves for each size (not asked for, or they don't fit):
-    // one walk in the planned order, so each size runs on straight from the
-    // last and two sizes only meet on the shelf between them. Spread evenly
-    // when that fits; in a cabinet too tight for it, fill each shelf in turn
-    // instead, rather than strand records that would have to be back-filled
-    // out of order.
-    overflow = fillRun(all, slots, state, sizeOf, unitsOf, true)
-    if (overflow.length > 0) {
-      state = fresh()
-      overflow = fillRun(all, slots, state, sizeOf, unitsOf, false)
+  // Every arrangement of runs and shelves worth trying, preferred first.
+  type Run = { records: SortedRecord[]; slots: Slot[] }
+  const arrangements: Run[][] = []
+  const partitions = separateSizeClasses && groups.length > 1 ? groupRuns(groups) : [[all]]
+  for (const runs of partitions) {
+    if (runs.length === 1) {
+      arrangements.push([{ records: runs[0], slots }])
+      continue
     }
+    const shares = shelfShares(runs, slots, unitsOf)
+    if (!shares) continue
+    let start = 0
+    arrangements.push(
+      runs.map((records, index) => {
+        const run = { records, slots: slots.slice(start, start + shares[index]) }
+        start += shares[index]
+        return run
+      }),
+    )
   }
 
+  // Each arrangement spread, then filled; last, the old size-skipping walk,
+  // which only wins when it places records the ordered layouts can't.
+  const attempts: { arrangement: Run[]; spread: boolean; skip: boolean }[] = arrangements.flatMap(
+    (arrangement) => [
+      { arrangement, spread: true, skip: false },
+      { arrangement, spread: false, skip: false },
+    ],
+  )
+  if (separateSizeClasses && groups.length > 1) {
+    attempts.push({ arrangement: [{ records: all, slots }], spread: true, skip: true })
+  }
+
+  let best: { state: Allocation; unplaced: DisplayRelease[]; outOfOrder: number } | null = null
+  for (const { arrangement, spread, skip } of attempts) {
+    const state: Allocation = { placements: new Map(), used: new Map(), classOfSlot: new Map() }
+    const overflow = arrangement.flatMap((run) =>
+      fillRun(run.records, run.slots, state, sizeOf, unitsOf, spread, skip),
+    )
+    const unplaced = backfill(overflow, slots, state, sizeOf, unitsOf, separateSizeClasses)
+    const outOfOrder = countOutOfOrder(all, state.placements, slots)
+    if (
+      !best ||
+      unplaced.length < best.unplaced.length ||
+      (unplaced.length === best.unplaced.length && outOfOrder < best.outOfOrder)
+    ) {
+      best = { state, unplaced, outOfOrder }
+    }
+    if (best.unplaced.length === 0 && best.outOfOrder === 0) break
+  }
+
+  return { placements: best!.state.placements, unplaced: best!.unplaced }
+}
+
+/**
+ * Puts records that found no room in their run into any space left, preferring
+ * a shelf that already holds their size when sizes are kept apart; returns the
+ * ones that fit nowhere.
+ */
+function backfill(
+  overflow: SortedRecord[],
+  slots: Slot[],
+  state: Allocation,
+  sizeOf: Map<string, SizeClass>,
+  unitsOf: Map<string, number>,
+  separateSizeClasses: boolean,
+): DisplayRelease[] {
   const unplaced: DisplayRelease[] = []
   for (const record of overflow) {
     const size = sizeOf.get(record.display.key) ?? 'other'
@@ -470,8 +561,7 @@ function allocate(
     state.used.set(slot.id, (state.used.get(slot.id) ?? 0) + units)
     if (!state.classOfSlot.has(slot.id)) state.classOfSlot.set(slot.id, size)
   }
-
-  return { placements: state.placements, unplaced }
+  return unplaced
 }
 
 export function planCabinet(input: CabinetPlanInput): CabinetPlan {
@@ -586,16 +676,7 @@ export function planCabinet(input: CabinetPlanInput): CabinetPlan {
 
   // A record back-filled onto an earlier shelf than its place in the order
   // breaks the reading order; say how many, so the layout isn't trusted blindly.
-  const shelfIndex = new Map(cabinet.slots.map((slot, index) => [slot.id, index]))
-  let furthest = -1
-  let outOfOrder = 0
-  for (const record of groups.flat()) {
-    const slotId = placements.get(record.display.key)
-    if (slotId === undefined) continue
-    const index = shelfIndex.get(slotId) ?? 0
-    if (index < furthest) outOfOrder++
-    else furthest = index
-  }
+  const outOfOrder = countOutOfOrder(groups.flat(), placements, cabinet.slots)
   if (outOfOrder > 0) conflicts.push({ type: 'out-of-order', count: outOfOrder })
 
   if (unplaced.length > 0) conflicts.push({ type: 'unplaced', count: unplaced.length })

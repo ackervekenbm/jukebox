@@ -108,10 +108,15 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   on separate shelves: each size group (ordered by its earliest record, so the
   cabinet still starts with the earliest artist) gets its own run of shelves
   (`shelfShares`: enough to fit, spare shelves to the fullest groups) and is
-  spread evenly over it. When the shelves can't hold the groups apart, the
-  groups still follow each other in order (spread evenly when that fits,
-  else each shelf filled before the next, so nothing is stranded), so only
-  the shelf where one size ends and the next begins is shared. A
+  spread evenly over it. When the shelves can't hold every group apart, as
+  few neighbouring groups as possible share a run (`groupRuns`), and inside a
+  run the groups follow each other in order, so only the shelf where one size
+  ends and the next begins is shared. Each candidate layout is tried spread
+  evenly and filled shelf by shelf, back-filled, and the best wins: fewest
+  records without a shelf, then fewest out of order, then the first listed
+  (fewest shared sizes, spread before filled). The old size-skipping walk is
+  the last candidate, so the planner never strands a record the old one
+  placed; it only wins in a cabinet too full for any ordered layout. A
   shelf's records are always listed in that planned order (size group, then
   artist, then Year/A–Z), never re-sorted on their own, so reading the shelves
   in turn never jumps back in the alphabet.

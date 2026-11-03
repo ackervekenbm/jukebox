@@ -491,6 +491,13 @@ export function CabinetScreen({
               ))}
             </ul>
           )}
+          {/* Sharing a shelf is the best layout this much space allows; say how
+              to get the sizes fully apart, since the chip alone reads like an error. */}
+          {plan.conflicts.some((conflict) => conflict.type === 'size-mix') && (
+            <p className="cabinet-hint cabinet-conflict-hint">
+              To keep every size on shelves of its own, add a shelf or raise a capacity.
+            </p>
+          )}
 
           <div className="cabinet-slots">
             {plan.slots.length === 0 && (
