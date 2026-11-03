@@ -10,6 +10,7 @@ import {
   fetchReleaseDetails,
   fetchReleaseNotes,
 } from './discogs'
+import { discogsBudget } from './rateLimit'
 
 const API = '/discogs'
 
@@ -46,6 +47,7 @@ function mockFetch(handler: (url: string, init?: RequestInit) => unknown): void 
 
 beforeEach(() => {
   vi.useFakeTimers()
+  discogsBudget.reset()
 })
 
 afterEach(() => {
@@ -82,7 +84,7 @@ describe('fetchFolders', () => {
 
     const promise = fetchFolders('alice', 'tok')
     // first backoff is 1000 * 2^1 + random(0..400)
-    await vi.advanceTimersByTimeAsync(2500)
+    await vi.runAllTimersAsync()
     await expect(promise).resolves.toEqual([])
     expect(calls).toBe(2)
   })
@@ -96,7 +98,7 @@ describe('fetchFolders', () => {
     // Attach the assertion before advancing so the rejection is handled in
     // time; otherwise Node flags it as unhandled.
     const assertion = expect(promise).rejects.toMatchObject({ status: 0 })
-    await vi.advanceTimersByTimeAsync(70_000)
+    await vi.runAllTimersAsync()
     await assertion
   })
 
@@ -108,7 +110,11 @@ describe('fetchFolders', () => {
     })
 
     const promise = fetchFolders('alice', 'tok')
-    await vi.advanceTimersByTimeAsync(1000)
+    // The budget holds the retry for the Retry-After second, then until the
+    // two requests a user-facing call keeps in reserve have come back (~2 s).
+    await vi.advanceTimersByTimeAsync(1_999)
+    expect(calls).toBe(1)
+    await vi.advanceTimersByTimeAsync(1)
     await expect(promise).resolves.toEqual([])
     expect(calls).toBe(2)
   })
@@ -125,7 +131,7 @@ describe('fetchCollection', () => {
 
     const promise = fetchCollection('alice', 'tok', onProgress)
     // 1100ms pacing between pages
-    await vi.advanceTimersByTimeAsync(1200)
+    await vi.runAllTimersAsync()
 
     const result = await promise
     expect(result.items).toBe(2)
@@ -171,7 +177,7 @@ describe('fetchMasterYears', () => {
     const onProgress = vi.fn()
 
     const promise = fetchMasterYears([1, 2, 3, 4], 'tok', onProgress, undefined, onMasterYear)
-    await vi.advanceTimersByTimeAsync(400) // cover the 100ms stagger offsets
+    await vi.runAllTimersAsync()
 
     const result = await promise
     expect(result).toEqual({ 1: 1976, 2: 1977, 3: null, 4: 1979 })
@@ -187,19 +193,24 @@ describe('fetchMasterYears', () => {
     })
 
     const promise = fetchMasterYears([1], 'tok')
-    await vi.advanceTimersByTimeAsync(1000)
+    // Past the Retry-After second, a background lookup also waits for its
+    // larger reserve (10) to come back before trying again (~10 s).
+    await vi.advanceTimersByTimeAsync(9_999)
+    expect(calls).toBe(1)
+    await vi.advanceTimersByTimeAsync(1)
     await expect(promise).resolves.toEqual({ 1: 1980 })
+    expect(calls).toBe(2)
   })
 
   it('drops masters that stay rate-limited (not cached for retry)', async () => {
     mockFetch(() => json({ message: 'throttled' }, 429, { 'Retry-After': '1' }))
 
     const promise = fetchMasterYears([1], 'tok')
-    for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(1000)
+    await vi.runAllTimersAsync()
     await expect(promise).resolves.toEqual({})
   })
 
-  it('paginates master fetches in staggered batches', async () => {
+  it('fetches every master, a handful at a time', async () => {
     let page = 0
     mockFetch(() => {
       page++
@@ -207,10 +218,7 @@ describe('fetchMasterYears', () => {
     })
 
     const promise = fetchMasterYears([10, 20, 30, 40, 50, 60, 70], 'tok')
-    // batch of 6 + pause, then final batch
-    await vi.advanceTimersByTimeAsync(600)
-    await vi.advanceTimersByTimeAsync(7_000)
-    await vi.advanceTimersByTimeAsync(600)
+    await vi.runAllTimersAsync()
 
     const result = await promise
     expect(Object.keys(result)).toHaveLength(7)
@@ -253,7 +261,7 @@ describe('fetchReleaseNotes', () => {
     const onRelease = vi.fn()
 
     const promise = fetchReleaseNotes([1, 2, 3, 1], 'tok', undefined, undefined, onRelease)
-    await vi.advanceTimersByTimeAsync(400)
+    await vi.runAllTimersAsync()
 
     await expect(promise).resolves.toEqual({ 1: 'Gate-fold cover', 2: '', 3: '' })
     expect(requested).toEqual([`${API}/releases/1`, `${API}/releases/2`, `${API}/releases/3`])
@@ -268,7 +276,7 @@ describe('fetchReleaseNotes', () => {
     mockFetch(() => json({ message: 'boom' }, 500))
 
     const promise = fetchReleaseNotes([1], 'tok')
-    for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(2500)
+    await vi.runAllTimersAsync()
     await expect(promise).resolves.toEqual({})
   })
 
@@ -280,8 +288,53 @@ describe('fetchReleaseNotes', () => {
     )
 
     const promise = fetchReleaseNotes([1, 2], 'tok')
-    await vi.advanceTimersByTimeAsync(400)
+    await vi.runAllTimersAsync()
     await expect(promise).resolves.toEqual({ 2: 'Gatefold' })
+  })
+
+  it('keeps counting while one lookup is slow, instead of waiting for it', async () => {
+    let finishSlow: () => void = () => {}
+    mockFetch((url) => {
+      const id = Number(/\/releases\/(\d+)$/.exec(url)?.[1])
+      const body = json({ id, title: 'X', year: 2000, tracklist: [], notes: `notes ${id}` })
+      if (id !== 1) return body
+      return new Promise<Response>((resolve) => {
+        finishSlow = () => resolve(body)
+      })
+    })
+    const onProgress = vi.fn()
+    const onRelease = vi.fn()
+
+    const promise = fetchReleaseNotes([1, 2, 3, 4], 'tok', onProgress, undefined, onRelease)
+    await vi.advanceTimersByTimeAsync(5_000)
+
+    // Release 1 is still out; the other three are counted and handed on.
+    expect(onRelease.mock.calls.map(([id]) => id)).toEqual([2, 3, 4])
+    expect(onProgress.mock.calls).toEqual([
+      [1, 4],
+      [2, 4],
+      [3, 4],
+    ])
+
+    finishSlow()
+    await vi.runAllTimersAsync()
+    await expect(promise).resolves.toEqual({ 1: 'notes 1', 2: 'notes 2', 3: 'notes 3', 4: 'notes 4' })
+    expect(onProgress).toHaveBeenLastCalledWith(4, 4)
+  })
+
+  it('keeps at most six lookups in flight, started at a steady pace', async () => {
+    const starts: number[] = []
+    mockFetch(() => {
+      starts.push(Date.now())
+      return new Promise<Response>(() => {})
+    })
+
+    void fetchReleaseNotes([1, 2, 3, 4, 5, 6, 7, 8, 9], 'tok')
+    await vi.advanceTimersByTimeAsync(15_000)
+
+    expect(starts).toHaveLength(6)
+    const gaps = starts.slice(1).map((start, index) => start - starts[index])
+    for (const gap of gaps) expect(gap).toBeGreaterThanOrEqual(1_180)
   })
 
   it('stops at once when Discogs refuses the token, instead of failing every release', async () => {
@@ -293,10 +346,57 @@ describe('fetchReleaseNotes', () => {
 
     const promise = fetchReleaseNotes([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], 'bad')
     const outcome = expect(promise).rejects.toMatchObject({ name: 'DiscogsError', status: 401 })
-    await vi.advanceTimersByTimeAsync(1000)
+    await vi.runAllTimersAsync()
     await outcome
-    // The first batch of six, each tried once; never the second batch.
-    expect(calls).toBeLessThanOrEqual(6)
+    // The first refusal stops the run: no other lookup starts.
+    expect(calls).toBe(1)
+  })
+
+  it('cancels lookups still waiting when one is refused, so the error comes at once', async () => {
+    let calls = 0
+    mockFetch((url) => {
+      calls++
+      // Release 1 is slow and then refused; the others are throttled for 30 s.
+      if (url.endsWith('/releases/1')) {
+        return new Promise<Response>((resolve) =>
+          setTimeout(() => resolve(json({ message: 'You must authenticate.' }, 401)), 3_000),
+        )
+      }
+      return json({ message: 'throttled' }, 429, { 'Retry-After': '30' })
+    })
+
+    const promise = fetchReleaseNotes([1, 2, 3], 'bad')
+    const outcome = expect(promise).rejects.toMatchObject({ name: 'DiscogsError', status: 401 })
+    // Three seconds in, the refusal arrives while 2 waits to retry and 3 waits
+    // to start, both behind release 2's 30 s pause. Neither waits it out.
+    await vi.advanceTimersByTimeAsync(3_000)
+    await outcome
+    expect(calls).toBe(2)
+  })
+
+  it('stops at once when the caller gives up', async () => {
+    const controller = new AbortController()
+    mockFetch(() => json({ message: 'throttled' }, 429, { 'Retry-After': '30' }))
+
+    const promise = fetchReleaseNotes([1, 2, 3], 'tok', undefined, controller.signal)
+    const outcome = expect(promise).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.advanceTimersByTimeAsync(100)
+    controller.abort()
+    await vi.advanceTimersByTimeAsync(0)
+    await outcome
+  })
+
+  it('ends the run when a result callback throws, instead of losing the error', async () => {
+    mockFetch((url) => {
+      const id = Number(/\/releases\/(\d+)$/.exec(url)?.[1])
+      return json({ id, title: 'X', year: 2000, tracklist: [], notes: '' })
+    })
+    const promise = fetchReleaseNotes([1, 2], 'tok', undefined, undefined, () => {
+      throw new Error('broken listener')
+    })
+    const outcome = expect(promise).rejects.toThrow('broken listener')
+    await vi.runAllTimersAsync()
+    await outcome
   })
 })
 
@@ -349,7 +449,7 @@ describe('fetchCollectionValue', () => {
     })
 
     const promise = fetchCollectionValue('alice', 'tok')
-    await vi.advanceTimersByTimeAsync(1000)
+    await vi.runAllTimersAsync()
     await expect(promise).resolves.toMatchObject({ median: '$2' })
     expect(calls).toBe(2)
   })

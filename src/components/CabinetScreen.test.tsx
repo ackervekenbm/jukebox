@@ -16,6 +16,15 @@ vi.mock('../hooks/useCabinet', () => ({
   useCabinet: () => mock.state,
 }))
 
+// Why a Discogs job waits has its own tests; here it says whatever a test sets.
+const wait = vi.hoisted(() => ({ note: null as string | null, calls: [] as unknown[][] }))
+vi.mock('../hooks/useDiscogsWait', () => ({
+  useDiscogsWaitNote: (active: boolean, progress: unknown) => {
+    wait.calls.push([active, progress])
+    return active ? wait.note : null
+  },
+}))
+
 let nextId = 0
 
 function release(artist: string, title: string, overrides: Partial<DisplayRelease> = {}): DisplayRelease {
@@ -118,6 +127,8 @@ function setDefault() {
 }
 
 beforeEach(() => {
+  wait.note = null
+  wait.calls = []
   vi.clearAllMocks()
   setDefault()
 })
@@ -572,6 +583,24 @@ describe('CabinetScreen', () => {
     renderScreen(vi.fn(), [cd])
     fireEvent.click(shelfHeader('Shelf 1'))
     expect(screen.queryByRole('button', { name: /^Gatefold/ })).not.toBeInTheDocument()
+  })
+
+  it('says why the release-notes check is not moving', () => {
+    const state = mock.state as { gatefoldScan: unknown }
+    state.gatefoldScan = { done: 12, total: 40 }
+    wait.note = "pausing to stay within Discogs' rate limit"
+    renderScreen()
+
+    expect(
+      screen.getByText(
+        "Checking release notes: 12 of 40 records — pausing to stay within Discogs' rate limit",
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('status', { name: 'Release notes check' })).toHaveTextContent(
+      "Now pausing to stay within Discogs' rate limit.",
+    )
+    // Asked about the running check, keyed on its count.
+    expect(wait.calls.at(-1)).toEqual([true, 12])
   })
 
   it('says when Discogs refused the token for the release notes', () => {

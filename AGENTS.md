@@ -64,9 +64,22 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
 
 - `src/hooks/useCollection.ts` — load orchestration: stale-while-revalidate.
   Content-first: the release grid commits to the UI immediately; master-year
-  enrichment runs in the background and streams in batches.
-- `src/api/discogs.ts` — raw Discogs calls, ~60 req/min budget. Master-year
-  fetch uses staggered batches of 6 + 6.6s pauses; 429s retry via `Retry-After`.
+  enrichment runs in the background and streams in as each year arrives.
+- `src/api/discogs.ts` — raw Discogs calls, ~60 req/min budget. Every call
+  goes through the shared `discogsBudget` (`src/api/rateLimit.ts`): it reads
+  `X-Discogs-Ratelimit-Remaining` from each answer, estimates how much of the
+  moving minute has come back, and holds new requests before Discogs refuses
+  them (background lookups keep a reserve of 10, so another device on the token
+  doesn't push them into 429s and an opened record answers at once; requests
+  the user waits for keep 2);
+  a 429 pauses every caller for its `Retry-After` (or 5 s), and a refused token
+  cancels the run's other lookups at once. Per-id lookups
+  (`fetchEach`: master years, release notes) keep up to 6 in flight, start one
+  every ~1.2 s, and report each result and progress as soon as it's back, so a
+  slow or retried lookup only holds its own slot. `useDiscogsWait` turns a
+  notable budget hold (a 429 pause, or a wait of 3 s or more) or 15 s without
+  progress into a note on the progress text
+  (sync banner, cabinet).
   All calls go through the same-origin `/discogs` proxy (vite dev forwards to
   the API server; the container runs it in Express) — the app must never call
   `api.discogs.com` cross-origin, because Discogs' 429s carry no CORS headers
@@ -105,7 +118,7 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   ouvrante, …) and skips denials ("not a gatefold", "unlike the original
   gatefold") and gatefold items ("gatefold poster"). The collection listing
   has no notes, so `src/hooks/useGatefoldNotes.ts` fetches `/releases/{id}`
-  (the shared `fetchEach` batcher in `src/api/discogs.ts`, same pacing as
+  (the shared `fetchEach` pool in `src/api/discogs.ts`, same pacing as
   master years; a 401/403 stops the whole run) for single vinyl discs the user
   hasn't decided, only while the cabinet is open and the collection has
   loaded. It caches the notes **text**, not a yes/no, so improving the
