@@ -23,12 +23,13 @@ New here? Start with the **prebuilt image**.
 | **Prebuilt image** | [docker-image.md](docker-image.md) | Anything with Docker: no build step, easy updates and rollback, `amd64` and `arm64` | Docker, 64-bit OS |
 | **Build from a checkout (Docker)** | [from-source-docker.md](from-source-docker.md) | A version you patch yourself, or a host that shouldn't pull an image | Docker, git, 64-bit OS |
 | **Bare Node** | [from-source-node.md](from-source-node.md) | A box that already runs Node 22+, managed by systemd | Node 22+, git, 64-bit OS |
-| **OpenMediaVault** | [openmediavault.md](openmediavault.md) | The OMV Compose plugin, all from the web UI (what the maintainer runs) | OMV with the Compose plugin, 64-bit OS |
+| **OpenMediaVault** | [openmediavault.md](openmediavault.md) | The OMV Compose plugin, all from the web UI, with HTTPS via Tailscale or Caddy (what the maintainer runs) | OMV with the Compose plugin, 64-bit OS |
 
 Whichever route you pick:
 
-- [https-and-offline.md](https-and-offline.md): HTTPS, reverse proxies, and
-  what needs HTTPS (offline launch).
+- [https-and-offline.md](https-and-offline.md): HTTPS (Tailscale, DuckDNS with
+  Caddy on the host or in Docker, mkcert), reverse proxies, and what needs HTTPS
+  (offline launch).
 - [operations.md](operations.md): settings, health checks, backups, updates,
   rollback, logs.
 - [troubleshooting.md](troubleshooting.md): symptoms and fixes.

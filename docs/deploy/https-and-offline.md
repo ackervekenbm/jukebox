@@ -44,8 +44,8 @@ From least to most setup:
 
 | Approach | What's needed | Good for |
 | --- | --- | --- |
-| **[Tailscale](#tailscale)** | Tailscale on the server and your devices | The easiest. Free certificates that renew themselves; no DNS, no proxy, no ports. Also the way to go on [OpenMediaVault](openmediavault.md#https-on-omv), whose UI holds 80/443 |
-| **[DuckDNS + Let's Encrypt](#duckdns--lets-encrypt-with-caddy)** | A free DuckDNS name and a Caddy build with the DuckDNS module | Devices trust it with no setup, and no ports are opened |
+| **[Tailscale](#tailscale)** | Tailscale on the server and your devices | The easiest. Free certificates that renew themselves; no DNS, no proxy, no ports |
+| **[DuckDNS + Let's Encrypt](#duckdns--lets-encrypt-with-caddy)** | A free DuckDNS name and a Caddy build with the DuckDNS module, on the host or [in Docker](#caddy-in-docker) | Devices trust it with no setup or app, no ports are opened, and one name serves several apps |
 | **[mkcert](#mkcert-your-own-local-ca)** | Your own certificate authority, installed on every device | Fully offline, no third party, works with a `jukebox.lan` name |
 
 Tailscale needs nothing else on this page. The other two need a reverse proxy
@@ -79,7 +79,8 @@ change it to `127.0.0.1:3000`.
 - `/discogs` calls can take up to `DISCOGS_TIMEOUT_MS` (30 s by default); keep the
   proxy's read timeout above that.
 - On OpenMediaVault, a proxy on the host can't use ports 80/443 (OMV's UI holds
-  them). Use [Tailscale](#tailscale), another port, or another machine.
+  them). Use [Tailscale](#tailscale), or Caddy on another port
+  ([Caddy on OMV](openmediavault.md#caddy-on-omv)).
 
 ### Caddy
 
@@ -185,8 +186,9 @@ creating a DNS record (the *DNS-01 challenge*), so no inbound ports are needed,
 and it works even when your internet provider gives you no public IP of your own
 (CGNAT).
 
-This section assumes Caddy installed from its Debian/Ubuntu package, running as
-a systemd service. For Caddy in Docker, see the note after step 4.
+Steps 1–3 assume Caddy installed from its Debian/Ubuntu package, running as a
+systemd service. For Caddy in Docker, do step 0, then
+[Caddy in Docker](#caddy-in-docker) below, and step 4.
 
 **0. Get a DuckDNS name and token.** Sign in at <https://www.duckdns.org>, add a
 subdomain (e.g. `yourname`), and set its IP to the server's **LAN** address,
@@ -251,14 +253,98 @@ Then `sudo systemctl restart caddy`, and check for the certificate with
 **4. Make sure the phone can resolve the name.** Many routers and DNS resolvers
 refuse public names that point to a private address (*DNS-rebinding
 protection*, e.g. on FRITZ!Box, OpenWrt/dnsmasq, pfSense/Unbound). If the phone
-can't resolve `yourname.duckdns.org`, allow the domain in that protection.
+can't resolve `yourname.duckdns.org` (with the wildcard setup below, the name
+you browse, e.g. `jukebox.yourname.duckdns.org`), allow the domain in that
+protection, including the names below it. Check on the device itself, or on a
+laptop with plain `nslookup jukebox.yourname.duckdns.org`: asking a public
+resolver directly (`nslookup … 1.1.1.1`) skips the router and proves only that
+DuckDNS is right. If the router has no such setting, point the devices at a
+DNS server you run (e.g. Pi-hole or AdGuard Home), which doesn't filter these
+answers by default.
 
-**Caddy in Docker instead:** build the image with a `caddy:builder` stage running
-the `xcaddy build` above, copied into a `caddy` image. Give it the token with
-`env_file: duckdns.env` in its compose service (a 0600 file next to the compose
-file), mount the Caddyfile, and put Caddy and Jukebox on one Docker network.
-The upstream is then `jukebox:3000` instead of `127.0.0.1:8080`, and Jukebox
-needs no `ports:` at all.
+### Caddy in Docker
+
+The same setup as a Compose stack: no package, no systemd drop-in, and the
+DuckDNS module is built into the image. It also serves **several apps under one
+DuckDNS name**: DuckDNS answers every name below yours
+(`jukebox.yourname.duckdns.org`, `photos.yourname.duckdns.org`, …) with the same
+IP, and Caddy gets one wildcard certificate, `*.yourname.duckdns.org`, for all
+of them. Prefer the wildcard over a certificate per name: DuckDNS holds a
+single TXT record per name, so challenges for several names at once overwrite
+each other and fail at random. For the same reason, don't add the bare
+`yourname.duckdns.org` to the site address: one certificate for both names
+needs two TXT values at once. (A side effect: Certificate Transparency logs
+show only `*.yourname.duckdns.org`, not each app's name.)
+
+The complete, paste-ready stack is in the
+[OpenMediaVault walkthrough](openmediavault.md#caddy-on-omv), steps 2–4: the
+shared `proxy` network, the Jukebox service joining it, and the `caddy`
+stack. Outside OMV, use those files with three changes:
+
+- **Paths**: replace `CHANGE_TO_COMPOSE_DATA_PATH/caddy/data` and `…/config`
+  with folders of your own, e.g. `./data` and `./config` next to the compose
+  file, and the Jukebox data path with yours.
+- **The token**: put `DUCKDNS_TOKEN=…` in a `.env` file next to the compose
+  file (`chmod 600 .env`). Compose reads it on its own.
+- **The port**: if 443 is free, publish `"443:443"` and `"443:443/udp"`, and
+  drop `:8443` from the site address. The app is then at
+  `https://jukebox.yourname.duckdns.org`. Keep `:8443` where 443 is taken (OMV
+  holds it for its own UI). The port is part of the address the PWA is
+  installed from, so decide before devices install it.
+
+How it works:
+
+- **`dockerfile_inline`** builds Caddy with the DuckDNS module, and
+  **`configs: content`** carries the Caddyfile, so everything is one file.
+  That needs Docker Compose 2.23.1 or newer (`docker compose version`).
+- **The first `up` builds Caddy** from source: a few minutes and about 1 GB of
+  memory, longer on low-power ARM boards. Later starts reuse the image.
+- **`${DUCKDNS_TOKEN:?…}`** makes Compose refuse to start without the token,
+  instead of Caddy failing later in the challenge. `{env.DUCKDNS_TOKEN}` in the
+  Caddyfile has no `$`, so Compose leaves it alone and Caddy reads the
+  variable itself; the token never ends up in the config. Anyone with Docker
+  access can still read it with `docker inspect`; a leaked token lets someone
+  repoint your DuckDNS name, so regenerate it on duckdns.org if that happens.
+- **`resolvers`** makes Caddy look up DuckDNS's nameservers through public
+  resolvers when it checks the challenge record, so the check doesn't depend on
+  the host's or router's DNS.
+- **`/data`** holds the certificate and the ACME account. Keep it, or every
+  recreate asks Let's Encrypt again and runs into its rate limits.
+- **`handle { abort }`** drops requests for any name you haven't configured.
+- **HTTP/3**: the `/udp` port lets Caddy serve QUIC. A log warning about the UDP
+  receive buffer size is harmless.
+
+**Another app:** put it on the `proxy` network, then add a block above the final
+`handle`, using its service name and the port **inside** its container (the
+right-hand side of its `ports:`):
+
+```caddyfile
+@photos host photos.yourname.duckdns.org
+handle @photos {
+  reverse_proxy photos:2342
+}
+```
+
+Two stacks whose services share a name (`app`, `web`) need a unique `aliases:`
+entry on the `proxy` network. Nothing changes on DuckDNS: the name and the
+certificate already cover it.
+
+**After editing the Caddyfile**, recreate the container:
+`docker compose up -d --force-recreate caddy` (on OMV: **Down**, then **Up**).
+The config is copied in when the container is created, so a plain `up -d` or a
+restart can keep the old one.
+
+**Updating Caddy:** `docker compose build && docker compose up -d`. The stack
+sets `pull: true` and `no_cache: true` under `build:`, so each build fetches the
+newest base images and module instead of reusing the cached layers. Without
+those, a rebuild produces the same binary. `docker compose pull` (OMV's
+**Pull**) can't fetch this image and reports an error for it; that is harmless.
+
+**Check**: `docker compose logs caddy` should show "certificate obtained
+successfully", then `https://jukebox.yourname.duckdns.org/api/health` (with
+`:8443` if you kept it) answers from another device. A `502` means the app
+isn't on the `proxy` network, or the upstream uses the host port instead of
+the container port.
 
 ## mkcert: your own local CA
 
