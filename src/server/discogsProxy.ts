@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2025-2026 ackervekenbm
+
 import type { Request, Response as ExpressResponse } from 'express'
 import { DISCOGS_API_BASE, DISCOGS_USER_AGENT, DISCOGS_TIMEOUT_MS } from './config'
 

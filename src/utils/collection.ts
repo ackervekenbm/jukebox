@@ -322,7 +322,8 @@ export function stackCountLabel(group: PressingGroup): string {
  * missing id — there is no master to collapse into) each stand alone, keyed by
  * release id so multiple copies of one release still gather together.
  */
-export function groupPressings(releases: DisplayRelease[]): PressingGroup[] {  const byKey = new Map<string, DisplayRelease[]>()
+export function groupPressings(releases: DisplayRelease[]): PressingGroup[] {
+  const byKey = new Map<string, DisplayRelease[]>()
 
   for (const display of releases) {
     const masterId = display.release?.basic_information?.master_id

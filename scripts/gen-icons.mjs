@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2025-2026 ackervekenbm
+
 import sharp from 'sharp'
 import { mkdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'

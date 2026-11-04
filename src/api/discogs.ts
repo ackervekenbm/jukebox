@@ -13,7 +13,8 @@ import type {
 } from '../types/discogs'
 import { abortableSleep, discogsBudget, type Priority } from './rateLimit'
 
-// Same-origin /discogs proxy (vite dev + nginx) for all API calls. The app
+// Same-origin /discogs proxy (vite dev forwards to the API server, which
+// relays to Discogs: src/server/discogsProxy.ts) for all API calls. The app
 // cannot call the API cross-origin: Discogs' 429 rate-limit responses carry no
 // Access-Control-Allow-Origin header, so the browser masks throttling as an
 // opaque CORS error and year enrichment can never finish. Through the proxy a
