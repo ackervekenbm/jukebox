@@ -85,6 +85,20 @@ Verify: **Services → Compose → Services** lists the container as running, an
   `<Data shared folder>/jukebox-data/jukebox.db` is the whole server-side state.
   That beats a named volume here: it is an ordinary folder you can see, browse
   and copy in OMV, and **Prune → Volume** cannot delete it.
+- **Ownership is automatic.** The app runs as the unprivileged user uid 1000,
+  not as root. Each time the container starts it gives `jukebox-data` and
+  the files in it to that user. Nothing to set up in OMV and no SSH needed, also
+  for a folder an older image left owned by root
+  ([first update](#the-first-update-after-the-switch-to-uid-1000)). Only
+  `jukebox-data` changes hands: the *Data* shared folder, its permissions in
+  the OMV UI and the other stacks' folders stay as they are. On the host,
+  uid 1000 is usually the first user created on the machine, and that user can
+  read the database (your Discogs username and cabinet layout); if that
+  matters, keep the *Data* shared folder closed to them.
+- **The Data folder must be on a Linux filesystem.** Check its type under
+  **Storage → File Systems**: ext4, btrfs and xfs (what OMV formats with) work.
+  NTFS, exFAT and FAT can't store an owner, so the container can't take the
+  folder over and won't start.
 - **No `container_name`**: compose derives it from the stack and service, so it
   is `jukebox-jukebox-1`. The plugin's **Logs** button doesn't care.
 - **Port `8080`**: host side only. Change the left-hand number if that port is
@@ -106,8 +120,8 @@ Verify: **Services → Compose → Services** lists the container as running, an
 **Services → Compose → Files** → select `jukebox` → **Pull**, then **Up**.
 
 - **Pull** fetches `:latest`; if the image hasn't changed it's a no-op.
-- **Up** recreates the container when the image did change. The data folder is
-  untouched, so the cabinet survives.
+- **Up** recreates the container when the image did change. The data in the
+  folder is untouched, so the cabinet survives.
 - Old images stay on disk. **Prune → Image** removes untagged ones, such as the
   previous `:latest` after a pull. A pinned tag you no longer use (e.g. after a
   rollback) stays until you delete it in the **Images** tab.
@@ -117,6 +131,27 @@ Devices pick up the new build on their own
 an authentication error, see
 [If a pull is denied](docker-image.md#if-a-pull-is-denied) and run its commands
 over SSH.
+
+### The first update after the switch to uid 1000
+
+Images from before the app stopped running as root left `jukebox-data` owned
+by root. The first **Up** with a newer image hands it over by itself; there is
+nothing to do beforehand. Afterwards, check:
+
+1. **Services → Compose → Services** shows the container running and, after
+   about half a minute, healthy.
+2. Its **Logs** have no line starting with `jukebox: could not give`.
+3. The app opens and the cabinet shows your shelves.
+
+If the container keeps restarting instead, the log says why
+([troubleshooting](troubleshooting.md#the-container-restarts-in-a-loop)). The
+database is not damaged either way. To go back meanwhile, pin the previous image
+tag in the stack ([how](docker-image.md#pin-a-version-roll-back)) and press **Up**.
+
+**Resetting permissions in OMV:** a recursive *Reset permissions* or ACL change
+on the *Data* shared folder gives `jukebox-data` back to root while the app
+runs, and saving the cabinet then fails. Restart the stack (**Down**, **Up**) and
+the container takes the folder over again.
 
 ## Backups
 
