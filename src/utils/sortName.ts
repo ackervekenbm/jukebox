@@ -26,6 +26,11 @@ export function sortLetter(key: string): string {
   return first.toUpperCase()
 }
 
+// One collator for every comparison. `a.localeCompare(b, 'en', options)` is
+// defined to compare exactly like this, but sets up a new collator on each
+// call, and sorting a large collection makes hundreds of thousands of them.
+const SORT_COLLATOR = new Intl.Collator('en', { sensitivity: 'base', numeric: true })
+
 export function compareSortKeys(a: string, b: string): number {
-  return a.localeCompare(b, 'en', { sensitivity: 'base', numeric: true })
+  return SORT_COLLATOR.compare(a, b)
 }

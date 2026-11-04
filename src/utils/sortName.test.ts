@@ -50,4 +50,24 @@ describe('compareSortKeys', () => {
     const list = ['Revo 10', 'Revo 2', 'revo 1', 'Revue'].sort(compareSortKeys)
     expect(list).toEqual(['revo 1', 'Revo 2', 'Revo 10', 'Revue'])
   })
+
+  it('treats accents and case alike, and keeps numbers in natural order', () => {
+    expect(compareSortKeys('björk', 'Bjork')).toBe(0)
+    expect(compareSortKeys('MOTÖRHEAD', 'motorhead')).toBe(0)
+    const list = ['zz top', '10cc', 'u2', '2 unlimited', 'abba', 'ac dc'].sort(compareSortKeys)
+    expect(list).toEqual(['2 unlimited', '10cc', 'abba', 'ac dc', 'u2', 'zz top'])
+  })
+
+  it('compares exactly like localeCompare with the same options', () => {
+    // The shared collator is a speed-up only: every pair must keep its order.
+    const parts = ['the', 'a', 'Ab', 'ab', 'ä', 'Å', 'é', 'e', '10', '9', '2b', '', ' ', '-', 'ß', 'ss', 'Œ', 'oe', 'z']
+    let seed = 1
+    const pick = () => parts[(seed = (seed * 48271) % 2147483647) % parts.length]
+    for (let i = 0; i < 2000; i++) {
+      const a = pick() + pick() + pick()
+      const b = pick() + pick() + pick()
+      const expected = Math.sign(a.localeCompare(b, 'en', { sensitivity: 'base', numeric: true }))
+      expect(Math.sign(compareSortKeys(a, b)), `${a} vs ${b}`).toBe(expected)
+    }
+  })
 })
