@@ -54,6 +54,11 @@ Open <http://localhost:8080>, or `http://<server-ip>:8080` from another device.
   ([what it checks](operations.md#health-and-monitoring)). An unwritable
   `/app/data` makes the container exit at start-up instead
   ([troubleshooting](troubleshooting.md#the-container-restarts-in-a-loop)).
+- The app runs as the image's unprivileged `node` user (uid 1000), not as
+  root. The container starts as root only to hand `/app/data` to that user,
+  including files an older image or a restore left there as root, so existing
+  data keeps working without any steps. To skip even that, run it as
+  `--user 1000:1000` with a volume or folder that already belongs to uid 1000.
 - Port `3000` is fixed inside the image, because the healthcheck probes it. To
   serve on another port, change the **host** side of the mapping (`80:3000`),
   not `PORT`.

@@ -126,16 +126,26 @@ docker logs --tail=30 jukebox
 
 Fix the mount, then restart:
 
-- **Named volume:** usually just works. If something root-only wrote into it,
-  `docker run --rm -v "$VOL":/data alpine:3.24 chown -R 0:0 /data`. Set `VOL` to
-  your route's real volume name first ([how](operations.md#set-the-names)); with
-  the wrong name this changes a new, empty volume and fixes nothing.
-- **Bind mount (a host folder):** the container runs as root, so the folder has
-  to be writable for root. Check its mode, and where it really points with
+The app runs as the image's `node` user (uid 1000). At start the container
+hands `/app/data` to that user; when it can't, the log says
+`jukebox: could not give /app/data to the node user (uid 1000)` just above
+the SQLite error.
+
+- **Named volume:** usually just works, ownership included. If it still fails,
+  give it to uid 1000 yourself:
+  `docker run --rm -v "$VOL":/data alpine:3.24 chown -R 1000:1000 /data`. Set
+  `VOL` to your route's real volume name first
+  ([how](operations.md#set-the-names)); with the wrong name this changes a new,
+  empty volume and fixes nothing.
+- **Bind mount (a host folder):** on a local disk the container takes it over
+  by itself. On network storage that blocks root (NFS with `root_squash`) it
+  can't: give the folder to uid 1000 on the host (`sudo chown -R 1000:1000
+  <folder>`). Check where it really points with
   `docker inspect --format '{{json .Mounts}}' jukebox`.
 - **Docker with user-namespace remapping** (`userns-remap` in the daemon
-  config): root in the container is an unprivileged user on the host. Give the
-  folder to that user, or use a named volume.
+  config) or **`--user`/`user:`** set to someone other than 1000: the
+  container can't hand the folder over, so give it to the user the app really
+  runs as on the host, or use a named volume.
 - **SELinux hosts** (Fedora, RHEL): a bind mount needs `:z` or `:Z` after the
   container path.
 

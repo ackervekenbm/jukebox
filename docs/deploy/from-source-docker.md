@@ -61,7 +61,10 @@ volume:
       - /srv/jukebox-data:/app/data
 ```
 
-The folder must be writable for root, which the container runs as.
+The app runs as the image's `node` user (uid 1000); the container hands the
+folder to that user when it starts. On network storage that blocks root (NFS
+with `root_squash`), give it to uid 1000 yourself: `sudo chown -R 1000:1000
+/srv/jukebox-data`.
 
 **A real version line**: Settings shows the commit and date of the build, taken
 from the `COMMIT_SHA` and `BUILD_TIME` build arguments. `docker compose up -d

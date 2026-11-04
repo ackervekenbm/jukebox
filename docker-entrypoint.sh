@@ -1,0 +1,25 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2025-2026 ackervekenbm
+
+# Runs the app as the unprivileged `node` user (uid 1000) instead of root.
+#
+# The container starts as root only for one thing: the data folder can hold
+# files root wrote — an image from before the app dropped root, or a restore
+# done as root — that `node` couldn't open. Those are handed to `node` here,
+# then the app starts as `node`. Started as a non-root user already (e.g.
+# `user: "1000:1000"` in compose), it runs the command as is.
+set -eu
+
+if [ "$(id -u)" = 0 ]; then
+  data="${DATA_DIR:-/app/data}"
+  mkdir -p "$data"
+  # Only what isn't node's yet, so a normal start touches nothing.
+  if ! find "$data" \( ! -user node -o ! -group node \) -exec chown node:node {} +; then
+    echo "jukebox: could not give $data to the node user (uid 1000)." >&2
+    echo "jukebox: if the app then can't write its database, give that folder to uid 1000 on the host." >&2
+  fi
+  exec su-exec node "$@"
+fi
+
+exec "$@"

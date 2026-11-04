@@ -219,6 +219,10 @@ variable, image tag, the Dockerfile or a workflow changes, update
 The production host is a Raspberry Pi running **OpenMediaVault**. OMV's web UI
 owns ports 80/443, so the app is exposed on host port **8080**. One container,
 one node process: it serves the static build, the API and the `/discogs` proxy.
+The process runs as the image's unprivileged `node` user (uid 1000):
+`docker-entrypoint.sh` starts as root only to hand `/app/data` to `node`
+(files a root-run image or a restore left there) and then drops to it with
+`su-exec`; the smoke job checks both, plus a root-owned volume and `--user 1000`.
 The SQLite DB lives in `/app/data`, bind-mounted into the Compose plugin's *Data*
 shared folder (`CHANGE_TO_COMPOSE_DATA_PATH/jukebox-data`). It holds the synced
 cabinet documents, so treat that folder as persistent user data. Backups and

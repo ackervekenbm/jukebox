@@ -281,7 +281,8 @@ since `down` removes the container. **Never `down -v`:** it deletes the volume.
 2. Stop the app and copy the backup in. `DBCOPY` checks the backup and the
    target before it deletes anything:
 
-   Docker volume (the container runs as root, so no ownership change is needed):
+   Docker volume (the restored files belong to root; the container hands them to
+   its `node` user when it starts, so no ownership change is needed):
 
    ```bash
    $DOCKER volume inspect "$VOL" >/dev/null && $DOCKER stop "$CT" && \
@@ -331,7 +332,7 @@ means carrying that file across:
    once, so it creates its data folder or volume.
 3. Set the names for the **new** route and run its [restore](#restore) with that
    `BK`. Restore clears a stale `-wal` and sets the ownership each route needs
-   (root for Docker, `jukebox` for bare Node).
+   (Docker takes the files over when it starts; bare Node needs `jukebox`).
 4. Check it with `jukebox_peek`, `/api/health` and the app.
 5. Update whatever points at the app. The port usually changes (bare Node
    listens on `3000`, the Docker examples on `8080`): fix the reverse-proxy
