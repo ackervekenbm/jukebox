@@ -21,11 +21,9 @@ function json(body: unknown, status = 200): Response {
 }
 
 const doc: CabinetDoc = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   cabinets: [{ id: 'c', name: 'Cabinet', slots: [{ id: 's', label: 'A', capacity: 40 }] }],
-  placements: {},
-  overrides: {},
-  unplaced: [],
+  sleeves: {},
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
 

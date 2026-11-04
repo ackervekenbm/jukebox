@@ -54,7 +54,7 @@ With compose, set them under `environment:`; with systemd, `Environment=` lines.
 | Data | Where | Survives redeploy |
 | --- | --- | --- |
 | Collection, tracklists, cached years, listen log, saved views, settings, token | **Browser** (IndexedDB + localStorage) | per device; cleared from Settings → *Clear everything* |
-| Record-cabinet layout (cabinets, slots, placements) | **Server** SQLite, table `cabinet_docs` | yes, if the data dir/volume is kept |
+| Record cabinet (shelves and your gatefold corrections; each device lays the records out itself) | **Server** SQLite, table `cabinet_docs` | yes, if the data dir/volume is kept |
 | App build | image / `dist/` + `dist-server/` | rebuilt each deploy |
 
 Two consequences worth remembering:

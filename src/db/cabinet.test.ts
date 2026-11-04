@@ -8,11 +8,9 @@ import { dbPromise, VERSION } from './database'
 
 function doc(updatedAt: string): CabinetDoc {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     cabinets: [{ id: 'c1', name: 'Main', slots: [{ id: 's1', label: 'A', capacity: 40 }] }],
-    placements: { '1-1': 's1' },
-    overrides: {},
-    unplaced: [],
+    sleeves: {},
     updatedAt,
   }
 }

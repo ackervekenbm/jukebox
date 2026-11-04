@@ -4,7 +4,7 @@
 import express, { type ErrorRequestHandler, type Request, type Response } from 'express'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { cabinetDocSchema, etagForRevision, parseEtag, type CabinetDoc } from '../shared/cabinetDoc'
+import { anyCabinetDocSchema, etagForRevision, parseEtag, type CabinetDoc } from '../shared/cabinetDoc'
 import { AuthError, parseToken, resolveUsername } from './auth'
 import { dbReady, getCabinetRow, putCabinetRow, ConflictError } from './db'
 import { discogsProxy } from './discogsProxy'
@@ -42,13 +42,21 @@ export function createApp(): express.Express {
     res.status(db ? 200 : 500).json({ ok: db, db })
   })
 
+  // A stored row may still be version 1 (saved before version 2); hand it out
+  // as version 2. A row that doesn't parse at all is returned as it is.
+  const readStored = (doc: string): unknown => {
+    const raw = JSON.parse(doc) as unknown
+    const parsed = anyCabinetDocSchema.safeParse(raw)
+    return parsed.success ? parsed.data : raw
+  }
+
   app.get('/api/sync/cabinet', async (req, res) => {
     const username = await requireUser(req, res)
     if (!username) return
     const row = getCabinetRow(username)
     res.json({
       username,
-      doc: row ? (JSON.parse(row.doc) as unknown) : null,
+      doc: row ? readStored(row.doc) : null,
       etag: etagForRevision(row?.revision ?? 0),
     })
   })
@@ -57,7 +65,8 @@ export function createApp(): express.Express {
     const username = await requireUser(req, res)
     if (!username) return
 
-    const parsed = cabinetDocSchema.safeParse(req.body)
+    // Either version is accepted and stored as version 2.
+    const parsed = anyCabinetDocSchema.safeParse(req.body)
     if (!parsed.success) {
       res.status(400).json({ error: 'Invalid cabinet document', issues: parsed.error.issues })
       return
@@ -83,7 +92,7 @@ export function createApp(): express.Express {
         username,
         (current) => {
           if (parsed.data.sleeves === undefined && current) {
-            const stored = cabinetDocSchema.safeParse(JSON.parse(current.doc))
+            const stored = anyCabinetDocSchema.safeParse(JSON.parse(current.doc))
             if (stored.success && stored.data.sleeves) {
               saved = { ...parsed.data, sleeves: stored.data.sleeves }
             }
@@ -98,7 +107,7 @@ export function createApp(): express.Express {
         const current = err.current
         res.status(409).json({
           error: 'Cabinet document is out of date',
-          doc: current ? (JSON.parse(current.doc) as unknown) : null,
+          doc: current ? readStored(current.doc) : null,
           etag: etagForRevision(current?.revision ?? 0),
         })
         return

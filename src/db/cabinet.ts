@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2025-2026 ackervekenbm
 
-import type { CabinetDoc } from '../shared/cabinetDoc'
+import type { StoredCabinetDoc } from '../shared/cabinetDoc'
 import { dbPromise } from './database'
 
 const STORE = 'cabinet'
 
 export interface CabinetRow {
   username: string
-  doc: CabinetDoc
+  /** As last saved: version 2, or version 1 from before the app moved to it. */
+  doc: StoredCabinetDoc
   /** Server revision the local copy is based on (0 = never synced). */
   revision: number
   /** True while local edits have not been pushed to the server. */

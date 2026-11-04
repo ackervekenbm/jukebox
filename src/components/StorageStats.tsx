@@ -8,8 +8,17 @@ import {
   gatherStorageStats,
   requestPersistence,
   clearAlbumArtCache,
+  type CabinetStat,
   type StorageStats as StorageStatsData,
 } from '../utils/storage'
+
+/** "2 shelves", plus the user's own gatefold calls when there are any. */
+function cabinetSummary(cabinet: CabinetStat): string {
+  const shelves = `${cabinet.slots} ${cabinet.slots === 1 ? 'shelf' : 'shelves'}`
+  if (cabinet.sleeveCalls === 0) return shelves
+  const calls = `${cabinet.sleeveCalls.toLocaleString()} gatefold ${cabinet.sleeveCalls === 1 ? 'correction' : 'corrections'}`
+  return `${shelves} · ${calls}`
+}
 
 function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -217,9 +226,7 @@ export function StorageStats({ username, onClearData }: StorageStatsProps) {
               <span className="stats-label">Record cabinet</span>
               <span className="stats-value">
                 {stats.indexedDb.cabinet
-                  ? `${stats.indexedDb.cabinet.slots} shelf${
-                      stats.indexedDb.cabinet.slots !== 1 ? 'ves' : ''
-                    } · ${stats.indexedDb.cabinet.placements.toLocaleString()} placed`
+                  ? cabinetSummary(stats.indexedDb.cabinet)
                   : 'not set up'}
               </span>
             </div>
