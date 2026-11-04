@@ -239,15 +239,23 @@ port/env/tag tables, in sync with the workflow matrix and the Dockerfile.
 - **Route A — prebuilt image (production).** The stack is the one in
   `docs/deploy/openmediavault.md`: stack name `jukebox`, port `8080`, data in
   the *Data* shared folder, and a `logging:` cap on the container log (add it if
-  the production stack predates it). To update after a merge: **Services →
+  the production stack predates it), plus the `proxy` network from
+  `#caddy-on-omv` step 3. To update after a merge: **Services →
   Compose → Files** → `jukebox` → **Pull** → **Up**.
 - **Route B — build on the Pi** (e.g. local variants): `docs/deploy/from-source-docker.md`.
   It uses the repo's `docker-compose.yml`, which keeps its data in the named
   volume `jukebox_jukebox-data`, **not** in Route A's bind folder. Switching
   routes starts on an empty DB unless you copy `jukebox.db` across
   (`docs/deploy/operations.md#moving-between-routes`).
-- **Offline / iPhone over HTTP**: home-screen install works over plain HTTP, but
-  offline launch needs HTTPS with a device-trusted cert. OMV holds 80/443 on this
-  host, so Tailscale `serve` is the simplest option
-  (`docs/deploy/openmediavault.md#https-on-omv`, all options in
-  `docs/deploy/https-and-offline.md`).
+- **HTTPS / offline**: home-screen install works over plain HTTP, but offline
+  launch needs HTTPS with a device-trusted cert. Production runs **Caddy in its
+  own Compose stack** (`caddy`) on host port **8443** (OMV holds 80/443): a
+  Caddy image built with the DuckDNS module, a wildcard Let's Encrypt
+  certificate via the DNS-01 challenge, one `handle` block per app, and the
+  shared external Docker network `proxy` (upstream `jukebox:3000`). The
+  generic steps are `docs/deploy/openmediavault.md#caddy-on-omv` and
+  `docs/deploy/https-and-offline.md#caddy-in-docker`; host-specific values
+  (names, IPs, DNS quirks) live in the maintainer's private `homelab` repo,
+  not here. Keep `ports: 8080` on the `jukebox` stack: devices without the
+  right DNS still use plain HTTP. Tailscale remains the documented
+  alternative.
