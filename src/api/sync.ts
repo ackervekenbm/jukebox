@@ -100,6 +100,10 @@ export async function fetchCabinet(token: string, signal?: AbortSignal): Promise
  * Writes the cabinet document, guarded by the ETag of the copy it was built
  * from. A 409 means the server moved on; the caller rebases and retries.
  */
+/** Shown when a save is refused for its size; the cabinet stays on this device. */
+export const CABINET_TOO_LARGE =
+  'The cabinet is too large to sync to the server. It is still saved on this device.'
+
 export async function pushCabinet(
   token: string,
   doc: CabinetDoc,
@@ -117,6 +121,9 @@ export async function pushCabinet(
   )
   const body = await readBody(res)
   if (res.status === 409) throw new SyncConflictError(asSnapshot(body))
+  // The server (or a proxy in front of it) refused the body for its size. That
+  // fails the same way on every retry, so say so instead of a generic failure.
+  if (res.status === 413) throw new SyncError(CABINET_TOO_LARGE, 413)
   if (!res.ok) throw new SyncError('Could not save the cabinet', res.status)
   return asSnapshot(body)
 }

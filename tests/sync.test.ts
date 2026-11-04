@@ -16,6 +16,7 @@ process.env.DATA_DIR = dataDir
 const knownTokens: Record<string, string> = {
   'token-alice': 'alice',
   'token-bob': 'bob',
+  'token-dave': 'dave',
 }
 
 vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
@@ -31,13 +32,14 @@ vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
   return new Response('Not Found', { status: 404 })
 })
 
-const { createApp } = await import('../src/server/app')
+const { createApp, SYNC_BODY_LIMIT_BYTES } = await import('../src/server/app')
 const { closeDb } = await import('../src/server/db')
 
 const app: Express = createApp()
 
 const alice = { Authorization: 'Discogs token=token-alice' }
 const bob = { Authorization: 'Discogs token=token-bob' }
+const dave = { Authorization: 'Discogs token=token-dave' }
 
 const sampleDoc = (
   placements: Record<string, string> = {},
@@ -115,6 +117,52 @@ describe('PUT /api/sync/cabinet', () => {
 
     const get = await request(app).get('/api/sync/cabinet').set(alice)
     expect(get.body.doc).toEqual(doc)
+    expect(get.body.etag).toBe('"r1"')
+  })
+
+  /**
+   * A document with one realistic placement per record, filled until its JSON
+   * is exactly `bytes` long (the last key absorbs the remainder).
+   */
+  const docOfSize = (bytes: number): CabinetDoc => {
+    const placements: Record<string, string> = {}
+    const size = () => Buffer.byteLength(JSON.stringify(sampleDoc(placements)))
+    // Each entry adds its own JSON ("key":"s1") plus a comma; count instead
+    // of re-serialising the whole document per record.
+    let estimate = size()
+    for (let i = 0; estimate < bytes - 64; i += 1) {
+      const key = `${1_000_000 + i}-${2_000_000 + i}`
+      placements[key] = 's1'
+      estimate += key.length + 8
+    }
+    const missing = bytes - size() - '"pad-":"s1",'.length
+    placements[`pad-${'x'.repeat(missing)}`] = 's1'
+    const doc = sampleDoc(placements)
+    expect(Buffer.byteLength(JSON.stringify(doc))).toBe(bytes)
+    return doc
+  }
+
+  it('takes a document right at the body limit', async () => {
+    const res = await request(app)
+      .put('/api/sync/cabinet')
+      .set(dave)
+      .set('If-Match', '"r0"')
+      .send(docOfSize(SYNC_BODY_LIMIT_BYTES))
+    expect(res.status).toBe(200)
+  })
+
+  it('refuses a document one byte over the limit with a JSON 413', async () => {
+    const res = await request(app)
+      .put('/api/sync/cabinet')
+      .set(dave)
+      .set('If-Match', '"r1"')
+      .send(docOfSize(SYNC_BODY_LIMIT_BYTES + 1))
+    expect(res.status).toBe(413)
+    expect(res.type).toBe('application/json')
+    expect(res.body.error).toEqual(expect.any(String))
+
+    // The refused save left the stored copy as it was.
+    const get = await request(app).get('/api/sync/cabinet').set(dave)
     expect(get.body.etag).toBe('"r1"')
   })
 
