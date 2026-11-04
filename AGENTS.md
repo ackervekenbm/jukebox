@@ -93,7 +93,11 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   routes live in `tests/` (node environment, supertest + temp `DATA_DIR`).
 - `src/shared/cabinetDoc.ts` — zod schema + types for the sync document,
   imported by both server (validation) and client (types only, so zod never
-  enters the browser bundle).
+  enters the browser bundle). Version 2 holds only what devices read back:
+  `cabinets` and the user's `sleeves` calls; each device plans placements
+  itself. The server still accepts version 1 (with the derived `placements`,
+  `overrides`, `unplaced`) from older cached apps, and stores and hands out
+  every document, old rows included, as version 2 (`anyCabinetDocSchema`).
 - `src/utils/cabinet.ts` — the shelf-layout engine (`planCabinet`): shelves
   sort exactly like the main view — always by artist (filing name), and inside
   an artist by the main view's Year or A–Z order (`CabinetSortMode` is

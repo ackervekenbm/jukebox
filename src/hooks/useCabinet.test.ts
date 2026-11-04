@@ -8,7 +8,7 @@ import type { DisplayRelease } from '../utils/collection'
 import { makeSortKey } from '../utils/sortName'
 import * as store from '../db/cabinet'
 import * as syncApi from '../api/sync'
-import type { CabinetDoc } from '../shared/cabinetDoc'
+import type { CabinetDoc, LegacyCabinetDoc } from '../shared/cabinetDoc'
 import {
   buildCabinetDoc,
   defaultCabinet,
@@ -54,13 +54,24 @@ function release(artist: string, title: string): DisplayRelease {
   }
 }
 
-function docWith(cabinetName: string, overrides: Record<string, string> = {}): CabinetDoc {
+function docWith(cabinetName: string): CabinetDoc {
+  return {
+    schemaVersion: 2,
+    cabinets: [{ id: 'main', name: cabinetName, slots: [{ id: 'slot-1', label: 'A', capacity: 40 }] }],
+    sleeves: {},
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  }
+}
+
+/** A document as an app from before version 2 saved it, derived fields and all. */
+function legacyDocWith(cabinetName: string, sleeves?: Record<string, boolean>): LegacyCabinetDoc {
   return {
     schemaVersion: 1,
     cabinets: [{ id: 'main', name: cabinetName, slots: [{ id: 'slot-1', label: 'A', capacity: 40 }] }],
-    placements: {},
-    overrides,
-    unplaced: [],
+    placements: { '1-1': 'slot-1' },
+    overrides: {},
+    unplaced: ['2-2'],
+    ...(sleeves ? { sleeves } : {}),
     updatedAt: '2026-01-01T00:00:00.000Z',
   }
 }
@@ -96,26 +107,31 @@ describe('helpers', () => {
     expect(nextSlotId([slot('slot-1'), slot('slot-3')])).toBe('slot-4')
   })
 
-  it('stamps the document with the computed placements', () => {
+  it('syncs only the shelves and the sleeve calls, not where each record goes', () => {
     const cabinet = defaultCabinet()
-    const plan = {
-      placements: { '1-1': 'slot-1' },
-      slots: [],
-      unplaced: [releases[1]],
-      conflicts: [],
-    }
-    const doc = buildCabinetDoc([cabinet], plan)
-    expect(doc.schemaVersion).toBe(1)
-    expect(doc.placements).toEqual({ '1-1': 'slot-1' })
-    expect(doc.unplaced).toEqual([releases[1].key])
-    expect(doc.overrides).toEqual({})
+    const doc = buildCabinetDoc([cabinet], { '7': true })
+    expect(Object.keys(doc).sort()).toEqual(['cabinets', 'schemaVersion', 'sleeves', 'updatedAt'])
+    expect(doc.schemaVersion).toBe(2)
+    expect(doc.cabinets).toEqual([cabinet])
+    expect(doc.sleeves).toEqual({ '7': true })
   })
 
   it('keeps the local cabinet after a sync conflict', () => {
     const local = docWith('Local')
-    const rebased = rebaseCabinetDoc(local)
+    const rebased = rebaseCabinetDoc({ ...local, sleeves: { '3': false } })
     expect(rebased.cabinets).toEqual(local.cabinets)
-    expect(rebased.overrides).toEqual({})
+    expect(rebased.sleeves).toEqual({ '3': false })
+  })
+
+  it('turns a copy stored before version 2 into version 2', () => {
+    const rebased = rebaseCabinetDoc(legacyDocWith('Old', { '5': true }))
+    expect(rebased).toEqual({
+      schemaVersion: 2,
+      cabinets: legacyDocWith('Old').cabinets,
+      sleeves: { '5': true },
+      updatedAt: expect.any(String),
+    })
+    expect(rebaseCabinetDoc(legacyDocWith('Old')).sleeves).toEqual({})
   })
 })
 
@@ -184,7 +200,7 @@ describe('useCabinet', () => {
       .spyOn(syncApi, 'pushCabinet')
       .mockRejectedValueOnce(
         new syncApi.SyncConflictError({
-          doc: docWith('Server', { fromServer: 'slot-1' }),
+          doc: docWith('Server'),
           etag: '"r5"',
         }),
       )
@@ -257,6 +273,27 @@ describe('useCabinet', () => {
     const ids = result.current.cabinet.slots.map((slot) => slot.id)
     expect(ids).toEqual(['slot-1', 'slot-3', 'slot-4'])
     expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('pushes a dirty copy stored before version 2 as version 2', async () => {
+    vi.spyOn(store, 'getCabinet').mockResolvedValue({
+      username: 'alice',
+      doc: legacyDocWith('Old', { '9': true }),
+      revision: 3,
+      dirty: true,
+    })
+    vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+    vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: null, etag: '"r0"' })
+    const pushSpy = vi
+      .spyOn(syncApi, 'pushCabinet')
+      .mockImplementation(async (_token, doc) => ({ doc, etag: '"r4"' }))
+
+    const { result } = renderHook(() => useIt())
+    await waitFor(() => expect(result.current.status).toBe('synced'))
+    const sent = pushSpy.mock.calls[0][1]
+    expect(sent.schemaVersion).toBe(2)
+    expect(sent).not.toHaveProperty('placements')
+    expect(sent.sleeves).toEqual({ '9': true })
   })
 
   describe('gatefolds', () => {

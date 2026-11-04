@@ -2,7 +2,7 @@
 // Copyright (C) 2025-2026 ackervekenbm
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Cabinet, CabinetDoc, Slot } from '../shared/cabinetDoc'
+import type { Cabinet, CabinetDoc, Slot, StoredCabinetDoc } from '../shared/cabinetDoc'
 import type { DisplayRelease } from '../utils/collection'
 import {
   detectedGatefold,
@@ -79,40 +79,30 @@ export function withUniqueSlotIds(cabinets: Cabinet[]): Cabinet[] {
 }
 
 /** The cabinets to show for a stored or synced document. */
-function cabinetsOf(doc: CabinetDoc): Cabinet[] {
+function cabinetsOf(doc: StoredCabinetDoc): Cabinet[] {
   // No cabinet at all means a document from before cabinets existed; a cabinet
   // without shelves is a layout the user started over, and stays empty.
   return doc.cabinets.length > 0 ? withUniqueSlotIds(doc.cabinets) : [defaultCabinet()]
 }
 
-/** The synced document for a computed layout, stamped with the current time. */
+/**
+ * The synced document: the shelves and the user's own sleeve calls, stamped
+ * with the current time. Where each record goes isn't in it; every device
+ * plans that from its own collection and options.
+ */
 export function buildCabinetDoc(
   cabinets: Cabinet[],
-  plan: CabinetPlan,
   sleeves: Record<string, boolean> = {},
 ): CabinetDoc {
-  return {
-    schemaVersion: 1,
-    cabinets,
-    placements: plan.placements,
-    overrides: {},
-    unplaced: plan.unplaced.map((record: DisplayRelease) => record.key),
-    sleeves,
-    updatedAt: new Date().toISOString(),
-  }
+  return { schemaVersion: 2, cabinets, sleeves, updatedAt: new Date().toISOString() }
 }
 
 /**
- * Keeps the local copy after a 409: the device that is being edited wins, and
- * the placements are recomputed from the collection anyway.
+ * Keeps the local copy after a 409: the device that is being edited wins. A
+ * copy stored before version 2 comes out as version 2.
  */
-export function rebaseCabinetDoc(local: CabinetDoc): CabinetDoc {
-  return {
-    ...local,
-    cabinets: local.cabinets,
-    overrides: {},
-    updatedAt: new Date().toISOString(),
-  }
+export function rebaseCabinetDoc(local: StoredCabinetDoc): CabinetDoc {
+  return buildCabinetDoc(local.cabinets, local.sleeves ?? {})
 }
 
 export interface UseCabinetArgs {
@@ -191,10 +181,7 @@ export function useCabinet({
     () => planCabinet({ releases, cabinet, options, sleeves }),
     [releases, cabinet, options, sleeves],
   )
-  const doc = useMemo(
-    () => buildCabinetDoc(cabinets, plan, overrides),
-    [cabinets, plan, overrides],
-  )
+  const doc = useMemo(() => buildCabinetDoc(cabinets, overrides), [cabinets, overrides])
 
   // Detection can only be checked against the live facts, so the toggle reads
   // them through a ref rather than closing over a stale copy.
@@ -339,7 +326,7 @@ export function useCabinet({
         const remoteRevision = revisionFromEtag(remote.etag, 0)
 
         if (!remote.doc) {
-          if (stored?.dirty) await push(stored.doc, stored.revision)
+          if (stored?.dirty) await push(rebaseCabinetDoc(stored.doc), stored.revision)
           else setStatus('synced')
           return
         }

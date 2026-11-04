@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { rm } from 'node:fs/promises'
 import request from 'supertest'
 import type { Express } from 'express'
-import type { CabinetDoc } from '../src/shared/cabinetDoc'
+import type { CabinetDoc, LegacyCabinetDoc } from '../src/shared/cabinetDoc'
 
 const identityCalls = vi.hoisted(() => ({ count: 0 }))
 
@@ -33,33 +33,46 @@ vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
 })
 
 const { createApp, SYNC_BODY_LIMIT_BYTES } = await import('../src/server/app')
-const { closeDb } = await import('../src/server/db')
+const { closeDb, getCabinetRow } = await import('../src/server/db')
 
 const app: Express = createApp()
+
+/** Every reply adds these, empty, for apps cached from before version 2. */
+const EMPTY_FOR_OLDER_APPS = { placements: {}, overrides: {}, unplaced: [] }
 
 const alice = { Authorization: 'Discogs token=token-alice' }
 const bob = { Authorization: 'Discogs token=token-bob' }
 const dave = { Authorization: 'Discogs token=token-dave' }
 
+const cabinetsNamed = (name: string) => [
+  {
+    id: 'main',
+    name,
+    slots: [
+      { id: 's1', label: 'Top left', capacity: 40 },
+      { id: 's2', label: 'Top right', capacity: 40 },
+    ],
+  },
+]
+
 const sampleDoc = (
-  placements: Record<string, string> = {},
+  name = 'Living room',
   updatedAt = '2026-10-15T10:00:00.000Z',
 ): CabinetDoc => ({
+  schemaVersion: 2,
+  cabinets: cabinetsNamed(name),
+  sleeves: {},
+  updatedAt,
+})
+
+/** As an app from before version 2 saves it: derived per-record fields, no sleeves. */
+const legacyDoc = (name = 'Living room', records = 3): LegacyCabinetDoc => ({
   schemaVersion: 1,
-  cabinets: [
-    {
-      id: 'main',
-      name: 'Living room',
-      slots: [
-        { id: 's1', label: 'Top left', capacity: 40 },
-        { id: 's2', label: 'Top right', capacity: 40 },
-      ],
-    },
-  ],
-  placements,
+  cabinets: cabinetsNamed(name),
+  placements: Object.fromEntries(Array.from({ length: records }, (_, i) => [`${i}-${i}`, 's1'])),
   overrides: {},
   unplaced: [],
-  updatedAt,
+  updatedAt: '2026-10-15T10:00:00.000Z',
 })
 
 afterAll(async () => {
@@ -105,7 +118,7 @@ describe('GET /api/sync/cabinet', () => {
 
 describe('PUT /api/sync/cabinet', () => {
   it('creates a document when the base revision matches', async () => {
-    const doc = sampleDoc({ '111-222': 's1' })
+    const doc = sampleDoc('Doc A')
     const res = await request(app)
       .put('/api/sync/cabinet')
       .set(alice)
@@ -113,10 +126,10 @@ describe('PUT /api/sync/cabinet', () => {
       .send(doc)
     expect(res.status).toBe(200)
     expect(res.body.etag).toBe('"r1"')
-    expect(res.body.doc).toEqual(doc)
+    expect(res.body.doc).toEqual({ ...doc, ...EMPTY_FOR_OLDER_APPS })
 
     const get = await request(app).get('/api/sync/cabinet').set(alice)
-    expect(get.body.doc).toEqual(doc)
+    expect(get.body.doc).toEqual({ ...doc, ...EMPTY_FOR_OLDER_APPS })
     expect(get.body.etag).toBe('"r1"')
   })
 
@@ -174,10 +187,10 @@ describe('PUT /api/sync/cabinet', () => {
       .put('/api/sync/cabinet')
       .set(alice)
       .set('If-Match', '"r0"')
-      .send(sampleDoc({ '999-999': 's2' }))
+      .send(sampleDoc('Doc B'))
     expect(res.status).toBe(409)
     expect(res.body.etag).toBe('"r1"')
-    expect(res.body.doc.placements).toEqual({ '111-222': 's1' })
+    expect(res.body.doc.cabinets[0].name).toBe('Doc A')
   })
 
   it('advances the revision on a matching write', async () => {
@@ -185,12 +198,12 @@ describe('PUT /api/sync/cabinet', () => {
       .put('/api/sync/cabinet')
       .set(alice)
       .set('If-Match', '"r1"')
-      .send(sampleDoc({ '111-222': 's2' }, '2026-10-15T11:00:00.000Z'))
+      .send(sampleDoc('Doc C', '2026-10-15T11:00:00.000Z'))
     expect(res.status).toBe(200)
     expect(res.body.etag).toBe('"r2"')
 
     const get = await request(app).get('/api/sync/cabinet').set(alice)
-    expect(get.body.doc.placements).toEqual({ '111-222': 's2' })
+    expect(get.body.doc.cabinets[0].name).toBe('Doc C')
     expect(get.body.etag).toBe('"r2"')
   })
 
@@ -216,7 +229,7 @@ describe('PUT /api/sync/cabinet', () => {
       .put('/api/sync/cabinet')
       .set(alice)
       .set('If-Match', '*')
-      .send(sampleDoc({ '555-555': 's1' }))
+      .send(sampleDoc('Doc D'))
     expect(res.status).toBe(200)
     expect(res.body.etag).toBe('"r3"')
   })
@@ -303,14 +316,14 @@ describe('PUT /api/sync/cabinet', () => {
     const withCalls = { ...sampleDoc(), sleeves: { '9160941': true } }
     await request(app).put('/api/sync/cabinet').set(alice).set('If-Match', '*').send(withCalls)
 
-    // A cached copy of the app from before sleeve calls existed moves a shelf.
-    const old = sampleDoc({ '1-1': 's2' })
+    // A cached copy of the app from before sleeve calls existed renames it.
+    const old = legacyDoc('Kitchen')
     const res = await request(app).put('/api/sync/cabinet').set(alice).set('If-Match', '*').send(old)
     expect(res.status).toBe(200)
     expect(res.body.doc.sleeves).toEqual({ '9160941': true })
 
     const get = await request(app).get('/api/sync/cabinet').set(alice)
-    expect(get.body.doc.placements).toEqual({ '1-1': 's2' })
+    expect(get.body.doc.cabinets[0].name).toBe('Kitchen')
     expect(get.body.doc.sleeves).toEqual({ '9160941': true })
   })
 
@@ -328,5 +341,79 @@ describe('PUT /api/sync/cabinet', () => {
 
     const get = await request(app).get('/api/sync/cabinet').set(alice)
     expect(get.body.doc.sleeves).toEqual({})
+  })
+})
+
+/** The document exactly as the server stored it. */
+const storedDoc = (username: string): unknown => {
+  const row = getCabinetRow(username)
+  return row ? JSON.parse(row.doc) : null
+}
+
+describe('cabinet document versions', () => {
+  it('accepts a version-1 save from an older app and stores it as version 2', async () => {
+    const res = await request(app)
+      .put('/api/sync/cabinet')
+      .set(bob)
+      .set('If-Match', '*')
+      .send(legacyDoc('Hall'))
+    expect(res.status).toBe(200)
+    expect(res.body.doc).toEqual({
+      schemaVersion: 2,
+      cabinets: cabinetsNamed('Hall'),
+      updatedAt: '2026-10-15T10:00:00.000Z',
+      ...EMPTY_FOR_OLDER_APPS,
+    })
+
+    // What is stored is plain version 2: the derived lists are gone.
+    expect(storedDoc('bob')).toEqual({
+      schemaVersion: 2,
+      cabinets: cabinetsNamed('Hall'),
+      updatedAt: '2026-10-15T10:00:00.000Z',
+    })
+  })
+
+  it('hands out a row stored before version 2 as version 2', async () => {
+    const { putCabinetRow } = await import('../src/server/db')
+    putCabinetRow('carol', JSON.stringify(legacyDoc('Attic')), 'force')
+    const carol = { Authorization: 'Discogs token=token-carol' }
+    knownTokens['token-carol'] = 'carol'
+
+    const get = await request(app).get('/api/sync/cabinet').set(carol)
+    expect(get.body.doc).toEqual({
+      schemaVersion: 2,
+      cabinets: cabinetsNamed('Attic'),
+      updatedAt: '2026-10-15T10:00:00.000Z',
+      ...EMPTY_FOR_OLDER_APPS,
+    })
+
+    // A conflict reply hands it out as version 2 too.
+    const conflict = await request(app)
+      .put('/api/sync/cabinet')
+      .set(carol)
+      .set('If-Match', '"r0"')
+      .send(sampleDoc('Attic'))
+    expect(conflict.status).toBe(409)
+    expect(conflict.body.doc).toEqual(get.body.doc)
+  })
+
+  it('gives apps from before version 2 the lists their storage panel counts', async () => {
+    // Those apps store a reply as is and run Object.keys(doc.placements).
+    const res = await request(app).get('/api/sync/cabinet').set(bob)
+    expect(res.body.doc.schemaVersion).toBe(2)
+    expect(Object.keys(res.body.doc.placements)).toEqual([])
+    expect(res.body.doc.unplaced).toEqual([])
+  })
+
+  it('still refuses a version-1 save too large for the body limit', async () => {
+    // Version 1 grew with every record and hit the 256 KB limit around 10,000
+    // records (#134). Version 2 has no per-record lists; an app still cached
+    // from before it keeps getting this refusal until it updates.
+    const res = await request(app)
+      .put('/api/sync/cabinet')
+      .set(bob)
+      .set('If-Match', '*')
+      .send(legacyDoc('Big', 20_000))
+    expect(res.status).toBe(413)
   })
 })

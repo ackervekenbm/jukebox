@@ -54,7 +54,7 @@ With compose, set them under `environment:`; with systemd, `Environment=` lines.
 | Data | Where | Survives redeploy |
 | --- | --- | --- |
 | Collection, tracklists, cached years, listen log, saved views, settings, token | **Browser** (IndexedDB + localStorage) | per device; cleared from Settings → *Clear everything* |
-| Record-cabinet layout (cabinets, slots, placements) | **Server** SQLite, table `cabinet_docs` | yes, if the data dir/volume is kept |
+| Record cabinet (shelves and your gatefold corrections; each device lays the records out itself) | **Server** SQLite, table `cabinet_docs` | yes, if the data dir/volume is kept |
 | App build | image / `dist/` + `dist-server/` | rebuilt each deploy |
 
 Two consequences worth remembering:
@@ -376,6 +376,14 @@ quickest way to tell a client that hasn't updated from a deploy that didn't land
 ([troubleshooting](troubleshooting.md#a-stale-deployment-survives-every-reload)).
 
 ## Rollback
+
+Don't roll back to a build from before the cabinet sync document's
+version 2 (issue #138) once a device has synced with a newer one. An older
+server refuses version-2 saves, so newer apps show a sync error. It also hands
+the stored version-2 copy out unchanged, which older apps can't read: their
+storage panel fails, and an app from before gatefold corrections existed wipes
+the stored ones on its next save. Roll back no further than a build with
+version 2, or restore the [backup](#backups) you took before the update.
 
 - **Image:** pin an older commit tag and recreate the container
   ([docker-image.md](docker-image.md#pin-a-version-roll-back)).

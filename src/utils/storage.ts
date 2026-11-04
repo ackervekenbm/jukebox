@@ -87,7 +87,8 @@ export interface MasterYearsStat {
 
 export interface CabinetStat {
   slots: number
-  placements: number
+  /** Gatefold calls the user made themselves. */
+  sleeveCalls: number
 }
 
 export interface IndexedDbStat {
@@ -139,7 +140,7 @@ export async function scanIndexedDb(username: string): Promise<IndexedDbStat> {
     cabinet: cabinetRow
       ? {
           slots: cabinetRow.doc.cabinets.reduce((sum, cabinet) => sum + cabinet.slots.length, 0),
-          placements: Object.keys(cabinetRow.doc.placements).length,
+          sleeveCalls: Object.keys(cabinetRow.doc.sleeves ?? {}).length,
         }
       : null,
   }
