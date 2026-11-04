@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2025-2026 ackervekenbm
+
 import { createHash } from 'node:crypto'
 import { DISCOGS_API_BASE, DISCOGS_USER_AGENT } from './config'
 

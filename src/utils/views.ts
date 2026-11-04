@@ -94,7 +94,7 @@ function criteriaKey(query: string, filters: Filters): string {
     normalized.genre,
     normalized.style,
     normalized.label,
-normalized.yearMin ?? '',
+    normalized.yearMin ?? '',
     normalized.yearMax ?? '',
   ].join('\u0001')
 }

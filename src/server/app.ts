@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2025-2026 ackervekenbm
+
 import express, { type ErrorRequestHandler, type Request, type Response } from 'express'
 import { existsSync } from 'node:fs'
 import path from 'node:path'

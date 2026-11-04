@@ -1,4 +1,7 @@
 // @vitest-environment node
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2025-2026 ackervekenbm
+
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { rm } from 'node:fs/promises'
 import request from 'supertest'
