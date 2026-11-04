@@ -87,10 +87,12 @@ jobs:
         run: |
           set -e
           # What an image from before the app dropped root leaves: a root-owned
-          # folder and database that the node user can't write.
+          # folder and database that the node user can't write. Plus a
+          # root-owned symlink to the entrypoint: the handover must not follow
+          # it and give node a file that runs as root.
           docker volume create smoke-old
           docker run --rm -v smoke-old:/data alpine:3.24 sh -c \
-            'touch /data/jukebox.db && chown -R 0:0 /data && chmod 755 /data && chmod 644 /data/jukebox.db'
+            'touch /data/jukebox.db && ln -s /usr/local/bin/jukebox-entrypoint /data/trap && chown -R -h 0:0 /data && chmod 755 /data && chmod 644 /data/jukebox.db'
           docker run -d --name smoke-old -p 8081:3000 -v smoke-old:/app/data jukebox:smoke
           for i in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:8081/api/health | grep -q '"ok":true'; then
@@ -101,7 +103,9 @@ jobs:
             sleep 1
           done
           docker exec smoke-old sh -c 'stat -c "%U %n" /app/data /app/data/*'
-          test -z "$(docker exec smoke-old find /app/data ! -user node)"
+          test -z "$(docker exec smoke-old find /app/data ! -type l ! -user node)"
+          # The symlink was skipped: its target still belongs to root.
+          test "$(docker exec smoke-old stat -c %U /usr/local/bin/jukebox-entrypoint)" = root
 
       - name: Run as uid 1000 from the start
         run: |

@@ -331,8 +331,8 @@ means carrying that file across:
    [install Docker](https://docs.docker.com/engine/install/) first). Start it
    once, so it creates its data folder or volume.
 3. Set the names for the **new** route and run its [restore](#restore) with that
-   `BK`. Restore clears a stale `-wal` and sets the ownership each route needs
-   (Docker takes the files over when it starts; bare Node needs `jukebox`).
+   `BK`. Restore clears a stale `-wal`; for bare Node it also gives the files
+   to `jukebox`, and Docker takes them over itself when it starts.
 4. Check it with `jukebox_peek`, `/api/health` and the app.
 5. Update whatever points at the app. The port usually changes (bare Node
    listens on `3000`, the Docker examples on `8080`): fix the reverse-proxy

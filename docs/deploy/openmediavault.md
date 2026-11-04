@@ -84,7 +84,13 @@ Verify: **Services → Compose → Services** lists the container as running, an
   *Data* shared folder's path every time it renders the file, so
   `<Data shared folder>/jukebox-data/jukebox.db` is the whole server-side state.
   That beats a named volume here: it is an ordinary folder you can see, browse
-  and copy in OMV, and **Prune → Volume** cannot delete it.
+  and copy in OMV, and **Prune → Volume** cannot delete it. The app runs as
+  uid 1000 and takes the folder over when it starts, so on the host
+  `jukebox-data` belongs to uid 1000, usually the first user created on the
+  machine. That user can read the database (your Discogs username and cabinet
+  layout); if that matters, keep the *Data* shared folder itself closed to them.
+  The folder must be on a Linux filesystem (ext4, btrfs, xfs): on NTFS, exFAT or
+  FAT the container can't take it over.
 - **No `container_name`**: compose derives it from the stack and service, so it
   is `jukebox-jukebox-1`. The plugin's **Logs** button doesn't care.
 - **Port `8080`**: host side only. Change the left-hand number if that port is

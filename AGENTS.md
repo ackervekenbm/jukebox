@@ -222,7 +222,9 @@ one node process: it serves the static build, the API and the `/discogs` proxy.
 The process runs as the image's unprivileged `node` user (uid 1000):
 `docker-entrypoint.sh` starts as root only to hand `/app/data` to `node`
 (files a root-run image or a restore left there) and then drops to it with
-`su-exec`; the smoke job checks both, plus a root-owned volume and `--user 1000`.
+`su-exec`. The smoke job checks that the app runs as `node`, that a root-owned
+volume (with a planted symlink, which must not be followed) is taken over and
+boots, and that `--user 1000:1000` works.
 The SQLite DB lives in `/app/data`, bind-mounted into the Compose plugin's *Data*
 shared folder (`CHANGE_TO_COMPOSE_DATA_PATH/jukebox-data`). It holds the synced
 cabinet documents, so treat that folder as persistent user data. Backups and

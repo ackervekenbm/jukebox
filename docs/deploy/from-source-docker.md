@@ -62,9 +62,11 @@ volume:
 ```
 
 The app runs as the image's `node` user (uid 1000); the container hands the
-folder to that user when it starts. On network storage that blocks root (NFS
-with `root_squash`), give it to uid 1000 yourself: `sudo chown -R 1000:1000
-/srv/jukebox-data`.
+folder to that user when it starts, so on the host it belongs to uid 1000
+(usually the first user created on the machine, who can then read the
+database). That needs a Linux filesystem (ext4, btrfs, xfs). On network storage
+that blocks root (NFS with `root_squash`), give it to uid 1000 yourself:
+`sudo chown -R 1000:1000 /srv/jukebox-data`.
 
 **A real version line**: Settings shows the commit and date of the build, taken
 from the `COMMIT_SHA` and `BUILD_TIME` build arguments. `docker compose up -d

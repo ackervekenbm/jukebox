@@ -127,9 +127,9 @@ docker logs --tail=30 jukebox
 Fix the mount, then restart:
 
 The app runs as the image's `node` user (uid 1000). At start the container
-hands `/app/data` to that user; when it can't, the log says
-`jukebox: could not give /app/data to the node user (uid 1000)` just above
-the SQLite error.
+hands `/app/data` to that user; when it can't, the log shows
+`jukebox: could not give /app/data to the node user (uid 1000).` before the
+SQLite error.
 
 - **Named volume:** usually just works, ownership included. If it still fails,
   give it to uid 1000 yourself:
@@ -137,15 +137,18 @@ the SQLite error.
   `VOL` to your route's real volume name first
   ([how](operations.md#set-the-names)); with the wrong name this changes a new,
   empty volume and fixes nothing.
-- **Bind mount (a host folder):** on a local disk the container takes it over
-  by itself. On network storage that blocks root (NFS with `root_squash`) it
-  can't: give the folder to uid 1000 on the host (`sudo chown -R 1000:1000
-  <folder>`). Check where it really points with
-  `docker inspect --format '{{json .Mounts}}' jukebox`.
+- **Bind mount (a host folder):** on a Linux filesystem (ext4, btrfs, xfs) the
+  container takes it over by itself. It can't on NTFS, exFAT or FAT (common on
+  USB drives): use a Linux-formatted disk or a named volume. Nor on network
+  storage that blocks root (NFS with `root_squash`): give the folder to uid
+  1000 on the host (`sudo chown -R 1000:1000 <folder>`). Check where it really
+  points with `docker inspect --format '{{json .Mounts}}' jukebox`.
+- **`--user` / `user:` set to someone other than 1000:** the container skips
+  the handover, so the folder must already belong to that user.
 - **Docker with user-namespace remapping** (`userns-remap` in the daemon
-  config) or **`--user`/`user:`** set to someone other than 1000: the
-  container can't hand the folder over, so give it to the user the app really
-  runs as on the host, or use a named volume.
+  config): a named volume is still taken over. A host folder must belong to the
+  host uid that the container's uid 1000 maps to (the start of the range in
+  `/etc/subuid` plus 1000, e.g. `101000`), not to 1000.
 - **SELinux hosts** (Fedora, RHEL): a bind mount needs `:z` or `:Z` after the
   container path.
 
