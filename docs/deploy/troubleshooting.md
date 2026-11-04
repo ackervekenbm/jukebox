@@ -143,6 +143,9 @@ Fix the mount, then restart:
   storage that blocks root (NFS with `root_squash`): give the folder to uid
   1000 on the host (`sudo chown -R 1000:1000 <folder>`). Check where it really
   points with `docker inspect --format '{{json .Mounts}}' jukebox`.
+- **Ownership changed while it ran** (e.g. a recursive permission reset on a
+  NAS share, such as OMV's *Reset permissions*): restart the container, and it
+  takes the folder over again.
 - **`--user` / `user:` set to someone other than 1000:** the container skips
   the handover, so the folder must already belong to that user.
 - **Docker with user-namespace remapping** (`userns-remap` in the daemon
