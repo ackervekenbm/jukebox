@@ -111,21 +111,21 @@ desktop, but needs no emulation. To build on an amd64 machine instead:
    ```
 
 3. **Copy the image to the host** (or push it to a registry, above). This
-   pipes it over SSH (`server` below is the host's SSH name or `user@address`),
-   so your user on the host needs to run `docker` without a password prompt
-   (membership in the `docker` group, or passwordless `sudo`):
+   pipes it over SSH. In the commands below, replace `user` with your login on
+   the host and `192.168.1.10` with the host's address. That user needs to run
+   `docker` without a password prompt (membership in the `docker` group, or
+   passwordless `sudo`):
 
    ```bash
-   docker save jukebox:latest | gzip | ssh server 'gunzip | docker load'
+   docker save jukebox:latest | gzip | ssh user@192.168.1.10 'gunzip | docker load'
    ```
 
-   If your user on the host needs a password for `sudo docker`, copy the file
-   first:
+   If that user needs a password for `sudo docker`, copy the file first:
 
    ```bash
    docker save jukebox:latest | gzip > jukebox.tar.gz
-   scp jukebox.tar.gz server:
-   ssh -t server 'gunzip -c jukebox.tar.gz | sudo docker load'
+   scp jukebox.tar.gz user@192.168.1.10:
+   ssh -t user@192.168.1.10 'gunzip -c jukebox.tar.gz | sudo docker load'
    ```
 
 4. **Start it on the host without `--build`**, from a checkout of the same commit

@@ -226,8 +226,8 @@ docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/w -w /w \
 
 `COMMIT_SHA` and `BUILD_TIME` stamp the build line in Settings; without them it
 reads `development build`. Copy the tarball over, e.g.
-`scp jukebox-*.tar.gz server:` (`server` is your server's SSH name or
-`user@address`).
+`scp jukebox-*.tar.gz user@192.168.1.10:`, with your login on the server for
+`user` and its address for `192.168.1.10`.
 
 **On the server, the first time:** set up steps 1 and 3 of
 [Install as a service](#install-as-a-service) (the user and the unit), then:
