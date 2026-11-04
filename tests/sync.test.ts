@@ -121,23 +121,25 @@ describe('PUT /api/sync/cabinet', () => {
   })
 
   /**
-   * A document with one realistic placement per record, filled until its JSON
-   * is exactly `bytes` long (the last key absorbs the remainder).
+   * A valid document whose JSON is exactly `bytes` long, filled with sleeve
+   * calls (the one per-release field every document version has; keys are
+   * release ids, so the last one is padded with digits).
    */
   const docOfSize = (bytes: number): CabinetDoc => {
-    const placements: Record<string, string> = {}
-    const size = () => Buffer.byteLength(JSON.stringify(sampleDoc(placements)))
-    // Each entry adds its own JSON ("key":"s1") plus a comma; count instead
-    // of re-serialising the whole document per record.
+    const sleeves: Record<string, boolean> = {}
+    const build = (): CabinetDoc => ({ ...sampleDoc(), sleeves })
+    const size = () => Buffer.byteLength(JSON.stringify(build()))
+    // Each call adds "id":true plus a comma; count instead of re-serialising
+    // the whole document per entry.
     let estimate = size()
     for (let i = 0; estimate < bytes - 64; i += 1) {
-      const key = `${1_000_000 + i}-${2_000_000 + i}`
-      placements[key] = 's1'
-      estimate += key.length + 8
+      const id = String(1_000_000 + i)
+      sleeves[id] = true
+      estimate += id.length + 8
     }
-    const missing = bytes - size() - '"pad-":"s1",'.length
-    placements[`pad-${'x'.repeat(missing)}`] = 's1'
-    const doc = sampleDoc(placements)
+    const missing = bytes - size() - '"9":true,'.length
+    sleeves['9'.repeat(missing + 1)] = true
+    const doc = build()
     expect(Buffer.byteLength(JSON.stringify(doc))).toBe(bytes)
     return doc
   }
@@ -146,24 +148,25 @@ describe('PUT /api/sync/cabinet', () => {
     const res = await request(app)
       .put('/api/sync/cabinet')
       .set(dave)
-      .set('If-Match', '"r0"')
+      .set('If-Match', '*')
       .send(docOfSize(SYNC_BODY_LIMIT_BYTES))
     expect(res.status).toBe(200)
   })
 
   it('refuses a document one byte over the limit with a JSON 413', async () => {
+    const before = await request(app).get('/api/sync/cabinet').set(dave)
     const res = await request(app)
       .put('/api/sync/cabinet')
       .set(dave)
-      .set('If-Match', '"r1"')
+      .set('If-Match', '*')
       .send(docOfSize(SYNC_BODY_LIMIT_BYTES + 1))
     expect(res.status).toBe(413)
     expect(res.type).toBe('application/json')
     expect(res.body.error).toEqual(expect.any(String))
 
     // The refused save left the stored copy as it was.
-    const get = await request(app).get('/api/sync/cabinet').set(dave)
-    expect(get.body.etag).toBe('"r1"')
+    const after = await request(app).get('/api/sync/cabinet').set(dave)
+    expect(after.body).toEqual(before.body)
   })
 
   it('rejects a stale base revision with the current document', async () => {

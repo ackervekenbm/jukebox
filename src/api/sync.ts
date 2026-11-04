@@ -96,14 +96,14 @@ export async function fetchCabinet(token: string, signal?: AbortSignal): Promise
   return asSnapshot(body)
 }
 
-/**
- * Writes the cabinet document, guarded by the ETag of the copy it was built
- * from. A 409 means the server moved on; the caller rebases and retries.
- */
 /** Shown when a save is refused for its size; the cabinet stays on this device. */
 export const CABINET_TOO_LARGE =
   'The cabinet is too large to sync to the server. It is still saved on this device.'
 
+/**
+ * Writes the cabinet document, guarded by the ETag of the copy it was built
+ * from. A 409 means the server moved on; the caller rebases and retries.
+ */
 export async function pushCabinet(
   token: string,
   doc: CabinetDoc,
