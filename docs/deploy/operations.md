@@ -377,6 +377,12 @@ quickest way to tell a client that hasn't updated from a deploy that didn't land
 
 ## Rollback
 
+Don't roll back to a build from before the cabinet sync document's
+version 2 (issue #138) once a device has synced with a newer one. Older servers
+refuse version-2 saves, so the newer apps show a sync error, and they can drop
+the gatefold corrections an older app saves. Roll back to a build that has it,
+or restore the [backup](#backups) you took before the update.
+
 - **Image:** pin an older commit tag and recreate the container
   ([docker-image.md](docker-image.md#pin-a-version-roll-back)).
 - **Bare Node:** [from-source-node.md](from-source-node.md#rolling-back).

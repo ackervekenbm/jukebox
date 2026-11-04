@@ -42,12 +42,23 @@ export function createApp(): express.Express {
     res.status(db ? 200 : 500).json({ ok: db, db })
   })
 
+  // Apps cached from before version 2 don't validate what they read and still
+  // expect the derived lists (their storage panel counts `placements`), so
+  // every reply carries them empty. Nothing is stored; drop this once those
+  // apps are gone.
+  const forOlderApps = (doc: CabinetDoc) => ({
+    ...doc,
+    placements: {},
+    overrides: {},
+    unplaced: [],
+  })
+
   // A stored row may still be version 1 (saved before version 2); hand it out
   // as version 2. A row that doesn't parse at all is returned as it is.
   const readStored = (doc: string): unknown => {
     const raw = JSON.parse(doc) as unknown
     const parsed = anyCabinetDocSchema.safeParse(raw)
-    return parsed.success ? parsed.data : raw
+    return parsed.success ? forOlderApps(parsed.data) : raw
   }
 
   app.get('/api/sync/cabinet', async (req, res) => {
@@ -101,7 +112,7 @@ export function createApp(): express.Express {
         },
         expected,
       )
-      res.json({ username, doc: saved, etag: etagForRevision(row.revision) })
+      res.json({ username, doc: forOlderApps(saved), etag: etagForRevision(row.revision) })
     } catch (err) {
       if (err instanceof ConflictError) {
         const current = err.current
