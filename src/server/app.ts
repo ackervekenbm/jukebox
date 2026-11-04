@@ -9,6 +9,12 @@ import { AuthError, parseToken, resolveUsername } from './auth'
 import { dbReady, getCabinetRow, putCabinetRow, ConflictError } from './db'
 import { discogsProxy } from './discogsProxy'
 
+/**
+ * Largest JSON body the API takes, in bytes. A bigger one gets a JSON 413,
+ * which the client shows as "too large to sync".
+ */
+export const SYNC_BODY_LIMIT_BYTES = 256 * 1024
+
 const distDir = path.resolve(process.env.CLIENT_DIST ?? path.resolve(process.cwd(), 'dist'))
 
 const NO_CACHE_FILES = ['index.html', 'sw.js', 'manifest.webmanifest']
@@ -29,7 +35,7 @@ async function requireUser(req: Request, res: Response): Promise<string | null> 
 export function createApp(): express.Express {
   const app = express()
   app.disable('x-powered-by')
-  app.use(express.json({ limit: '256kb' }))
+  app.use(express.json({ limit: SYNC_BODY_LIMIT_BYTES }))
 
   app.get('/api/health', (_req, res) => {
     const db = dbReady()

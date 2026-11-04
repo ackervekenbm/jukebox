@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CabinetDoc } from '../shared/cabinetDoc'
 import {
   fetchCabinet,
+  CABINET_TOO_LARGE,
   pushCabinet,
   revisionEtag,
   revisionFromEtag,
@@ -126,6 +127,24 @@ describe('pushCabinet', () => {
     expect(conflict).toBeInstanceOf(SyncError)
     expect(conflict.doc).toEqual(serverDoc)
     expect(conflict.etag).toBe('"r9"')
+  })
+
+  it('says the cabinet is too large when the server refuses its size', async () => {
+    mockFetch(() => json({ error: 'request entity too large' }, 413))
+
+    await expect(pushCabinet('tok', doc, '"r0"')).rejects.toMatchObject({
+      status: 413,
+      message: CABINET_TOO_LARGE,
+    })
+  })
+
+  it('treats a size refusal from a proxy in front of the server the same way', async () => {
+    mockFetch(() => new Response('<html>413 Request Entity Too Large</html>', { status: 413 }))
+
+    await expect(pushCabinet('tok', doc, '"r0"')).rejects.toMatchObject({
+      status: 413,
+      message: CABINET_TOO_LARGE,
+    })
   })
 
   it('surfaces rejection as a plain sync error', async () => {
