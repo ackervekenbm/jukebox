@@ -198,8 +198,9 @@ at the top of the page.
 
 **1. A Caddy build with the DuckDNS module.** Stock Caddy can't do the DNS
 challenge. Download one from <https://caddyserver.com/download> with
-`caddy-dns/duckdns` ticked (pick your platform, e.g. `linux arm64` for a Pi), or
-build it with [xcaddy](https://github.com/caddyserver/xcaddy), which needs Go:
+`caddy-dns/duckdns` ticked (pick your platform, `linux amd64` or
+`linux arm64`), or build it with
+[xcaddy](https://github.com/caddyserver/xcaddy), which needs Go:
 `xcaddy build --with github.com/caddy-dns/duckdns`. Then install it **next to**
 the packaged binary, the way Caddy's docs describe, so an `apt upgrade` doesn't
 silently put the stock one back (which would break certificate renewal two
@@ -360,7 +361,7 @@ DNS* or *Hostnames*), in Pi-hole (**Local DNS → DNS Records**) or in dnsmasq
 instead. On Android, a custom **Private DNS** setting (e.g. `dns.google`)
 bypasses your router; set it to *Automatic* or *Off* on that phone.
 
-**2. Create the certificate** (Debian/Raspberry Pi OS:
+**2. Create the certificate** (Debian and derivatives:
 `sudo apt install mkcert libnss3-tools`):
 
 ```bash

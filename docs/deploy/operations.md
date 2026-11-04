@@ -101,8 +101,8 @@ next to an index file, `jukebox.db-shm`. Copying `jukebox.db` alone while the ap
 runs can miss those writes, so a backup either uses SQLite's own `.backup`
 command (hot, app running) or copies the files with the app stopped (cold).
 
-The commands on this page are for **bash** (the default shell on Debian and
-Raspberry Pi OS).
+The commands on this page are for **bash** (the default shell on Debian and its
+derivatives).
 
 ### Find your data first
 

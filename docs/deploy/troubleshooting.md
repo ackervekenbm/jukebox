@@ -37,7 +37,7 @@ config, wrong port).
 | Container stuck in `Restarting`, or exits right after start | The data directory isn't writable | [The container restarts in a loop](#the-container-restarts-in-a-loop) |
 | `/api/health` → `500 {"ok":false,"db":false}` | The database connection is unusable (rare while serving) | Restart; if it comes back, check the logs for an SQLite error ([what health checks](operations.md#health-and-monitoring)) |
 | Cabinet changes don't save ("Could not save the cabinet"), health OK | Disk full, or the database file was deleted or replaced underneath the app | Free space or restore the file, then restart ([why health stays OK](operations.md#health-and-monitoring)) |
-| `exec format error` | 32-bit Raspberry Pi OS, or a single-architecture tag for the wrong CPU | 64-bit OS ([why](README.md#the-contract-every-route-shares)); use `:latest` or the matching `-amd64`/`-arm64` tag |
+| `no matching manifest for linux/arm/v7`, or `exec format error` | A 32-bit OS, or a single-architecture tag for the wrong CPU | 64-bit OS ([why](README.md#the-contract-every-route-shares)); use `:latest` or the matching `-amd64`/`-arm64` tag |
 | Bare Node exits at start-up: `Cannot find module …/better_sqlite3.node` | 32-bit OS | 64-bit OS ([why](README.md#the-contract-every-route-shares)), then `npm ci` again |
 | `[jukebox] no client build found; serving API only` | Started without a client build | `npm run build`, or set `CLIENT_DIST` |
 | Proxy answers `502`, the app is up | The proxy points at the wrong port, or (proxy in a container) can't reach the app's network | Docker: `127.0.0.1:8080`; bare Node: `127.0.0.1:3000`; proxy in a container: both on one network, upstream `jukebox:3000` ([table](https-and-offline.md#reverse-proxy)) |
@@ -111,7 +111,7 @@ applies.
 ## The container restarts in a loop
 
 First read the log (below). If it says `exec format error`, the host runs a
-32-bit OS: see [64-bit only](README.md#the-contract-every-route-shares).
+32-bit OS (or an image tag for another CPU): see [64-bit only](README.md#the-contract-every-route-shares).
 Otherwise it is almost always the data directory. The database is opened at
 start-up, so a data directory the process can't write to stops it before it
 listens. You get `Restarting` in `docker ps -a`, not a 500

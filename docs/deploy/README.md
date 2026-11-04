@@ -75,11 +75,17 @@ All settings are environment variables; the full list is in
 
 **64-bit only.** The image is published for `amd64` and `arm64` only, and the
 SQLite library (`better-sqlite3`) ships no 32-bit ARM build. Installs never
-compile anything, so there is no fallback either. On a Raspberry Pi, `uname -m`
-must say `aarch64`, not `armv7l`. On 32-bit Raspberry Pi OS the image fails with
-`exec format error`, and a source checkout builds but stops at start-up with
-`Cannot find module …/better_sqlite3.node`. Install the 64-bit Raspberry Pi OS
-image.
+compile anything, so there is no fallback either. Check the OS, not the CPU:
+`dpkg --print-architecture` must print `arm64` or `amd64` (and for bare Node,
+`node -p process.arch` must print `arm64` or `x64`). `uname -m` alone isn't
+enough: some 32-bit images boot a 64-bit kernel, so it says `aarch64` while
+Docker and Node are 32-bit. On a 32-bit OS, Docker refuses the image with
+`no matching manifest for linux/arm/v7` (or `exec format error` if you force
+an `-arm64` tag), and a source checkout builds but stops at start-up with
+`Cannot find module …/better_sqlite3.node`. Reinstall with the 64-bit
+(`arm64`) image of your OS if the CPU supports it (any ARMv8 CPU does); a
+board whose CPU is 32-bit only (`armv6l`, or `armv7l` on ARMv7 hardware) can't
+run Jukebox.
 
 ## Common mistakes
 

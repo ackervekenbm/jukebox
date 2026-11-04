@@ -8,8 +8,9 @@ this when the host already runs Node and you'd rather not add Docker.
 ## What you need
 
 - **Node 22 or newer** (`package.json` engines) and `git`. Check with `node -v`.
-  The Node in Debian's and Raspberry Pi OS's own `apt` is too old (18 on
-  bookworm, 20 on trixie). Install a current LTS release, 24, from
+  The Node in Debian's own `apt` is too old (18 on bookworm, 20 on trixie), and
+  other Debian-based systems' often is too: check with `apt-cache policy
+  nodejs`. If it's below 22, install a current LTS release, 24, from
   [NodeSource](https://github.com/nodesource/distributions) instead. Node 22
   also works, but its support ends in April 2027. The script is downloaded first
   so you can read it before running it:
@@ -21,14 +22,14 @@ this when the host already runs Node and you'd rather not add Docker.
   ```
 
   That puts Node at `/usr/bin/node`, which the unit below expects.
-- **A 64-bit OS** (`x64` or `arm64`; on a Pi, `uname -m` must say `aarch64`).
-  On 32-bit the build succeeds but `npm start` fails; see
+- **A 64-bit OS** (`x64` or `arm64`: `node -p process.arch` must print one of
+  those). On 32-bit the build succeeds but `npm start` fails; see
   [64-bit only](README.md#the-contract-every-route-shares).
 - No C compiler, Python or `make`: nothing is compiled at install time.
 - Enough memory to build. `npm run build` type-checks, lints and bundles the
-  client on the machine itself. On a 2 GB Raspberry Pi that takes several minutes
-  and most of the memory. To avoid that, build on another machine and
-  [ship a tarball](#shipping-a-tarball).
+  client on the machine itself. On a small board with 2 GB of memory that
+  takes several minutes and most of the memory. To avoid that, build on another
+  machine and [ship a tarball](#shipping-a-tarball).
 - Optional: a reverse proxy for a hostname and HTTPS, see
   [https-and-offline.md](https-and-offline.md).
 
@@ -201,7 +202,7 @@ next update's `npm ci` puts them back.
 ## Shipping a tarball
 
 There is no published package, but you can build on a faster machine and ship
-the result to the Pi. The tarball only contains JavaScript and the package
+the result to the server. The tarball only contains JavaScript and the package
 manifests, so it isn't tied to the build machine's platform.
 
 **On the build machine**, in a clone of the repository. With Node 22+ and git
@@ -225,9 +226,10 @@ docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/w -w /w \
 
 `COMMIT_SHA` and `BUILD_TIME` stamp the build line in Settings; without them it
 reads `development build`. Copy the tarball over, e.g.
-`scp jukebox-*.tar.gz pi:`.
+`scp jukebox-*.tar.gz user@192.168.1.10:`, with your login on the server for
+`user` and its address for `192.168.1.10`.
 
-**On the Pi, the first time:** set up steps 1 and 3 of
+**On the server, the first time:** set up steps 1 and 3 of
 [Install as a service](#install-as-a-service) (the user and the unit), then:
 
 ```bash

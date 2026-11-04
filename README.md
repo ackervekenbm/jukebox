@@ -64,7 +64,7 @@ docker run -d --name jukebox -p 8080:3000 -v jukebox-data:/app/data \
 ```
 
 The image is public (no `docker login` needed) and built for `amd64`/`arm64`
-only — a Pi needs a 64-bit OS.
+only — the host needs a 64-bit OS.
 
 Then open <http://localhost:8080>. Four things hold for every route:
 
