@@ -124,12 +124,12 @@ docker logs --tail=30 jukebox
 # SqliteError: attempt to write a readonly database
 ```
 
-Fix the mount, then restart:
-
 The app runs as the image's `node` user (uid 1000). At start the container
 hands `/app/data` to that user; when it can't, the log shows
 `jukebox: could not give /app/data to the node user (uid 1000).` before the
 SQLite error.
+
+Fix the mount, then restart:
 
 - **Named volume:** usually just works, ownership included. If it still fails,
   give it to uid 1000 yourself:
