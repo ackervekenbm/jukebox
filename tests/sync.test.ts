@@ -349,6 +349,25 @@ describe('PUT /api/sync/cabinet', () => {
     expect(bad.status).toBe(400)
   })
 
+  it('keeps the copies on display when an older app saves without them, and rejects bad ids', async () => {
+    await request(app)
+      .put('/api/sync/cabinet')
+      .set(alice)
+      .set('If-Match', '*')
+      .send({ ...sampleDoc(), displayed: [123, 456] })
+
+    await request(app).put('/api/sync/cabinet').set(alice).set('If-Match', '*').send(sampleDoc())
+    const get = await request(app).get('/api/sync/cabinet').set(alice)
+    expect(get.body.doc.displayed).toEqual([123, 456])
+
+    const bad = await request(app)
+      .put('/api/sync/cabinet')
+      .set(alice)
+      .set('If-Match', '*')
+      .send({ ...sampleDoc(), displayed: ['abc'] })
+    expect(bad.status).toBe(400)
+  })
+
   it('clears the sleeve calls when a current app saves none', async () => {
     await request(app)
       .put('/api/sync/cabinet')

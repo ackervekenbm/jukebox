@@ -94,8 +94,9 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
 - `src/shared/cabinetDoc.ts` — zod schema + types for the sync document,
   imported by both server (validation) and client (types only, so zod never
   enters the browser bundle). Version 2 holds only what devices read back:
-  `cabinets`, the layout `options` (in-artist order, sizes apart) and the
-  user's `sleeves` calls; each device plans placements
+  `cabinets`, the layout `options` (in-artist order, sizes apart), the
+  user's `sleeves` calls and the copies `displayed` elsewhere (instance
+  ids, left out of the plan); each device plans placements
   itself. The server still accepts version 1 (with the derived `placements`,
   `overrides`, `unplaced`) from older cached apps, and stores and hands out
   every document, old rows included, as version 2 (`anyCabinetDocSchema`).
@@ -144,8 +145,12 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   order. Conflicts: over-capacity, size-mix (one for the cabinet, only when
   sizes are kept apart), artist-split (per size run when sizes are kept
   apart), out-of-order (back-filled records) and unplaced. Layout is fully
-  automatic — there are no manual pins.
-- Record cabinet — `src/hooks/useCabinet.ts` orchestrates it: storage-first
+  automatic — there are no manual pins; the only per-record call besides the
+  sleeve is "on display" (cabinet row or release detail), which takes a copy
+  off the shelves.
+- Record cabinet — `src/hooks/useCabinet.ts` orchestrates it (called in `App`,
+  on while the cabinet or a release detail is open; the release-notes scan
+  runs only with the cabinet open): storage-first
   load from IndexedDB, debounced `PUT /api/sync/cabinet` when local changes are
   dirty, and a 409 rebase-and-retry when the server copy moved. Pushes run one
   at a time, and a push only marks the cabinet clean when no edit happened

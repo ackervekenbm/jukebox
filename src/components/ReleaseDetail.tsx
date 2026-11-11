@@ -22,6 +22,10 @@ interface ReleaseDetailProps {
   onNext?: () => void
   /** 1-based position within the open stack, for the "Pressing x of y" label. */
   position?: { index: number; total: number }
+  /** This copy is on display, out of the record cabinet. */
+  displayed?: boolean
+  /** Puts this copy on display or back in the cabinet; no toggle without it. */
+  onToggleDisplayed?: () => void
 }
 
 export interface RecentPick {
@@ -39,6 +43,8 @@ export function ReleaseDetail({
   onPrev,
   onNext,
   position,
+  displayed = false,
+  onToggleDisplayed,
 }: ReleaseDetailProps) {
   useScrollLock(true)
 
@@ -159,6 +165,28 @@ export function ReleaseDetail({
                   .filter(Boolean)
                   .join(' / ')}
               </p>
+            </div>
+          )}
+
+          {onToggleDisplayed && (
+            <div className="detail-section">
+              <span className="detail-section-title">Record cabinet</span>
+              <div className="detail-display">
+                <button
+                  type="button"
+                  className={`cabinet-sleeve-btn${displayed ? ' active' : ''}`}
+                  aria-pressed={displayed}
+                  aria-describedby="detail-display-hint"
+                  onClick={onToggleDisplayed}
+                >
+                  On display
+                </button>
+                <span className="detail-display-hint" id="detail-display-hint">
+                  {displayed
+                    ? 'This copy needs no shelf. Press to put it back in the cabinet.'
+                    : 'Press if this copy is on display elsewhere, so it needs no shelf.'}
+                </span>
+              </div>
             </div>
           )}
 
