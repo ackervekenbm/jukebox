@@ -3,7 +3,7 @@
 
 import { sortYear, type DisplayRelease } from '../utils/collection'
 import { useScrollLock } from '../hooks/useScrollLock'
-import { useCabinet, type CabinetStatus, type RemovedSlot } from '../hooks/useCabinet'
+import type { CabinetStatus, RemovedSlot, UseCabinetResult } from '../hooks/useCabinet'
 import { useDiscogsWaitNote } from '../hooks/useDiscogsWait'
 import {
   SIZE_CLASS_LABELS,
@@ -30,6 +30,7 @@ const STATUS_TEXT: Record<CabinetStatus, string> = {
 
 /** Expansion key for the "Without a shelf" section; shelf ids look like `slot-1`. */
 const UNPLACED_ID = 'unplaced'
+const DISPLAYED_ID = 'displayed'
 
 /** A shelf's size, in record spaces: anything a real shelf could plausibly hold. */
 const MIN_SHELF_SIZE = 1
@@ -108,8 +109,8 @@ function CapacityInput({
 }
 
 interface CabinetScreenProps {
-  username: string
-  token: string | null
+  /** The cabinet, loaded and synced by the app so other screens can share it. */
+  cabinet: UseCabinetResult
   releases: DisplayRelease[]
   /** The collection has loaded (not enriching, no error); the gatefold scan waits for it. */
   collectionReady?: boolean
@@ -117,8 +118,7 @@ interface CabinetScreenProps {
 }
 
 export function CabinetScreen({
-  username,
-  token,
+  cabinet,
   releases,
   collectionReady = true,
   onClose,
@@ -139,8 +139,10 @@ export function CabinetScreen({
     setSort,
     setSeparateSizeClasses,
     toggleGatefold,
+    toggleDisplayed,
+    displayed,
     retry,
-  } = useCabinet({ username, token, releases, enabled: true, collectionReady })
+  } = cabinet
 
   const placed = Object.keys(plan.placements).length
   const totalCapacity = plan.slots.reduce((total, slot) => total + slot.slot.capacity, 0)
@@ -159,7 +161,10 @@ export function CabinetScreen({
 
   // How to get the sizes apart: every size needs at least a shelf of its own,
   // so with fewer shelves than sizes no capacity helps.
-  const sizesInCabinet = new Set(releases.map((record) => sizeClassOf(record))).size
+  const displayedKeys = new Set(displayed.map((record) => record.key))
+  const sizesInCabinet = new Set(
+    releases.filter((record) => !displayedKeys.has(record.key)).map((record) => sizeClassOf(record)),
+  ).size
   const shelvesShort = sizesInCabinet - plan.slots.length
   const sizeMixHint =
     shelvesShort > 0
@@ -172,6 +177,7 @@ export function CabinetScreen({
   ).size
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const unplacedExpanded = expanded.has(UNPLACED_ID)
+  const displayedExpanded = expanded.has(DISPLAYED_ID)
   const [adding, setAdding] = useState(false)
   const [newCapacity, setNewCapacity] = useState(DEFAULT_SHELF_SIZE)
   const [newCapacityError, setNewCapacityError] = useState(false)
@@ -256,7 +262,7 @@ export function CabinetScreen({
       : 'Standard sleeve. Press to mark it as a gatefold.'
   }
 
-  const recordRow = (record: DisplayRelease) => {
+  const recordRow = (record: DisplayRelease, onDisplay = false) => {
     const units = spaceUnitsOf(record, sleeves)
     const discs = discCountOf(record)
     const gatefold = isGatefold(record, sleeves)
@@ -275,10 +281,9 @@ export function CabinetScreen({
       </span>
       {sortYear(record) > 0 && <span className="cabinet-record-year">{sortYear(record)}</span>}
       {/* Sleeve chips sit right-aligned on the artist's line, under the year, so
-          the years line up whatever chips a record has; the Gatefold button
-          comes last so it lines up too. */}
-      {(vinyl || units > 1) && (
-        <span className="cabinet-record-tags">
+          the years line up whatever chips a record has; the Display button
+          every row has comes last, so it and the Gatefold button line up too. */}
+      <span className="cabinet-record-tags">
           {/* Says why it takes more than one space: its discs, or (with the
               Gatefold button pressed next to it) its sleeve. */}
           {units > 1 && (
@@ -301,8 +306,21 @@ export function CabinetScreen({
               {yours && <span className="cabinet-sleeve-yours">you</span>}
             </button>
           )}
+          <button
+            type="button"
+            className={`cabinet-sleeve-btn${onDisplay ? ' active' : ''}`}
+            aria-pressed={onDisplay}
+            aria-label={`On display: ${record.title}`}
+            title={
+              onDisplay
+                ? 'On display, so it needs no shelf. Press to put it back in the cabinet.'
+                : 'Press if this copy is on display elsewhere, so it needs no shelf.'
+            }
+            onClick={() => toggleDisplayed(record)}
+          >
+            Display
+          </button>
         </span>
-      )}
     </li>
     )
   }
@@ -331,6 +349,7 @@ export function CabinetScreen({
           <p className="cabinet-summary">
             {plural(releases.length, 'release')} · {placed.toLocaleString()} placed
             {plan.unplaced.length > 0 && ` · ${plan.unplaced.length.toLocaleString()} without a shelf`}
+            {displayed.length > 0 && ` · ${displayed.length.toLocaleString()} on display`}
           </p>
 
           <section className="cabinet-settings" aria-label="Cabinet settings">
@@ -610,6 +629,34 @@ export function CabinetScreen({
                     </p>
                     <ul className="cabinet-records">
                       {plan.unplaced.map((record) => recordRow(record))}
+                    </ul>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {displayed.length > 0 && (
+              <section className="cabinet-slot cabinet-unplaced">
+                <button
+                  type="button"
+                  className="cabinet-slot-toggle"
+                  onClick={() => toggleExpanded(DISPLAYED_ID)}
+                  aria-label={`On display, ${plural(displayed.length, 'record')}`}
+                  aria-expanded={displayedExpanded}
+                  aria-controls={displayedExpanded ? 'cabinet-displayed' : undefined}
+                >
+                  <span className="cabinet-slot-toggle-label">On display</span>
+                  <span className="cabinet-slot-count">{plural(displayed.length, 'record')}</span>
+                  <span className="cabinet-slot-chevron">{displayedExpanded ? '▾' : '▸'}</span>
+                </button>
+
+                {displayedExpanded && (
+                  <div id="cabinet-displayed" className="cabinet-slot-body">
+                    <p className="cabinet-hint">
+                      Displayed elsewhere, so they need no shelf. Press Display to put one back.
+                    </p>
+                    <ul className="cabinet-records">
+                      {displayed.map((record) => recordRow(record, true))}
                     </ul>
                   </div>
                 )}

@@ -32,6 +32,7 @@ import {
 import { SettingsForm } from './components/Settings'
 import { StorageStats } from './components/StorageStats'
 import { CabinetScreen } from './components/CabinetScreen'
+import { useCabinet } from './hooks/useCabinet'
 import { useScrollLock } from './hooks/useScrollLock'
 import { useDatabaseState } from './hooks/useDatabaseState'
 import { useDiscogsWaitNote } from './hooks/useDiscogsWait'
@@ -243,6 +244,15 @@ export default function App() {
     () => releases.map((release) => toDisplayRelease(release, masterYears)),
     [releases, masterYears],
   )
+  // Loaded while the cabinet or a release is open: both can put a record on display.
+  const cabinet = useCabinet({
+    username: settings?.username ?? '',
+    token: settings?.token ?? null,
+    releases: displayReleases,
+    enabled: Boolean(settings) && (showCabinet || selected !== null),
+    // The release-notes scan only runs while the cabinet itself shows.
+    collectionReady: showCabinet && status === 'idle',
+  })
 
   const artistCount = grouped.length
   const totalMatching = filtered.length
@@ -801,8 +811,7 @@ export default function App() {
       {/* Record cabinet overlay */}
       {showCabinet && settings && (
         <CabinetScreen
-          username={settings.username}
-          token={settings.token}
+          cabinet={cabinet}
           releases={displayReleases}
           collectionReady={status === 'idle'}
           onClose={() => setShowCabinet(false)}
@@ -821,6 +830,8 @@ export default function App() {
           position={
             stack ? { index: stack.index + 1, total: stack.pressings.length } : undefined
           }
+          displayed={cabinet.displayed.some((record) => record.instanceId === selected.instanceId)}
+          onToggleDisplayed={settings ? () => cabinet.toggleDisplayed(selected) : undefined}
           onClose={() => {
             setRecentPicks(null)
             setStack(null)

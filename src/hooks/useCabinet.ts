@@ -91,16 +91,24 @@ function cabinetsOf(doc: StoredCabinetDoc): Cabinet[] {
 }
 
 /**
- * The synced document: the shelves, the layout options and the user's own
- * sleeve calls, stamped with the current time. Where each record goes isn't in
+ * The synced document: the shelves, the layout options, the user's own sleeve
+ * calls and the copies on display, stamped with the current time. Where each record goes isn't in
  * it; every device plans that from its own collection.
  */
 export function buildCabinetDoc(
   cabinets: Cabinet[],
   sleeves: Record<string, boolean> = {},
   options: CabinetOptions = DEFAULT_CABINET_OPTIONS,
+  displayed: number[] = [],
 ): CabinetDoc {
-  return { schemaVersion: 2, cabinets, sleeves, options, updatedAt: new Date().toISOString() }
+  return {
+    schemaVersion: 2,
+    cabinets,
+    sleeves,
+    options,
+    displayed,
+    updatedAt: new Date().toISOString(),
+  }
 }
 
 /**
@@ -109,7 +117,17 @@ export function buildCabinetDoc(
  * options synced takes this device's own.
  */
 export function rebaseCabinetDoc(local: StoredCabinetDoc): CabinetDoc {
-  return buildCabinetDoc(local.cabinets, local.sleeves ?? {}, optionsOf(local, loadCabinetOptions()))
+  return buildCabinetDoc(
+    local.cabinets,
+    local.sleeves ?? {},
+    optionsOf(local, loadCabinetOptions()),
+    displayedOf(local),
+  )
+}
+
+/** The copies on display, none for a document from before they synced. */
+function displayedOf(doc: StoredCabinetDoc): number[] {
+  return ('displayed' in doc && doc.displayed) || []
 }
 
 /** The document's layout options, or `fallback` when it predates them. */
@@ -121,7 +139,7 @@ export interface UseCabinetArgs {
   username: string
   token: string | null
   releases: DisplayRelease[]
-  /** The cabinet only loads and syncs while its screen is on. */
+  /** The cabinet only loads and syncs while a screen that shows it is on. */
   enabled: boolean
   /** The collection has loaded (not enriching, no error); the gatefold scan waits for it. */
   collectionReady?: boolean
@@ -137,6 +155,8 @@ export interface UseCabinetResult {
   cabinet: Cabinet
   options: CabinetOptions
   plan: CabinetPlan
+  /** Copies on display elsewhere: they are left out of the plan. */
+  displayed: DisplayRelease[]
   /** What is known about sleeves: release notes and the user's own calls. */
   sleeves: SleeveFacts
   /** The release-notes gatefold scan, null when idle. */
@@ -156,6 +176,8 @@ export interface UseCabinetResult {
   setSeparateSizeClasses: (separate: boolean) => void
   /** Flip a record between gatefold and standard sleeve, overriding detection. */
   toggleGatefold: (display: DisplayRelease) => void
+  /** Takes a copy off the shelves to be on display, or puts it back. */
+  toggleDisplayed: (display: DisplayRelease) => void
   retry: () => void
   reset: () => Promise<void>
 }
@@ -170,6 +192,7 @@ export function useCabinet({
   const [cabinets, setCabinets] = useState<Cabinet[]>(() => [defaultCabinet()])
   const [overrides, setOverrides] = useState<Record<string, boolean>>({})
   const [options, setOptions] = useState<CabinetOptions>(() => loadCabinetOptions())
+  const [displayedIds, setDisplayedIds] = useState<number[]>([])
   const [revision, setRevision] = useState(0)
   const [dirty, setDirty] = useState(false)
   const [status, setStatus] = useState<CabinetStatus>('local')
@@ -189,13 +212,21 @@ export function useCabinet({
   const sleeves = useMemo<SleeveFacts>(() => ({ notes, overrides }), [notes, overrides])
 
   const cabinet = cabinets[0]
+  const [displayed, onShelves] = useMemo(() => {
+    const ids = new Set(displayedIds)
+    return [
+      releases.filter((record) => ids.has(record.instanceId)),
+      releases.filter((record) => !ids.has(record.instanceId)),
+    ]
+  }, [releases, displayedIds])
+  // Off, nothing reads the plan; skip laying out the whole collection.
   const plan = useMemo(
-    () => planCabinet({ releases, cabinet, options, sleeves }),
-    [releases, cabinet, options, sleeves],
+    () => planCabinet({ releases: enabled ? onShelves : [], cabinet, options, sleeves }),
+    [enabled, onShelves, cabinet, options, sleeves],
   )
   const doc = useMemo(
-    () => buildCabinetDoc(cabinets, overrides, options),
-    [cabinets, overrides, options],
+    () => buildCabinetDoc(cabinets, overrides, options, displayedIds),
+    [cabinets, overrides, options, displayedIds],
   )
 
   // Detection can only be checked against the live facts, so the toggle reads
@@ -272,6 +303,7 @@ export function useCabinet({
             setCabinets(nextDoc.cabinets)
             setOverrides(nextDoc.sleeves ?? {})
             setOptions(optionsOf(nextDoc, DEFAULT_CABINET_OPTIONS))
+            setDisplayedIds(displayedOf(nextDoc))
             setRevision(nextRevision)
             persist(nextDoc, nextRevision, true)
             continue
@@ -323,11 +355,13 @@ export function useCabinet({
         setCabinets(cabinetsOf(stored.doc))
         setOverrides(stored.doc.sleeves ?? {})
         setOptions((current) => optionsOf(stored.doc, current))
+        setDisplayedIds(displayedOf(stored.doc))
         setRevision(stored.revision)
         setDirty(stored.dirty)
       } else {
         setCabinets([defaultCabinet()])
         setOverrides({})
+        setDisplayedIds([])
         setRevision(0)
         setDirty(false)
       }
@@ -352,6 +386,7 @@ export function useCabinet({
           setCabinets(rebased.cabinets)
           setOverrides(rebased.sleeves ?? {})
           setOptions(optionsOf(rebased, DEFAULT_CABINET_OPTIONS))
+          setDisplayedIds(displayedOf(rebased))
           setRevision(remoteRevision)
           await push(rebased, remoteRevision)
           return
@@ -362,6 +397,7 @@ export function useCabinet({
           setCabinets(upgraded.cabinets)
           setOverrides(upgraded.sleeves ?? {})
           setOptions(optionsOf(upgraded, DEFAULT_CABINET_OPTIONS))
+          setDisplayedIds(displayedOf(upgraded))
           setRevision(remoteRevision)
           await push(upgraded, remoteRevision)
           return
@@ -369,6 +405,7 @@ export function useCabinet({
         setCabinets(cabinetsOf(remote.doc))
         setOverrides(remote.doc.sleeves ?? {})
         setOptions(remote.doc.options)
+        setDisplayedIds(displayedOf(remote.doc))
         setRevision(remoteRevision)
         setStatus('synced')
         persist(remote.doc, remoteRevision, false)
@@ -513,6 +550,18 @@ export function useCabinet({
     [edited],
   )
 
+  const toggleDisplayed = useCallback(
+    (display: DisplayRelease) => {
+      setDisplayedIds((current) =>
+        current.includes(display.instanceId)
+          ? current.filter((id) => id !== display.instanceId)
+          : [...current, display.instanceId],
+      )
+      edited()
+    },
+    [edited],
+  )
+
   const retry = useCallback(() => {
     setDirty(true)
     setError(null)
@@ -523,6 +572,7 @@ export function useCabinet({
     if (username) await clearCabinet(username)
     setCabinets([defaultCabinet()])
     setOverrides({})
+    setDisplayedIds([])
     setRevision(0)
     setDirty(false)
     setStatus('local')
@@ -534,6 +584,7 @@ export function useCabinet({
     cabinet,
     options,
     plan,
+    displayed,
     sleeves,
     gatefoldScan,
     gatefoldScanError,
@@ -547,6 +598,7 @@ export function useCabinet({
     setSort,
     setSeparateSizeClasses,
     toggleGatefold,
+    toggleDisplayed,
     retry,
     reset,
   }

@@ -30,19 +30,24 @@ const optionsSchema = z.object({
   separateSizeClasses: z.boolean(),
 })
 
+/** Copies (collection instance ids) on display elsewhere, so they need no shelf. */
+const displayedSchema = z.array(z.number().int().positive())
+
 /**
- * What devices sync: the shelves, the layout options and the user's own sleeve
- * calls. Where each record goes is computed on every device from its own
- * collection, so it isn't synced (it grew with the collection, see #134).
+ * What devices sync: the shelves, the layout options, the user's own sleeve
+ * calls and the records on display. Where each record goes is computed on
+ * every device from its own collection, so it isn't synced (it grew with the
+ * collection, see #134).
  *
- * `sleeves` and `options` are optional because an app that predates them
- * leaves them out; the server then keeps the stored ones.
+ * `sleeves`, `options` and `displayed` are optional because an app that
+ * predates them leaves them out; the server then keeps the stored ones.
  */
 export const cabinetDocSchema = z.object({
   schemaVersion: z.literal(2),
   cabinets: z.array(cabinetSchema),
   sleeves: sleevesSchema.optional(),
   options: optionsSchema.optional(),
+  displayed: displayedSchema.optional(),
   updatedAt: z.iso.datetime(),
 })
 
@@ -69,6 +74,7 @@ export const anyCabinetDocSchema = z
       cabinets: doc.cabinets,
       ...(doc.sleeves === undefined ? {} : { sleeves: doc.sleeves }),
       ...('options' in doc && doc.options ? { options: doc.options } : {}),
+      ...('displayed' in doc && doc.displayed ? { displayed: doc.displayed } : {}),
       updatedAt: doc.updatedAt,
     }),
   )

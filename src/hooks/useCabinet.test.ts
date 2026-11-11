@@ -114,6 +114,7 @@ describe('helpers', () => {
     const doc = buildCabinetDoc([cabinet], { '7': true })
     expect(Object.keys(doc).sort()).toEqual([
       'cabinets',
+      'displayed',
       'options',
       'schemaVersion',
       'sleeves',
@@ -138,6 +139,7 @@ describe('helpers', () => {
       cabinets: legacyDocWith('Old').cabinets,
       sleeves: { '5': true },
       options: { sort: 'chronological', separateSizeClasses: false },
+      displayed: [],
       updatedAt: expect.any(String),
     })
     expect(rebaseCabinetDoc(legacyDocWith('Old')).sleeves).toEqual({})
@@ -216,6 +218,43 @@ describe('useCabinet', () => {
     })
 
     expect(pushSpy.mock.calls[0][1].options?.separateSizeClasses).toBe(true)
+  })
+
+  it('takes a copy on display off the shelves, and syncs it', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
+    vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+    vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: null, etag: '"r0"' })
+    const pushSpy = vi
+      .spyOn(syncApi, 'pushCabinet')
+      .mockResolvedValue({ doc: docWith('x'), etag: '"r1"' })
+
+    const { result } = renderHook(() => useIt())
+    await act(async () => {})
+    expect(result.current.plan.placements[releases[0].key]).toBeDefined()
+
+    act(() => result.current.toggleDisplayed(releases[0]))
+    expect(result.current.displayed).toEqual([releases[0]])
+    expect(result.current.plan.placements[releases[0].key]).toBeUndefined()
+    expect(result.current.plan.unplaced).not.toContain(releases[0])
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(800)
+    })
+    expect(pushSpy.mock.calls[0][1].displayed).toEqual([releases[0].instanceId])
+
+    act(() => result.current.toggleDisplayed(releases[0]))
+    expect(result.current.displayed).toEqual([])
+    expect(result.current.plan.placements[releases[0].key]).toBeDefined()
+  })
+
+  it('restores the copies on display from the server copy', async () => {
+    vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
+    const remote = { ...docWith('x'), displayed: [releases[1].instanceId] }
+    vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: remote, etag: '"r3"' })
+
+    const { result } = renderHook(() => useIt())
+
+    await waitFor(() => expect(result.current.displayed).toEqual([releases[1]]))
   })
 
   it('reports offline when the server cannot be reached', async () => {

@@ -148,3 +148,22 @@ describe('ReleaseDetail stack navigation', () => {
     expect(onPrev).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('ReleaseDetail on display', () => {
+  it('has no display toggle without a cabinet to put it in', () => {
+    render(<ReleaseDetail display={display} token="tok" onClose={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'On display' })).not.toBeInTheDocument()
+  })
+
+  it('shows whether this copy is on display, and toggles it', async () => {
+    const user = userEvent.setup()
+    const onToggle = vi.fn()
+    render(
+      <ReleaseDetail display={display} token="tok" onClose={vi.fn()} displayed onToggleDisplayed={onToggle} />,
+    )
+    const toggle = screen.getByRole('button', { name: 'On display' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    await user.click(toggle)
+    expect(onToggle).toHaveBeenCalledTimes(1)
+  })
+})

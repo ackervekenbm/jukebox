@@ -9,12 +9,11 @@ import { makeSortKey } from '../utils/sortName'
 import { planCabinet, type CabinetPlan, type PlannedSlot } from '../utils/cabinet'
 import type { Cabinet } from '../shared/cabinetDoc'
 import { CabinetScreen } from './CabinetScreen'
+import type { UseCabinetResult } from '../hooks/useCabinet'
 
 const mock = vi.hoisted(() => ({ state: {} as Record<string, unknown> }))
 
-vi.mock('../hooks/useCabinet', () => ({
-  useCabinet: () => mock.state,
-}))
+const cab = () => mock.state as unknown as UseCabinetResult
 
 // Why a Discogs job waits has its own tests; here it says whatever a test sets.
 const wait = vi.hoisted(() => ({ note: null as string | null, calls: [] as unknown[][] }))
@@ -99,6 +98,7 @@ const actions = {
   setSort: vi.fn(),
   setSeparateSizeClasses: vi.fn(),
   toggleGatefold: vi.fn(),
+  toggleDisplayed: vi.fn(),
   retry: vi.fn(),
   reset: vi.fn(),
 }
@@ -110,6 +110,7 @@ function setState(cabinet: Cabinet, plan: CabinetPlan, overrides: Record<string,
     options: { sort: 'chronological', separateSizeClasses: true },
     plan,
     sleeves: {},
+    displayed: [],
     gatefoldScan: null,
     gatefoldScanError: null,
     status: 'synced',
@@ -138,7 +139,7 @@ afterEach(() => {
 })
 
 function renderScreen(onClose = vi.fn(), list = releases) {
-  render(<CabinetScreen username="alice" token="tok" releases={list} onClose={onClose} />)
+  render(<CabinetScreen cabinet={cab()} releases={list} onClose={onClose} />)
   return onClose
 }
 
@@ -218,7 +219,7 @@ describe('CabinetScreen', () => {
 
       setState(cabinet, plan)
       const { unmount } = render(
-        <CabinetScreen username="alice" token="tok" releases={releases} onClose={vi.fn()} />,
+        <CabinetScreen cabinet={cab()} releases={releases} onClose={vi.fn()} />,
       )
       const warnings = screen.getByRole('list', { name: 'Cabinet warnings' })
       expect(within(warnings).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
@@ -330,11 +331,11 @@ describe('CabinetScreen', () => {
         return { slot: cabinet.slots[0], index: 0 }
       })
       const { rerender } = render(
-        <CabinetScreen username="alice" token="tok" releases={releases} onClose={vi.fn()} />,
+        <CabinetScreen cabinet={cab()} releases={releases} onClose={vi.fn()} />,
       )
       fireEvent.click(shelfHeader('Shelf 1'))
       fireEvent.click(screen.getByRole('button', { name: 'Remove Shelf 1' }))
-      rerender(<CabinetScreen username="alice" token="tok" releases={releases} onClose={vi.fn()} />)
+      rerender(<CabinetScreen cabinet={cab()} releases={releases} onClose={vi.fn()} />)
 
       // slot-2 is now first, so it reads "Shelf 1".
       expect(shelfHeader('Shelf 1')).toHaveFocus()
@@ -429,6 +430,27 @@ describe('CabinetScreen', () => {
     expect(within(screen.getByRole('button', { name: /^Without a shelf/ })).getByText('2 records')).toBeInTheDocument()
   })
 
+  it('lists the records on display apart, and puts one back with its Display button', () => {
+    const cabinet = cabinetOf([75])
+    setState(cabinet, planOf(cabinet, [{ records: [onShelf(releases[0])] }]), {
+      displayed: [releases[1]],
+    })
+    renderScreen()
+
+    expect(screen.getByText('2 releases · 1 placed · 1 on display')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'On display, 1 record' }))
+    const back = screen.getByRole('button', { name: 'On display: Second' })
+    expect(back).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(back)
+    expect(actions.toggleDisplayed).toHaveBeenCalledWith(releases[1])
+
+    fireEvent.click(shelfHeader('Shelf 1'))
+    expect(screen.getByRole('button', { name: 'On display: First' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+  })
+
   it('manages records automatically without per-record shelf controls', () => {
     renderScreen()
     expect(screen.queryByLabelText('Shelf for First')).not.toBeInTheDocument()
@@ -517,6 +539,7 @@ describe('CabinetScreen', () => {
       options: { sort: 'chronological', separateSizeClasses: true },
       plan: planCabinet({ releases, cabinet, sleeves }),
       sleeves,
+      displayed: [],
       gatefoldScan: null,
       status: 'synced',
       dirty: false,
@@ -534,13 +557,14 @@ describe('CabinetScreen', () => {
     expect(within(toggle.closest('li')!).getByText('2 spaces')).toBeInTheDocument()
 
     // The chips come after the year (right-aligned under it, on the artist's
-    // line), so the years line up; the Gatefold button comes last so it lines
-    // up too.
+    // line), so the years line up; the Display button every row has comes
+    // last and the Gatefold button just before it, so both line up too.
     const row = toggle.closest('li')!
     const tags = row.querySelector('.cabinet-record-tags')!
     expect(tags.parentElement).toBe(row)
     expect(tags.previousElementSibling).toHaveClass('cabinet-record-year')
-    expect(tags.lastElementChild).toBe(toggle)
+    expect(tags.lastElementChild).toHaveAccessibleName('On display: First')
+    expect(tags.lastElementChild!.previousElementSibling).toBe(toggle)
   })
 
   it('reports the release-notes check while it runs', () => {
@@ -557,8 +581,7 @@ describe('CabinetScreen', () => {
   it('says the check waits for the collection to load', () => {
     render(
       <CabinetScreen
-        username="alice"
-        token="tok"
+        cabinet={cab()}
         releases={releases}
         collectionReady={false}
         onClose={vi.fn()}
@@ -637,7 +660,7 @@ describe('CabinetScreen', () => {
     const state = mock.state as { gatefoldScan: unknown }
     state.gatefoldScan = { done: 0, total: 40 }
     const { rerender } = render(
-      <CabinetScreen username="alice" token="tok" releases={releases} onClose={vi.fn()} />,
+      <CabinetScreen cabinet={cab()} releases={releases} onClose={vi.fn()} />,
     )
     const announcer = screen.getByRole('status', { name: 'Release notes check' })
     expect(announcer).toHaveTextContent('Checking release notes for gatefold sleeves.')
@@ -645,11 +668,11 @@ describe('CabinetScreen', () => {
     expect(screen.getByText(/Checking release notes: 0 of 40/)).not.toHaveAttribute('aria-live')
 
     state.gatefoldScan = { done: 20, total: 40 }
-    rerender(<CabinetScreen username="alice" token="tok" releases={releases} onClose={vi.fn()} />)
+    rerender(<CabinetScreen cabinet={cab()} releases={releases} onClose={vi.fn()} />)
     expect(announcer).toHaveTextContent('Checking release notes for gatefold sleeves.')
 
     state.gatefoldScan = null
-    rerender(<CabinetScreen username="alice" token="tok" releases={releases} onClose={vi.fn()} />)
+    rerender(<CabinetScreen cabinet={cab()} releases={releases} onClose={vi.fn()} />)
     expect(announcer).toHaveTextContent('Release notes checked.')
   })
 
