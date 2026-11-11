@@ -327,6 +327,28 @@ describe('PUT /api/sync/cabinet', () => {
     expect(get.body.doc.sleeves).toEqual({ '9160941': true })
   })
 
+  it('keeps the layout options when an older app saves without them, and rejects unknown ones', async () => {
+    const options = { sort: 'byName', separateSizeClasses: true }
+    await request(app)
+      .put('/api/sync/cabinet')
+      .set(alice)
+      .set('If-Match', '*')
+      .send({ ...sampleDoc(), options })
+
+    const old = sampleDoc() // no options, like an app from before they synced
+    const res = await request(app).put('/api/sync/cabinet').set(alice).set('If-Match', '*').send(old)
+    expect(res.status).toBe(200)
+    const get = await request(app).get('/api/sync/cabinet').set(alice)
+    expect(get.body.doc.options).toEqual(options)
+
+    const bad = await request(app)
+      .put('/api/sync/cabinet')
+      .set(alice)
+      .set('If-Match', '*')
+      .send({ ...sampleDoc(), options: { sort: 'random', separateSizeClasses: true } })
+    expect(bad.status).toBe(400)
+  })
+
   it('clears the sleeve calls when a current app saves none', async () => {
     await request(app)
       .put('/api/sync/cabinet')

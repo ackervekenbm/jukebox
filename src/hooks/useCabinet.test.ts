@@ -59,6 +59,7 @@ function docWith(cabinetName: string): CabinetDoc {
     schemaVersion: 2,
     cabinets: [{ id: 'main', name: cabinetName, slots: [{ id: 'slot-1', label: 'A', capacity: 40 }] }],
     sleeves: {},
+    options: { sort: 'chronological', separateSizeClasses: false },
     updatedAt: '2026-01-01T00:00:00.000Z',
   }
 }
@@ -89,6 +90,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+  localStorage.clear()
 })
 
 describe('helpers', () => {
@@ -107,10 +109,16 @@ describe('helpers', () => {
     expect(nextSlotId([slot('slot-1'), slot('slot-3')])).toBe('slot-4')
   })
 
-  it('syncs only the shelves and the sleeve calls, not where each record goes', () => {
+  it('syncs only the shelves, options and sleeve calls, not where each record goes', () => {
     const cabinet = defaultCabinet()
     const doc = buildCabinetDoc([cabinet], { '7': true })
-    expect(Object.keys(doc).sort()).toEqual(['cabinets', 'schemaVersion', 'sleeves', 'updatedAt'])
+    expect(Object.keys(doc).sort()).toEqual([
+      'cabinets',
+      'options',
+      'schemaVersion',
+      'sleeves',
+      'updatedAt',
+    ])
     expect(doc.schemaVersion).toBe(2)
     expect(doc.cabinets).toEqual([cabinet])
     expect(doc.sleeves).toEqual({ '7': true })
@@ -129,6 +137,7 @@ describe('helpers', () => {
       schemaVersion: 2,
       cabinets: legacyDocWith('Old').cabinets,
       sleeves: { '5': true },
+      options: { sort: 'chronological', separateSizeClasses: false },
       updatedAt: expect.any(String),
     })
     expect(rebaseCabinetDoc(legacyDocWith('Old')).sleeves).toEqual({})
@@ -158,6 +167,55 @@ describe('useCabinet', () => {
 
     await waitFor(() => expect(result.current.cabinet.name).toBe('From server'))
     expect(result.current.status).toBe('synced')
+  })
+
+  it('takes the layout options from the server copy', async () => {
+    vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
+    const remote = { ...docWith('x'), options: { sort: 'byName', separateSizeClasses: true } } as const
+    vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: remote, etag: '"r3"' })
+
+    const { result } = renderHook(() => useIt())
+
+    await waitFor(() => expect(result.current.options).toEqual(remote.options))
+  })
+
+  it('pushes this device\'s options to a server copy saved before they synced', async () => {
+    localStorage.setItem(
+      'vinyl-vault:cabinet-options',
+      JSON.stringify({ sort: 'byName', separateSizeClasses: true }),
+    )
+    vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
+    vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+    const old = docWith('Old')
+    delete old.options
+    vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: old, etag: '"r3"' })
+    const pushSpy = vi.spyOn(syncApi, 'pushCabinet').mockResolvedValue({ doc: old, etag: '"r4"' })
+
+    const { result } = renderHook(() => useIt())
+
+    await waitFor(() => expect(result.current.status).toBe('synced'))
+    expect(pushSpy.mock.calls[0][1].options).toEqual({ sort: 'byName', separateSizeClasses: true })
+    expect(pushSpy.mock.calls[0][1].cabinets[0].name).toBe('Old')
+  })
+
+  it('syncs a change to the layout options', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
+    vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+    vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: null, etag: '"r0"' })
+    const pushSpy = vi
+      .spyOn(syncApi, 'pushCabinet')
+      .mockResolvedValue({ doc: docWith('x'), etag: '"r1"' })
+
+    const { result } = renderHook(() => useIt())
+    await act(async () => {})
+
+    act(() => result.current.setSeparateSizeClasses(true))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(800)
+    })
+
+    expect(pushSpy.mock.calls[0][1].options?.separateSizeClasses).toBe(true)
   })
 
   it('reports offline when the server cannot be reached', async () => {

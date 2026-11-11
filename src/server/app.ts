@@ -95,17 +95,18 @@ export function createApp(): express.Express {
     }
 
     try {
-      // An app version from before sleeve calls existed saves without them;
-      // keep the stored ones rather than wiping the user's calls. Current
-      // clients always send the field (`{}` when there are none).
+      // An app version from before sleeve calls or synced options existed
+      // saves without them; keep the stored ones rather than wiping them.
+      // Current clients always send both fields.
       let saved: CabinetDoc = parsed.data
       const row = putCabinetRow(
         username,
         (current) => {
-          if (parsed.data.sleeves === undefined && current) {
+          if ((parsed.data.sleeves === undefined || parsed.data.options === undefined) && current) {
             const stored = anyCabinetDocSchema.safeParse(JSON.parse(current.doc))
-            if (stored.success && stored.data.sleeves) {
-              saved = { ...parsed.data, sleeves: stored.data.sleeves }
+            if (stored.success) {
+              const { sleeves, options } = stored.data
+              saved = { ...(sleeves && { sleeves }), ...(options && { options }), ...parsed.data }
             }
           }
           return JSON.stringify(saved)

@@ -13,7 +13,12 @@ import {
 } from '../utils/cabinet'
 import { useGatefoldNotes, type GatefoldScanProgress } from './useGatefoldNotes'
 import { clearCabinet, getCabinet, putCabinet } from '../db/cabinet'
-import { loadCabinetOptions, saveCabinetOptions, type CabinetOptions } from '../db/cabinetOptions'
+import {
+  DEFAULT_CABINET_OPTIONS,
+  loadCabinetOptions,
+  saveCabinetOptions,
+  type CabinetOptions,
+} from '../db/cabinetOptions'
 import {
   fetchCabinet,
   pushCabinet,
@@ -86,23 +91,30 @@ function cabinetsOf(doc: StoredCabinetDoc): Cabinet[] {
 }
 
 /**
- * The synced document: the shelves and the user's own sleeve calls, stamped
- * with the current time. Where each record goes isn't in it; every device
- * plans that from its own collection and options.
+ * The synced document: the shelves, the layout options and the user's own
+ * sleeve calls, stamped with the current time. Where each record goes isn't in
+ * it; every device plans that from its own collection.
  */
 export function buildCabinetDoc(
   cabinets: Cabinet[],
   sleeves: Record<string, boolean> = {},
+  options: CabinetOptions = DEFAULT_CABINET_OPTIONS,
 ): CabinetDoc {
-  return { schemaVersion: 2, cabinets, sleeves, updatedAt: new Date().toISOString() }
+  return { schemaVersion: 2, cabinets, sleeves, options, updatedAt: new Date().toISOString() }
 }
 
 /**
  * Keeps the local copy after a 409: the device that is being edited wins. A
- * copy stored before version 2 comes out as version 2.
+ * copy stored before version 2 comes out as version 2, and one stored before
+ * options synced takes this device's own.
  */
 export function rebaseCabinetDoc(local: StoredCabinetDoc): CabinetDoc {
-  return buildCabinetDoc(local.cabinets, local.sleeves ?? {})
+  return buildCabinetDoc(local.cabinets, local.sleeves ?? {}, optionsOf(local, loadCabinetOptions()))
+}
+
+/** The document's layout options, or `fallback` when it predates them. */
+function optionsOf(doc: StoredCabinetDoc, fallback: CabinetOptions): CabinetOptions {
+  return ('options' in doc && doc.options) || fallback
 }
 
 export interface UseCabinetArgs {
@@ -181,7 +193,10 @@ export function useCabinet({
     () => planCabinet({ releases, cabinet, options, sleeves }),
     [releases, cabinet, options, sleeves],
   )
-  const doc = useMemo(() => buildCabinetDoc(cabinets, overrides), [cabinets, overrides])
+  const doc = useMemo(
+    () => buildCabinetDoc(cabinets, overrides, options),
+    [cabinets, overrides, options],
+  )
 
   // Detection can only be checked against the live facts, so the toggle reads
   // them through a ref rather than closing over a stale copy.
@@ -256,6 +271,7 @@ export function useCabinet({
             nextRevision = revisionFromEtag(err.etag, nextRevision)
             setCabinets(nextDoc.cabinets)
             setOverrides(nextDoc.sleeves ?? {})
+            setOptions(optionsOf(nextDoc, DEFAULT_CABINET_OPTIONS))
             setRevision(nextRevision)
             persist(nextDoc, nextRevision, true)
             continue
@@ -306,6 +322,7 @@ export function useCabinet({
       if (stored) {
         setCabinets(cabinetsOf(stored.doc))
         setOverrides(stored.doc.sleeves ?? {})
+        setOptions((current) => optionsOf(stored.doc, current))
         setRevision(stored.revision)
         setDirty(stored.dirty)
       } else {
@@ -334,12 +351,24 @@ export function useCabinet({
           const rebased = rebaseCabinetDoc({ ...stored.doc, cabinets: cabinetsOf(stored.doc) })
           setCabinets(rebased.cabinets)
           setOverrides(rebased.sleeves ?? {})
+          setOptions(optionsOf(rebased, DEFAULT_CABINET_OPTIONS))
           setRevision(remoteRevision)
           await push(rebased, remoteRevision)
           return
         }
+        // A copy saved before options synced gets this device's, once.
+        if (!remote.doc.options) {
+          const upgraded = rebaseCabinetDoc({ ...remote.doc, cabinets: cabinetsOf(remote.doc) })
+          setCabinets(upgraded.cabinets)
+          setOverrides(upgraded.sleeves ?? {})
+          setOptions(optionsOf(upgraded, DEFAULT_CABINET_OPTIONS))
+          setRevision(remoteRevision)
+          await push(upgraded, remoteRevision)
+          return
+        }
         setCabinets(cabinetsOf(remote.doc))
         setOverrides(remote.doc.sleeves ?? {})
+        setOptions(remote.doc.options)
         setRevision(remoteRevision)
         setStatus('synced')
         persist(remote.doc, remoteRevision, false)
@@ -452,7 +481,8 @@ export function useCabinet({
       saveCabinetOptions(next)
       return next
     })
-  }, [])
+    edited()
+  }, [edited])
 
   const setSeparateSizeClasses = useCallback((separateSizeClasses: boolean) => {
     setOptions((current) => {
@@ -460,7 +490,8 @@ export function useCabinet({
       saveCabinetOptions(next)
       return next
     })
-  }, [])
+    edited()
+  }, [edited])
 
   const toggleGatefold = useCallback(
     (display: DisplayRelease) => {
