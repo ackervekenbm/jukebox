@@ -92,8 +92,8 @@ function cabinetsOf(doc: StoredCabinetDoc): Cabinet[] {
 
 /**
  * The synced document: the shelves, the layout options, the user's own sleeve
- * calls and the copies on display, stamped with the current time. Where each record goes isn't in
- * it; every device plans that from its own collection.
+ * calls and the copies on display, stamped with the current time. Where each
+ * record goes isn't in it; every device plans that from its own collection.
  */
 export function buildCabinetDoc(
   cabinets: Cabinet[],
