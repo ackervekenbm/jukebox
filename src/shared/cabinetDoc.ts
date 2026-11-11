@@ -24,18 +24,25 @@ export const cabinetSchema = z.object({
 /** The user's own sleeve calls, release id → gatefold or not. */
 const sleevesSchema = z.record(z.string().regex(/^\d+$/), z.boolean())
 
+/** How the shelves are laid out: it decides where records physically go. */
+const optionsSchema = z.object({
+  sort: z.enum(['chronological', 'byName']),
+  separateSizeClasses: z.boolean(),
+})
+
 /**
- * What devices sync: the shelves and the user's own sleeve calls. Where each
- * record goes is computed on every device from its own collection and
- * options, so it isn't synced (it grew with the collection, see #134).
+ * What devices sync: the shelves, the layout options and the user's own sleeve
+ * calls. Where each record goes is computed on every device from its own
+ * collection, so it isn't synced (it grew with the collection, see #134).
  *
- * `sleeves` is optional because a version-1 save from an app that predates it
- * leaves it out; the server then keeps the stored calls.
+ * `sleeves` and `options` are optional because an app that predates them
+ * leaves them out; the server then keeps the stored ones.
  */
 export const cabinetDocSchema = z.object({
   schemaVersion: z.literal(2),
   cabinets: z.array(cabinetSchema),
   sleeves: sleevesSchema.optional(),
+  options: optionsSchema.optional(),
   updatedAt: z.iso.datetime(),
 })
 
@@ -61,6 +68,7 @@ export const anyCabinetDocSchema = z
       schemaVersion: 2,
       cabinets: doc.cabinets,
       ...(doc.sleeves === undefined ? {} : { sleeves: doc.sleeves }),
+      ...('options' in doc && doc.options ? { options: doc.options } : {}),
       updatedAt: doc.updatedAt,
     }),
   )

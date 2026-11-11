@@ -27,8 +27,8 @@ const LEGACY_SORTS: Record<string, CabinetSortMode> = {
 }
 
 /**
- * How the shelves are laid out. A per-device view preference like the theme,
- * so it stays in localStorage and never travels with the synced cabinet.
+ * How the shelves are laid out. Synced with the cabinet (#168); this copy only
+ * seeds a cabinet saved before options synced, and works without an account.
  */
 export function loadCabinetOptions(): CabinetOptions {
   try {
