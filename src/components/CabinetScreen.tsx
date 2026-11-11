@@ -284,43 +284,43 @@ export function CabinetScreen({
           the years line up whatever chips a record has; the Display button
           every row has comes last, so it and the Gatefold button line up too. */}
       <span className="cabinet-record-tags">
-          {/* Says why it takes more than one space: its discs, or (with the
-              Gatefold button pressed next to it) its sleeve. */}
-          {units > 1 && (
-            <span className="cabinet-record-space">
-              {discs > 1 ? `${discs} discs` : `${units} spaces`}
-            </span>
-          )}
-          {vinyl && (
-            <button
-              type="button"
-              className={`cabinet-sleeve-btn${gatefold ? ' active' : ''}`}
-              aria-pressed={gatefold}
-              aria-label={`Gatefold: ${record.title}`}
-              aria-description={sleeveSource(record)}
-              title={sleeveSource(record)}
-              onClick={() => toggleGatefold(record)}
-            >
-              Gatefold
-              {/* Shown, not only told: a tooltip never appears on a touch screen. */}
-              {yours && <span className="cabinet-sleeve-yours">you</span>}
-            </button>
-          )}
+        {/* Says why it takes more than one space: its discs, or (with the
+            Gatefold button pressed next to it) its sleeve. */}
+        {units > 1 && (
+          <span className="cabinet-record-space">
+            {discs > 1 ? `${discs} discs` : `${units} spaces`}
+          </span>
+        )}
+        {vinyl && (
           <button
             type="button"
-            className={`cabinet-sleeve-btn${onDisplay ? ' active' : ''}`}
-            aria-pressed={onDisplay}
-            aria-label={`On display: ${record.title}`}
-            title={
-              onDisplay
-                ? 'On display, so it needs no shelf. Press to put it back in the cabinet.'
-                : 'Press if this copy is on display elsewhere, so it needs no shelf.'
-            }
-            onClick={() => toggleDisplayed(record)}
+            className={`cabinet-sleeve-btn${gatefold ? ' active' : ''}`}
+            aria-pressed={gatefold}
+            aria-label={`Gatefold: ${record.title}`}
+            aria-description={sleeveSource(record)}
+            title={sleeveSource(record)}
+            onClick={() => toggleGatefold(record)}
           >
-            Display
+            Gatefold
+            {/* Shown, not only told: a tooltip never appears on a touch screen. */}
+            {yours && <span className="cabinet-sleeve-yours">you</span>}
           </button>
-        </span>
+        )}
+        <button
+          type="button"
+          className={`cabinet-sleeve-btn${onDisplay ? ' active' : ''}`}
+          aria-pressed={onDisplay}
+          aria-label={`On display: ${record.title}`}
+          title={
+            onDisplay
+              ? 'On display, so it needs no shelf. Press to put it back in the cabinet.'
+              : 'Press if this copy is on display elsewhere, so it needs no shelf.'
+          }
+          onClick={() => toggleDisplayed(record)}
+        >
+          Display
+        </button>
+      </span>
     </li>
     )
   }
