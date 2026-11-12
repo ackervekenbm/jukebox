@@ -2925,3 +2925,13 @@ button:disabled {
     align-self: flex-start;
   }
 }
+
+/* iOS Safari zooms into any focused field under 16px and stays zoomed, so the
+   page scrolls sideways (#167). Only iOS needs it; elsewhere the compact sizes stay. */
+@supports (-webkit-touch-callout: none) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
