@@ -1,0 +1,347 @@
+/* Release detail overlay. */
+
+/* ---------- Release detail overlay ---------- */
+
+.detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: grid;
+  place-items: center;
+  padding: calc(20px + env(safe-area-inset-top, 0px))
+    calc(20px + env(safe-area-inset-right, 0px))
+    calc(20px + env(safe-area-inset-bottom, 0px))
+    calc(20px + env(safe-area-inset-left, 0px));
+  overflow-y: auto;
+  /* Don't let swiping past the modal's scroll edges push the page behind it. */
+  overscroll-behavior: contain;
+  /* A single, viewport-bounded column. Without an explicit track the auto
+     column sizes to the card's min/max-content, so a release whose details
+     contain a wide, unbreakable row (long title, nowrap label) pushes the
+     card past the viewport — its close button lands off-screen to the right
+     (issue #112). minmax(0, 1fr) pins the column to the padded viewport so the
+     card can never exceed it. */
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.detail-card {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  max-width: 600px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: var(--card-head) var(--close-inset) 22px;
+  max-height: calc(
+    100vh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  /* 100dvh excludes iOS Safari's toolbar, so the bottom stays visible. */
+  max-height: calc(
+    100dvh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+.card-scroll {
+  min-height: 0;
+  /* Spans the full card width so the scrollbar hugs the card's right
+     edge, in line with the close button; the content keeps its inset. */
+  padding: 0 calc(var(--card-pad) - var(--close-inset));
+  overflow-y: auto;
+  /* Don't let swiping past the scroll edges push the page behind the modal. */
+  overscroll-behavior: contain;
+}
+
+.card-close {
+  position: absolute;
+  top: var(--close-inset);
+  right: var(--close-inset);
+  z-index: 1;
+  width: var(--close-size);
+  height: var(--close-size);
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-dim);
+}
+
+.random-fab {
+  position: fixed;
+  right: calc(20px + env(safe-area-inset-right, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  z-index: 70;
+  width: 54px;
+  height: 54px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--on-accent);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+.random-fab:hover {
+  background: var(--accent-fill-hover);
+  border-color: var(--accent-fill-hover);
+  color: var(--on-accent-hover);
+  transform: translateY(-2px);
+}
+
+.random-fab:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.detail-cover {
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.detail-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.detail-title {
+  margin: 18px 0 2px;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.3;
+  font-family: var(--font-display);
+}
+
+.detail-album {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.detail-years {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.detail-year {
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.detail-year-label {
+  color: var(--text-faint);
+  font-weight: 400;
+  margin-right: 5px;
+}
+
+.detail-section {
+  margin-top: 16px;
+}
+
+.detail-section-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+
+.detail-row {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.detail-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.detail-display + .detail-display {
+  margin-top: 10px;
+}
+
+.detail-display-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.detail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.detail-chip {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--bg-elevated);
+}
+
+.detail-credits {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.recent-picks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recent-picks button {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.recent-picks button:hover {
+  border-color: var(--accent-strong);
+}
+
+.recent-pick-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-pick-time {
+  flex: none;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.detail-role {
+  color: var(--text-dim);
+}
+
+.tracklist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.track {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px;
+  font-size: 13px;
+  background: var(--bg-elevated);
+}
+
+.track + .track {
+  border-top: 1px solid var(--border);
+}
+
+.track-position {
+  flex: 0 0 auto;
+  min-width: 28px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.track-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.track-title {
+  color: var(--text);
+}
+
+.track-artists {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.track-duration {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.tracklist-note {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.detail-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.detail-links a {
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.detail-links a:hover {
+  text-decoration: underline;
+}

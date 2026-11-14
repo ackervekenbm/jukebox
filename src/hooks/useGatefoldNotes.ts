@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { DisplayRelease } from '../utils/collection'
-import { needsNotesCheck } from '../utils/cabinet'
+import { needsNotesCheck } from '../utils/physical'
 import { DiscogsError, fetchReleaseNotes } from '../api/discogs'
 import { getReleaseNotes, setReleaseNotes } from '../db/collection'
 

@@ -1,0 +1,225 @@
+/* Collection stats overlay. */
+
+/* ---------- Collection stats ---------- */
+
+.stats-totals {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 4px 0 22px;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 14px 8px;
+  background: var(--panel-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.stat-tile-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--accent-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-tile-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+.stats-section {
+  margin-bottom: 24px;
+}
+
+.stats-section h3 {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.stats-empty {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 0.9rem;
+}
+
+/* Horizontal count bars */
+
+.stats-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stats-bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1.4fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.stats-bar-label {
+  font-size: 0.86rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-bar-track {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--panel-hover);
+  overflow: hidden;
+}
+
+/* Scoped to the stats track: the storage bar in Settings shares the fill class
+   but not a positioned track, so a global rule stretched it over the card (#187). */
+.stats-bar-track > .stats-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.stats-bar-count {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  min-width: 2.4em;
+  text-align: right;
+}
+
+/* Column charts */
+
+.stats-title {
+  /* Sits above the scroll container rather than sticky inside it, so the
+     card's scrollbar starts below the title instead of hiding beneath it.
+     The side padding lines the title up with the inset scroll content. */
+  flex: none;
+  margin: 0 0 18px;
+  padding: 0 calc(var(--card-pad) - var(--close-inset)) 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.stats-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stats-chart-svg {
+  width: 100%;
+  height: 64px;
+  display: block;
+  border-bottom: 1px solid var(--border);
+}
+
+.stats-chart-bar {
+  fill: var(--accent);
+  opacity: 0.85;
+  transition: opacity 0.15s ease;
+}
+
+.stats-chart-bar:hover {
+  opacity: 1;
+}
+
+.stats-chart-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.74rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 480px) {
+  .stats-totals {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stats-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.stats-section-head h3 {
+  margin: 0;
+}
+
+.stats-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.stats-link-btn:hover:not(:disabled) {
+  color: var(--accent-text);
+}
+
+.stats-link-btn:disabled {
+  color: var(--text-faint);
+  cursor: default;
+  text-decoration: none;
+}
+
+.stats-value-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.stats-value-grid .stat-tile-value {
+  font-size: 1.25rem;
+}
+
+.stats-note {
+  margin: 10px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-faint);
+}
+
+.stats-updated {
+  margin: 2px 0 0;
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}
+
+.stats-error {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  color: var(--danger);
+}
+
+@media (max-width: 480px) {
+  .stats-value-grid {
+    grid-template-columns: 1fr;
+  }
+}

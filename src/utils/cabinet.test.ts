@@ -2,65 +2,9 @@
 // Copyright (C) 2025-2026 ackervekenbm
 
 import { describe, expect, it } from 'vitest'
-import type { DiscogsCollectionRelease, DiscogsFormat } from '../types/discogs'
-import { compareReleases, groupReleases, toDisplayRelease, type DisplayRelease } from './collection'
-import { artist, release } from '../test/factories'
-import { makeSortKey } from './sortName'
-import {
-  conflictLabel,
-  discCountOf,
-  isGatefold,
-  needsNotesCheck,
-  isUserCall,
-  mentionsGatefold,
-  planCabinet,
-  sizeClassOf,
-  sleeveSource,
-  spaceUnitsOf,
-} from './cabinet'
-
-interface FakeInput {
-  artist: string
-  title: string
-  id?: number
-  year?: number
-  formatText?: string
-  /** Raw formats; by default one format named like the start of formatText. */
-  formats?: DiscogsFormat[]
-}
-
-let counter = 0
-
-function fake(input: FakeInput): DisplayRelease {
-  const id = input.id ?? ++counter
-  const year = input.year ?? 2020
-  const formatText = input.formatText ?? 'Vinyl · 12" · LP'
-  return {
-    key: `${id}-${id}`,
-    instanceId: id,
-    id,
-    title: input.title,
-    titleKey: makeSortKey(input.title),
-    year,
-    originalYear: year,
-    artistName: input.artist,
-    genres: [],
-    styles: [],
-    labels: [],
-    country: '',
-    // Like real data: the format name is what the format text starts with.
-    formatNames: [formatText.split(' · ')[0]],
-    formatText,
-    coverImage: '',
-    thumb: '',
-    release: {
-      basic_information: {
-        formats: input.formats ?? [{ name: formatText.split(' · ')[0], qty: '1' }],
-      },
-    } as unknown as DiscogsCollectionRelease,
-    dateAdded: '2024-01-01T00:00:00-00:00',
-  }
-}
+import { compareReleases, groupReleases, toDisplayRelease } from './collection'
+import { artist, fakeRecord, release } from '../test/factories'
+import { conflictLabel, planCabinet } from './cabinet'
 
 const cabinetWith = (capacities: number[]) => ({
   id: 'cab',
@@ -74,266 +18,12 @@ const cabinetWith = (capacities: number[]) => ({
 
 const keysIn = (records: { key: string }[]) => records.map((record) => record.key)
 
-describe('sizeClassOf', () => {
-  it('reads the size from the format text', () => {
-    expect(sizeClassOf(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · 12" · LP' }))).toBe(
-      '12-inch',
-    )
-    expect(sizeClassOf(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · 7" · Single' }))).toBe(
-      'small',
-    )
-    expect(sizeClassOf(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · 10" · EP' }))).toBe(
-      'small',
-    )
-  })
-
-  it('counts vinyl without a stated size as 12 inch', () => {
-    expect(sizeClassOf(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · LP · Album' }))).toBe(
-      '12-inch',
-    )
-    expect(sizeClassOf(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · Single' }))).toBe(
-      '12-inch',
-    )
-  })
-
-  it('only files records as small when a smaller size is stated', () => {
-    expect(sizeClassOf(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · 7" · 45 RPM' }))).toBe(
-      'small',
-    )
-    expect(
-      sizeClassOf({ ...fake({ artist: 'A', title: 'T', formatText: 'Shellac · 10"' }), formatNames: ['Shellac'] }),
-    ).toBe('small')
-  })
-
-  it('keeps formats that are not vinyl apart as other', () => {
-    const cd = { ...fake({ artist: 'A', title: 'T', formatText: 'CD · Album' }), formatNames: ['CD'] }
-    const tape = { ...fake({ artist: 'A', title: 'T', formatText: 'Cassette · Album' }), formatNames: ['Cassette'] }
-    expect(sizeClassOf(cd)).toBe('other')
-    expect(sizeClassOf(tape)).toBe('other')
-  })
-
-  it('treats a box set with vinyl inside as vinyl', () => {
-    const box = {
-      ...fake({ artist: 'A', title: 'T', formatText: 'Box Set / Vinyl · LP' }),
-      formatNames: ['Box Set', 'Vinyl'],
-    }
-    expect(sizeClassOf(box)).toBe('12-inch')
-  })
-
-  it('uses the largest vinyl size in a set, counting an unsized LP as 12 inch', () => {
-    const set = (formatText: string) =>
-      sizeClassOf({ ...fake({ artist: 'A', title: 'T', formatText }), formatNames: ['Box Set', 'Vinyl'] })
-    expect(set('Box Set · Compilation / Vinyl · 12" / Vinyl · 7"')).toBe('12-inch')
-    // Discogs leaves the LP's size off; only the bonus single states one.
-    expect(set('Vinyl · LP · Album / Vinyl · 7" · Single')).toBe('12-inch')
-    expect(set('Box Set / Vinyl · 7" / Vinyl · 7"')).toBe('small')
-  })
-
-  it('reads sizes from vinyl formats only', () => {
-    const of = (formatText: string, name: string) =>
-      sizeClassOf({ ...fake({ artist: 'A', title: 'T', formatText }), formatNames: [name] })
-    expect(of('CD · 3" · Mini', 'CD')).toBe('other')
-    expect(of('Reel-To-Reel · 7" · 7 ½ ips', 'Reel-To-Reel')).toBe('other')
-    expect(of('Floppy Disk · 3.5"', 'Floppy Disk')).toBe('other')
-    // A CD packaged with a 7" is filed by the 7".
-    expect(
-      sizeClassOf({
-        ...fake({ artist: 'A', title: 'T', formatText: 'CD · Album / Vinyl · 7"' }),
-        formatNames: ['CD', 'Vinyl'],
-      }),
-    ).toBe('small')
-  })
-})
-
-describe('spaceUnitsOf', () => {
-  it('counts a gatefold sleeve as two spaces', () => {
-    expect(spaceUnitsOf(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · 12" · LP · Gatefold' }))).toBe(2)
-  })
-
-  it('counts a standard sleeve as one space', () => {
-    expect(spaceUnitsOf(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · 12" · LP' }))).toBe(1)
-  })
-
-  it('finds a gatefold in a format\'s free text', () => {
-    const record = fake({
-      artist: 'A',
-      title: 'T',
-      formatText: 'Vinyl · LP · Album',
-      formats: [{ name: 'Vinyl', qty: '1', text: '180g, Gatefold', descriptions: ['LP', 'Album'] }],
-    })
-    expect(spaceUnitsOf(record)).toBe(2)
-  })
-
-  it('counts a gatefold the release notes describe', () => {
-    // Blink-182 – Enema Of The State (9160941): only the notes say gatefold.
-    const record = fake({ artist: 'blink-182', title: 'Enema Of The State', id: 9160941, formatText: 'Vinyl · LP · Album · Reissue · Stereo' })
-    expect(spaceUnitsOf(record)).toBe(1)
-    const notes = '180 Gram Heavyweight Vinyl\nGatefold sleeve.\nMade in the EU.'
-    expect(spaceUnitsOf(record, { notes: { '9160941': notes } })).toBe(2)
-    expect(spaceUnitsOf(record, { notes: { '9160941': 'Printed inner sleeve.' } })).toBe(1)
-    expect(spaceUnitsOf(record, { notes: { '9160941': '' } })).toBe(1)
-  })
-
-  it('ignores gatefold text on a format that is not vinyl', () => {
-    // A CD's gatefold card sleeve doesn't make the LP in the same set thicker.
-    const set = fake({
-      artist: 'A',
-      title: 'T',
-      formatText: 'Vinyl · LP / CD · Album · Gatefold',
-      formats: [
-        { name: 'Vinyl', qty: '1', descriptions: ['LP'] },
-        { name: 'CD', qty: '1', text: 'Gatefold digisleeve', descriptions: ['Album', 'Gatefold'] },
-      ],
-    })
-    expect(spaceUnitsOf(set)).toBe(1)
-    const cd = fake({
-      artist: 'A',
-      title: 'T',
-      formatText: 'CD · Album',
-      formats: [{ name: 'CD', qty: '1', text: 'Gatefold Cardboard Sleeve' }],
-    })
-    expect(isGatefold(cd)).toBe(false)
-  })
-
-  it('lets the user\'s call win both ways', () => {
-    const plain = fake({ artist: 'A', title: 'T', id: 1, formatText: 'Vinyl · LP' })
-    const folded = fake({ artist: 'A', title: 'U', id: 2, formatText: 'Vinyl · LP · Gatefold' })
-    expect(spaceUnitsOf(plain, { overrides: { '1': true } })).toBe(2)
-    expect(spaceUnitsOf(folded, { overrides: { '2': false } })).toBe(1)
-    expect(isGatefold(folded, { notes: { '2': 'Gatefold' }, overrides: { '2': false } })).toBe(false)
-  })
-
-  it('treats only a call that disagrees with Discogs as the user\'s', () => {
-    const lp = fake({ artist: 'A', title: 'T', id: 1, formatText: 'Vinyl · LP' })
-    expect(isUserCall(lp, { overrides: { '1': true } })).toBe(true)
-    // Marked as gatefold before the notes said so: it now agrees, so it's Discogs' call.
-    expect(isUserCall(lp, { notes: { '1': 'Gatefold sleeve' }, overrides: { '1': true } })).toBe(false)
-    expect(isUserCall(lp)).toBe(false)
-  })
-
-  it('says where the sleeve call comes from', () => {
-    const lp = fake({ artist: 'A', title: 'T', id: 1, formatText: 'Vinyl · LP' })
-    expect(sleeveSource(lp)).toMatch(/^Standard sleeve\. Press/)
-    expect(sleeveSource(lp, { notes: { '1': 'Gatefold sleeve' } })).toMatch(/according to Discogs/)
-    expect(sleeveSource(lp, { overrides: { '1': true } })).toMatch(/^Gatefold, marked by you/)
-  })
-
-  it('gives a multi-disc set one space per disc, gatefold or not', () => {
-    const lps = (qty: string, descriptions: string[] = ['LP']) =>
-      fake({
-        artist: 'A',
-        title: 'T',
-        formatText: ['Vinyl', ...descriptions].join(' · '),
-        formats: [{ name: 'Vinyl', qty, descriptions }],
-      })
-    expect(spaceUnitsOf(lps('2'))).toBe(2)
-    expect(spaceUnitsOf(lps('2', ['LP', 'Gatefold']))).toBe(2)
-    expect(spaceUnitsOf(lps('3'))).toBe(3)
-    expect(discCountOf(lps('nonsense'))).toBe(1)
-  })
-
-  it('does not count a bonus 7" or flexi tucked in an LP\'s sleeve', () => {
-    const bonus = fake({
-      artist: 'A',
-      title: 'T',
-      formatText: 'Vinyl · LP · Album / Vinyl · 7" · Single / Flexi-disc · 7"',
-      formats: [
-        { name: 'Vinyl', qty: '1', descriptions: ['LP', 'Album'] },
-        { name: 'Vinyl', qty: '1', descriptions: ['7"', 'Single'] },
-        { name: 'Flexi-disc', qty: '1', descriptions: ['7"'] },
-      ],
-    })
-    expect(discCountOf(bonus)).toBe(1)
-    expect(spaceUnitsOf(bonus)).toBe(1)
-    // A double 7" single still takes two.
-    const double7 = fake({
-      artist: 'A',
-      title: 'T',
-      formatText: 'Vinyl · 7"',
-      formats: [{ name: 'Vinyl', qty: '2', descriptions: ['7"'] }],
-    })
-    expect(discCountOf(double7)).toBe(2)
-  })
-
-  it('counts vinyl discs only in a mixed set', () => {
-    const record = fake({
-      artist: 'A',
-      title: 'T',
-      formatText: 'Vinyl · LP / CD · Album',
-      formats: [
-        { name: 'Vinyl', qty: '1', descriptions: ['LP'] },
-        { name: 'CD', qty: '2', descriptions: ['Album'] },
-      ],
-    })
-    expect(discCountOf(record)).toBe(1)
-    expect(spaceUnitsOf(record)).toBe(1)
-  })
-})
-
-describe('mentionsGatefold', () => {
-  it.each([
-    '180 Gram Heavyweight Vinyl\nGatefold sleeve.',
-    'Comes in a gate-fold cover',
-    'Gate fold jacket with lyrics',
-    'Pitman Pressing, Gatefold',
-    'Issued in gatefold jacket',
-    'Klappcover mit Textbeilage',
-    'Pochette ouvrante',
-    'Copertina apribile',
-    'Doble carpeta',
-    'Uitklaphoes',
-    'Fold-out cover with poster',
-    'Tri-fold sleeve',
-    '見開きジャケット',
-    // A denial in an earlier sentence doesn't carry over.
-    'Not on label. Gatefold sleeve.',
-  ])('finds a gatefold in "%s"', (text) => {
-    expect(mentionsGatefold(text)).toBe(true)
-  })
-
-  it.each([
-    'Printed inner sleeve. Includes a download voucher.',
-    'Unlike the original gatefold issue, this repress comes in a single sleeve.',
-    'Not a gatefold.',
-    'No gatefold on this pressing',
-    'Comes without the gatefold of the first edition',
-    'Includes a gatefold poster',
-    'With gatefold insert',
-    'Gatefold inner sleeve',
-    '',
-  ])('finds no gatefold in "%s"', (text) => {
-    expect(mentionsGatefold(text)).toBe(false)
-  })
-
-  it('reads a gatefold that a denied mention is followed by', () => {
-    expect(mentionsGatefold('Not the poster: the jacket is a gatefold.')).toBe(true)
-    expect(mentionsGatefold(undefined)).toBe(false)
-  })
-})
-
-describe('needsNotesCheck', () => {
-  it('only asks about single vinyl LPs that are not known yet', () => {
-    const lp = fake({ artist: 'A', title: 'T', id: 1, formatText: 'Vinyl · LP' })
-    expect(needsNotesCheck(lp)).toBe(true)
-    expect(needsNotesCheck(lp, { notes: { '1': '' } })).toBe(false)
-    // The user already decided; the notes can't change that.
-    expect(needsNotesCheck(lp, { overrides: { '1': false } })).toBe(false)
-    expect(needsNotesCheck(fake({ artist: 'A', title: 'T', formatText: 'Vinyl · LP · Gatefold' }))).toBe(false)
-    expect(needsNotesCheck(fake({ artist: 'A', title: 'T', formatText: 'CD · Album' }))).toBe(false)
-    expect(
-      needsNotesCheck(
-        fake({ artist: 'A', title: 'T', formatText: 'Vinyl · LP', formats: [{ name: 'Vinyl', qty: '2' }] }),
-      ),
-    ).toBe(false)
-  })
-})
-
 describe('planCabinet sorting', () => {
   // One artist: a 2015 reissue of a 1971 album, a 1980 album and an undated one.
-  const reissue = { ...fake({ id: 1, artist: 'The Band', title: 'Zulu', year: 2015 }), originalYear: 1971 }
-  const eighties = fake({ id: 2, artist: 'The Band', title: 'Alpha', year: 1980 })
-  const undated = { ...fake({ id: 3, artist: 'The Band', title: 'Mid', year: 0 }), originalYear: 0 }
-  const other = fake({ id: 4, artist: 'Abba', title: 'Waterloo', year: 1974 })
+  const reissue = { ...fakeRecord({ id: 1, artist: 'The Band', title: 'Zulu', year: 2015 }), originalYear: 1971 }
+  const eighties = fakeRecord({ id: 2, artist: 'The Band', title: 'Alpha', year: 1980 })
+  const undated = { ...fakeRecord({ id: 3, artist: 'The Band', title: 'Mid', year: 0 }), originalYear: 0 }
+  const other = fakeRecord({ id: 4, artist: 'Abba', title: 'Waterloo', year: 1974 })
   const shelf = (sort: 'chronological' | 'byName') =>
     planCabinet({
       releases: [undated, eighties, reissue, other],
@@ -367,12 +57,12 @@ describe('planCabinet sorting', () => {
 describe('planCabinet', () => {
   it('distributes a collection evenly across slots', () => {
     const releases = [
-      fake({ artist: 'A', title: 'a' }),
-      fake({ artist: 'B', title: 'b' }),
-      fake({ artist: 'C', title: 'c' }),
-      fake({ artist: 'D', title: 'd' }),
-      fake({ artist: 'E', title: 'e' }),
-      fake({ artist: 'F', title: 'f' }),
+      fakeRecord({ artist: 'A', title: 'a' }),
+      fakeRecord({ artist: 'B', title: 'b' }),
+      fakeRecord({ artist: 'C', title: 'c' }),
+      fakeRecord({ artist: 'D', title: 'd' }),
+      fakeRecord({ artist: 'E', title: 'e' }),
+      fakeRecord({ artist: 'F', title: 'f' }),
     ]
     const plan = planCabinet({ releases, cabinet: cabinetWith([10, 10, 10]) })
     expect(plan.slots.map((slot) => slot.records.length)).toEqual([2, 2, 2])
@@ -382,12 +72,12 @@ describe('planCabinet', () => {
 
   it('keeps an artist together even when that overshoots the even target', () => {
     const releases = [
-      fake({ id: 1, artist: 'A', title: 'a1', year: 2010 }),
-      fake({ artist: 'A', title: 'a2', year: 2011, id: 2 }),
-      fake({ artist: 'A', title: 'a3', year: 2012, id: 3 }),
-      fake({ artist: 'B', title: 'b1', id: 4 }),
-      fake({ artist: 'B', title: 'b2', id: 5 }),
-      fake({ artist: 'B', title: 'b3', id: 6 }),
+      fakeRecord({ id: 1, artist: 'A', title: 'a1', year: 2010 }),
+      fakeRecord({ artist: 'A', title: 'a2', year: 2011, id: 2 }),
+      fakeRecord({ artist: 'A', title: 'a3', year: 2012, id: 3 }),
+      fakeRecord({ artist: 'B', title: 'b1', id: 4 }),
+      fakeRecord({ artist: 'B', title: 'b2', id: 5 }),
+      fakeRecord({ artist: 'B', title: 'b3', id: 6 }),
     ]
     const plan = planCabinet({ releases, cabinet: cabinetWith([10, 10, 10]) })
     expect(plan.slots.map((slot) => keysIn(slot.records))).toEqual([
@@ -400,12 +90,12 @@ describe('planCabinet', () => {
 
   it('keeps size classes in separate slots', () => {
     const releases = [
-      fake({ artist: 'A', title: 'a', formatText: 'Vinyl · 12"' }),
-      fake({ artist: 'B', title: 'b', formatText: 'Vinyl · 12"' }),
-      fake({ artist: 'C', title: 'c', formatText: 'Vinyl · 12"' }),
-      fake({ artist: 'D', title: 'd', formatText: 'Vinyl · 7"' }),
-      fake({ artist: 'E', title: 'e', formatText: 'Vinyl · 7"' }),
-      fake({ artist: 'F', title: 'f', formatText: 'Vinyl · 7"' }),
+      fakeRecord({ artist: 'A', title: 'a', formatText: 'Vinyl · 12"' }),
+      fakeRecord({ artist: 'B', title: 'b', formatText: 'Vinyl · 12"' }),
+      fakeRecord({ artist: 'C', title: 'c', formatText: 'Vinyl · 12"' }),
+      fakeRecord({ artist: 'D', title: 'd', formatText: 'Vinyl · 7"' }),
+      fakeRecord({ artist: 'E', title: 'e', formatText: 'Vinyl · 7"' }),
+      fakeRecord({ artist: 'F', title: 'f', formatText: 'Vinyl · 7"' }),
     ]
     const plan = planCabinet({
       releases,
@@ -422,8 +112,8 @@ describe('planCabinet', () => {
     // sharing the last shelf; per size, the 12"s spread over two shelves and
     // the 7" gets the third.
     const releases = [
-      ...'ABCDEFGHIJK'.split('').map((artist) => fake({ artist, title: artist, formatText: 'Vinyl · LP' })),
-      fake({ artist: 'L', title: 'L', formatText: 'Vinyl · 7"' }),
+      ...'ABCDEFGHIJK'.split('').map((artist) => fakeRecord({ artist, title: artist, formatText: 'Vinyl · LP' })),
+      fakeRecord({ artist: 'L', title: 'L', formatText: 'Vinyl · 7"' }),
     ]
     const plan = planCabinet({
       releases,
@@ -442,7 +132,7 @@ describe('planCabinet', () => {
     // Three 12" and three 7" on shelves of 3, 2 and 1: the 12"s fill the
     // first shelf, the 7"s the other two.
     const releases = ['A', 'B', 'C', 'D', 'E', 'F'].map((artist, index) =>
-      fake({ artist, title: artist.toLowerCase(), formatText: index % 2 ? 'Vinyl · 7"' : 'Vinyl · 12"' }),
+      fakeRecord({ artist, title: artist.toLowerCase(), formatText: index % 2 ? 'Vinyl · 7"' : 'Vinyl · 12"' }),
     )
     const plan = planCabinet({
       releases,
@@ -459,10 +149,10 @@ describe('planCabinet', () => {
     // the real cabinet that showed the bug: every shelf is nearly full.
     const artist = (i: number) => `Artist ${String(i).padStart(3, '0')}`
     const lps = Array.from({ length: 430 }, (_, i) =>
-      fake({ artist: artist(i), title: 'lp', formatText: 'Vinyl · LP' }),
+      fakeRecord({ artist: artist(i), title: 'lp', formatText: 'Vinyl · LP' }),
     )
     const singles = Array.from({ length: 40 }, (_, i) =>
-      fake({ artist: artist(i * 3), title: 'single', formatText: 'Vinyl · 7"' }),
+      fakeRecord({ artist: artist(i * 3), title: 'single', formatText: 'Vinyl · 7"' }),
     )
     const plan = planCabinet({
       releases: [...singles, ...lps],
@@ -488,7 +178,7 @@ describe('planCabinet', () => {
     // Three 12" and three 7" on shelves of 4 and 2: the 7"s need three spaces
     // and the second shelf has two, so one 7" joins the 12"s.
     const releases = ['A', 'B', 'C', 'D', 'E', 'F'].map((artist, index) =>
-      fake({ artist, title: artist.toLowerCase(), formatText: index % 2 ? 'Vinyl · 7"' : 'Vinyl · 12"' }),
+      fakeRecord({ artist, title: artist.toLowerCase(), formatText: index % 2 ? 'Vinyl · 7"' : 'Vinyl · 12"' }),
     )
     const plan = planCabinet({
       releases,
@@ -513,10 +203,10 @@ describe('planCabinet', () => {
     // other, so only one shelf is mixed, not two (chaining all three put a
     // size boundary on each shelf).
     const releases = [
-      fake({ artist: 'C', title: 'c', formatText: 'Vinyl · LP' }),
-      fake({ artist: 'B', title: 'b', formatText: 'Vinyl · 10" · EP' }),
-      fake({ artist: 'D', title: 'd-lp', formatText: 'Vinyl · LP' }),
-      fake({ artist: 'D', title: 'd-cd', formatText: 'CD · Album' }),
+      fakeRecord({ artist: 'C', title: 'c', formatText: 'Vinyl · LP' }),
+      fakeRecord({ artist: 'B', title: 'b', formatText: 'Vinyl · 10" · EP' }),
+      fakeRecord({ artist: 'D', title: 'd-lp', formatText: 'Vinyl · LP' }),
+      fakeRecord({ artist: 'D', title: 'd-cd', formatText: 'CD · Album' }),
     ]
     const plan = planCabinet({
       releases,
@@ -538,12 +228,12 @@ describe('planCabinet', () => {
     // turn would leave only one-space gaps for the last gatefold; spreading
     // and back-filling places everything, so that layout wins.
     const releases = [
-      fake({ id: 1, artist: 'B', title: 'b1', formatText: 'CD · Album' }),
-      fake({ id: 2, artist: 'B', title: 'b2', formatText: 'CD · Album' }),
-      fake({ id: 3, artist: 'B', title: 'b3', formatText: 'CD · Album' }),
-      fake({ id: 4, artist: 'D', title: 'd1', year: 2001, formatText: 'Vinyl · LP · Gatefold' }),
-      fake({ id: 5, artist: 'D', title: 'd2', year: 2002, formatText: 'Vinyl · 7"' }),
-      fake({ id: 6, artist: 'D', title: 'd3', year: 2003, formatText: 'Vinyl · LP · Gatefold' }),
+      fakeRecord({ id: 1, artist: 'B', title: 'b1', formatText: 'CD · Album' }),
+      fakeRecord({ id: 2, artist: 'B', title: 'b2', formatText: 'CD · Album' }),
+      fakeRecord({ id: 3, artist: 'B', title: 'b3', formatText: 'CD · Album' }),
+      fakeRecord({ id: 4, artist: 'D', title: 'd1', year: 2001, formatText: 'Vinyl · LP · Gatefold' }),
+      fakeRecord({ id: 5, artist: 'D', title: 'd2', year: 2002, formatText: 'Vinyl · 7"' }),
+      fakeRecord({ id: 6, artist: 'D', title: 'd3', year: 2003, formatText: 'Vinyl · LP · Gatefold' }),
     ]
     const plan = planCabinet({ releases, cabinet: cabinetWith([1, 4, 2, 1]) })
     expect(plan.unplaced).toEqual([])
@@ -555,11 +245,11 @@ describe('planCabinet', () => {
     // gatefold LPs. Every layout that keeps the order strands a gatefold; the
     // size-skipping walk fits them all, so it wins, out of order as it is.
     const releases = [
-      fake({ id: 0, artist: 'C', title: 'c', year: 2000, formatText: 'CD · Album' }),
-      fake({ id: 1, artist: 'D', title: 'd1', year: 2001, formatText: 'Vinyl · LP · Gatefold' }),
-      fake({ id: 2, artist: 'A', title: 'a-cd', year: 2002, formatText: 'CD · Album' }),
-      fake({ id: 3, artist: 'D', title: 'd3', year: 2003, formatText: 'Vinyl · LP · Gatefold' }),
-      fake({ id: 4, artist: 'A', title: 'a-lp', year: 2004, formatText: 'Vinyl · LP' }),
+      fakeRecord({ id: 0, artist: 'C', title: 'c', year: 2000, formatText: 'CD · Album' }),
+      fakeRecord({ id: 1, artist: 'D', title: 'd1', year: 2001, formatText: 'Vinyl · LP · Gatefold' }),
+      fakeRecord({ id: 2, artist: 'A', title: 'a-cd', year: 2002, formatText: 'CD · Album' }),
+      fakeRecord({ id: 3, artist: 'D', title: 'd3', year: 2003, formatText: 'Vinyl · LP · Gatefold' }),
+      fakeRecord({ id: 4, artist: 'A', title: 'a-lp', year: 2004, formatText: 'Vinyl · LP' }),
     ]
     const plan = planCabinet({
       releases,
@@ -573,10 +263,10 @@ describe('planCabinet', () => {
   it('places everything in a tight cabinet without size separation', () => {
     // 6 spaces of records in 6, A–Z within each artist, two of them gatefolds.
     const releases = [
-      fake({ id: 1, artist: 'A', title: 'a4', formatText: 'Vinyl · LP · Gatefold' }),
-      fake({ id: 2, artist: 'B', title: 'b3', formatText: 'Vinyl · LP' }),
-      fake({ id: 3, artist: 'C', title: 'c1', formatText: 'Vinyl · LP' }),
-      fake({ id: 4, artist: 'C', title: 'c2', formatText: 'Vinyl · LP · Gatefold' }),
+      fakeRecord({ id: 1, artist: 'A', title: 'a4', formatText: 'Vinyl · LP · Gatefold' }),
+      fakeRecord({ id: 2, artist: 'B', title: 'b3', formatText: 'Vinyl · LP' }),
+      fakeRecord({ id: 3, artist: 'C', title: 'c1', formatText: 'Vinyl · LP' }),
+      fakeRecord({ id: 4, artist: 'C', title: 'c2', formatText: 'Vinyl · LP · Gatefold' }),
     ]
     const plan = planCabinet({
       releases,
@@ -593,11 +283,11 @@ describe('planCabinet', () => {
     // get the second shelf: the LPs (A–Z), then A's singles (A–Z), share the
     // first.
     const releases = [
-      fake({ artist: 'A', title: 'zebra', year: 1970, formatText: 'Vinyl · LP' }),
-      fake({ artist: 'A', title: 'apple', year: 1980, formatText: 'Vinyl · LP' }),
-      fake({ artist: 'B', title: 'b-lp', year: 1990, formatText: 'Vinyl · LP' }),
-      fake({ artist: 'A', title: 'yellow', year: 1971, formatText: 'Vinyl · 7"' }),
-      fake({ artist: 'A', title: 'banana', year: 1985, formatText: 'Vinyl · 7"' }),
+      fakeRecord({ artist: 'A', title: 'zebra', year: 1970, formatText: 'Vinyl · LP' }),
+      fakeRecord({ artist: 'A', title: 'apple', year: 1980, formatText: 'Vinyl · LP' }),
+      fakeRecord({ artist: 'B', title: 'b-lp', year: 1990, formatText: 'Vinyl · LP' }),
+      fakeRecord({ artist: 'A', title: 'yellow', year: 1971, formatText: 'Vinyl · 7"' }),
+      fakeRecord({ artist: 'A', title: 'banana', year: 1985, formatText: 'Vinyl · 7"' }),
     ]
     const layout = (sort: 'byName' | 'chronological') =>
       planCabinet({
@@ -612,14 +302,14 @@ describe('planCabinet', () => {
   it('sets a record bigger than every shelf aside, and lays out the rest as usual', () => {
     // A 12-LP box set on shelves of 6 fits nowhere. It counts as without a
     // shelf, and doesn't push the records after it out of order.
-    const lps = 'ABCDEFGHI'.split('').map((artist) => fake({ artist, title: artist, formatText: 'Vinyl · LP' }))
-    const box = fake({
+    const lps = 'ABCDEFGHI'.split('').map((artist) => fakeRecord({ artist, title: artist, formatText: 'Vinyl · LP' }))
+    const box = fakeRecord({
       artist: 'E',
       title: 'box',
       formatText: 'Vinyl · LP · Box Set',
       formats: [{ name: 'Vinyl', qty: '12', descriptions: ['LP'] }],
     })
-    const singles = ['S', 'T'].map((artist) => fake({ artist, title: artist, formatText: 'Vinyl · 7"' }))
+    const singles = ['S', 'T'].map((artist) => fakeRecord({ artist, title: artist, formatText: 'Vinyl · 7"' }))
     const plan = planCabinet({
       releases: [...lps, box, ...singles],
       cabinet: cabinetWith([6, 6, 6]),
@@ -635,7 +325,7 @@ describe('planCabinet', () => {
     // 26 LPs on shelves of 21 and 12: an equal share (13) is more than the
     // small shelf holds, so the share follows each shelf's size instead.
     const releases = Array.from({ length: 26 }, (_, i) =>
-      fake({ artist: `A${String(i).padStart(2, '0')}`, title: 't', formatText: 'Vinyl · LP' }),
+      fakeRecord({ artist: `A${String(i).padStart(2, '0')}`, title: 't', formatText: 'Vinyl · LP' }),
     )
     const plan = planCabinet({ releases, cabinet: cabinetWith([21, 12]) })
     expect(plan.conflicts).toEqual([])
@@ -648,10 +338,10 @@ describe('planCabinet', () => {
     // at the end). Two layouts place everything in order; the one with one
     // mixed shelf wins over the one with two.
     const releases = [
-      fake({ id: 0, artist: 'ABBA', title: 'The D', year: 0, formatText: 'CD · Album' }),
-      fake({ id: 1, artist: 'ABBA', title: 'C', year: 1980, formatText: 'Vinyl · LP · Gatefold' }),
-      fake({ id: 2, artist: 'ABBA', title: 'C', year: 0, formatText: 'Vinyl · LP · Gatefold' }),
-      fake({ id: 3, artist: 'ABBA', title: 'B', year: 1980, formatText: 'Vinyl · 10"' }),
+      fakeRecord({ id: 0, artist: 'ABBA', title: 'The D', year: 0, formatText: 'CD · Album' }),
+      fakeRecord({ id: 1, artist: 'ABBA', title: 'C', year: 1980, formatText: 'Vinyl · LP · Gatefold' }),
+      fakeRecord({ id: 2, artist: 'ABBA', title: 'C', year: 0, formatText: 'Vinyl · LP · Gatefold' }),
+      fakeRecord({ id: 3, artist: 'ABBA', title: 'B', year: 1980, formatText: 'Vinyl · 10"' }),
     ]
     const plan = planCabinet({
       releases,
@@ -668,7 +358,7 @@ describe('planCabinet', () => {
     // Shelves of 5 and 5, with a gatefold (2 spaces) among nine records: keeping
     // to an even share leaves Z no room on shelf 2, so it fills the gap on shelf 1.
     const releases = 'ABCDEFGHZ'.split('').map((artist) =>
-      fake({ artist, title: artist, formatText: artist === 'E' ? 'Vinyl · LP · Gatefold' : 'Vinyl · LP' }),
+      fakeRecord({ artist, title: artist, formatText: artist === 'E' ? 'Vinyl · LP · Gatefold' : 'Vinyl · LP' }),
     )
     const plan = planCabinet({ releases, cabinet: cabinetWith([5, 5]) })
     expect(plan.unplaced).toEqual([])
@@ -690,7 +380,7 @@ describe('planCabinet', () => {
     expect(groupReleases([split])).toHaveLength(2)
 
     const display = toDisplayRelease(split)
-    const others = [fake({ artist: 'Abba', title: 'a' }), fake({ artist: 'Yes', title: 'y' })]
+    const others = [fakeRecord({ artist: 'Abba', title: 'a' }), fakeRecord({ artist: 'Yes', title: 'y' })]
     const plan = planCabinet({ releases: [...others, display], cabinet: cabinetWith([10]) })
     const filed = plan.slots[0].records.map((record) => record.display.artistName)
     expect(filed).toEqual(['Abba', 'Yes', 'Zappa'])
@@ -698,7 +388,7 @@ describe('planCabinet', () => {
   })
 
   it('reports nothing out of order when every record follows the order', () => {
-    const releases = 'ABCDEF'.split('').map((artist) => fake({ artist, title: artist }))
+    const releases = 'ABCDEF'.split('').map((artist) => fakeRecord({ artist, title: artist }))
     const plan = planCabinet({ releases, cabinet: cabinetWith([3, 3]) })
     expect(plan.conflicts).toEqual([])
   })
@@ -712,8 +402,8 @@ describe('planCabinet', () => {
 
   it('does not warn about mixed sizes when they are not kept apart', () => {
     const releases = [
-      fake({ artist: 'A', title: 'a', formatText: 'Vinyl · 12"' }),
-      fake({ artist: 'B', title: 'b', formatText: 'Vinyl · 7"' }),
+      fakeRecord({ artist: 'A', title: 'a', formatText: 'Vinyl · 12"' }),
+      fakeRecord({ artist: 'B', title: 'b', formatText: 'Vinyl · 7"' }),
     ]
     const plan = planCabinet({
       releases,
@@ -725,7 +415,7 @@ describe('planCabinet', () => {
   })
 
   it('places every record when the cabinet has no slots', () => {
-    const releases = [fake({ artist: 'A', title: 'a' })]
+    const releases = [fakeRecord({ artist: 'A', title: 'a' })]
     const plan = planCabinet({ releases, cabinet: { id: 'c', name: 'C', slots: [] } })
     expect(plan.unplaced).toHaveLength(1)
     expect(plan.conflicts).toEqual([{ type: 'unplaced', count: 1 }])
@@ -733,7 +423,7 @@ describe('planCabinet', () => {
 
   it('reports records that do not fit as unplaced', () => {
     const releases = [1, 2, 3, 4, 5].map((id) =>
-      fake({ artist: `Artist ${id}`, title: `t${id}`, id }),
+      fakeRecord({ artist: `Artist ${id}`, title: `t${id}`, id }),
     )
     const plan = planCabinet({ releases, cabinet: cabinetWith([3]) })
     expect(plan.slots[0].records).toHaveLength(3)
@@ -743,7 +433,7 @@ describe('planCabinet', () => {
 
   it('fills every shelf before reporting records as unplaced', () => {
     const releases = Array.from({ length: 391 }, (_, index) =>
-      fake({ id: index + 1, artist: `Artist ${String(index).padStart(3, '0')}`, title: `t${index}` }),
+      fakeRecord({ id: index + 1, artist: `Artist ${String(index).padStart(3, '0')}`, title: `t${index}` }),
     )
 
     const one = planCabinet({ releases, cabinet: cabinetWith([70]) })
@@ -760,10 +450,10 @@ describe('planCabinet', () => {
 
   it('groups size classes even when artists interleave sizes', () => {
     const releases = [
-      fake({ id: 1, artist: 'A', title: 'a12', formatText: 'Vinyl · 12"' }),
-      fake({ id: 2, artist: 'A', title: 'a7', formatText: 'Vinyl · 7"' }),
-      fake({ id: 3, artist: 'B', title: 'b12', formatText: 'Vinyl · 12"' }),
-      fake({ id: 4, artist: 'B', title: 'b7', formatText: 'Vinyl · 7"' }),
+      fakeRecord({ id: 1, artist: 'A', title: 'a12', formatText: 'Vinyl · 12"' }),
+      fakeRecord({ id: 2, artist: 'A', title: 'a7', formatText: 'Vinyl · 7"' }),
+      fakeRecord({ id: 3, artist: 'B', title: 'b12', formatText: 'Vinyl · 12"' }),
+      fakeRecord({ id: 4, artist: 'B', title: 'b7', formatText: 'Vinyl · 7"' }),
     ]
     const plan = planCabinet({
       releases,
@@ -778,9 +468,9 @@ describe('planCabinet', () => {
 
   it('keeps shelves in artist order when a shelf is added', () => {
     const releases = [
-      fake({ id: 1, artist: 'A', title: 'a', formatText: 'Vinyl · 7"' }),
-      fake({ id: 2, artist: 'B', title: 'b', formatText: 'Vinyl · 12"' }),
-      fake({ id: 3, artist: 'C', title: 'c', formatText: 'Vinyl · 12"' }),
+      fakeRecord({ id: 1, artist: 'A', title: 'a', formatText: 'Vinyl · 7"' }),
+      fakeRecord({ id: 2, artist: 'B', title: 'b', formatText: 'Vinyl · 12"' }),
+      fakeRecord({ id: 3, artist: 'C', title: 'c', formatText: 'Vinyl · 12"' }),
     ]
 
     const one = planCabinet({ releases, cabinet: cabinetWith([2]) })
@@ -800,8 +490,8 @@ describe('planCabinet', () => {
 
   it('starts a size-separated layout with the earliest class', () => {
     const releases = [
-      fake({ id: 1, artist: 'B', title: 'b12', formatText: 'Vinyl · 12"' }),
-      fake({ id: 2, artist: 'A', title: 'a7', formatText: 'Vinyl · 7"' }),
+      fakeRecord({ id: 1, artist: 'B', title: 'b12', formatText: 'Vinyl · 12"' }),
+      fakeRecord({ id: 2, artist: 'A', title: 'a7', formatText: 'Vinyl · 7"' }),
     ]
     const plan = planCabinet({
       releases,
@@ -814,14 +504,14 @@ describe('planCabinet', () => {
 
   it('reuses spare shelf space before leaving records unplaced', () => {
     const releases = [
-      fake({ id: 1, artist: 'A', title: 'a', formatText: 'Vinyl · 12"' }),
-      fake({ id: 2, artist: 'B', title: 'b', formatText: 'Vinyl · 12"' }),
-      fake({ id: 3, artist: 'C', title: 'c', formatText: 'Vinyl · 12"' }),
+      fakeRecord({ id: 1, artist: 'A', title: 'a', formatText: 'Vinyl · 12"' }),
+      fakeRecord({ id: 2, artist: 'B', title: 'b', formatText: 'Vinyl · 12"' }),
+      fakeRecord({ id: 3, artist: 'C', title: 'c', formatText: 'Vinyl · 12"' }),
       ...[4, 5, 6, 7, 8, 9, 10, 11].map((id) =>
-        fake({ id, artist: `S${id}`, title: `s${id}`, formatText: 'Vinyl · 7"' }),
+        fakeRecord({ id, artist: `S${id}`, title: `s${id}`, formatText: 'Vinyl · 7"' }),
       ),
       ...[12, 13, 14, 15].map((id) =>
-        fake({ id, artist: `O${id}`, title: `o${id}`, formatText: 'CD · Album' }),
+        fakeRecord({ id, artist: `O${id}`, title: `o${id}`, formatText: 'CD · Album' }),
       ),
     ]
     const plan = planCabinet({
@@ -841,9 +531,9 @@ describe('planCabinet', () => {
 
   it('reports an artist split across slots', () => {
     const releases = [
-      fake({ artist: 'A', title: 'a1', id: 1 }),
-      fake({ artist: 'A', title: 'a2', id: 2 }),
-      fake({ artist: 'A', title: 'a3', id: 3 }),
+      fakeRecord({ artist: 'A', title: 'a1', id: 1 }),
+      fakeRecord({ artist: 'A', title: 'a2', id: 2 }),
+      fakeRecord({ artist: 'A', title: 'a3', id: 3 }),
     ]
     const plan = planCabinet({ releases, cabinet: cabinetWith([2, 2]) })
     expect(plan.slots.map((slot) => slot.records.length)).toEqual([2, 1])
@@ -852,10 +542,10 @@ describe('planCabinet', () => {
 
   it('does not call an artist split when only the kept-apart sizes divide them', () => {
     const releases = [
-      fake({ artist: 'A', title: 'lp1', formatText: 'Vinyl · 12"' }),
-      fake({ artist: 'A', title: 'lp2', formatText: 'Vinyl · 12"' }),
-      fake({ artist: 'A', title: 'single', formatText: 'Vinyl · 7"' }),
-      fake({ artist: 'B', title: 'b', formatText: 'Vinyl · 7"' }),
+      fakeRecord({ artist: 'A', title: 'lp1', formatText: 'Vinyl · 12"' }),
+      fakeRecord({ artist: 'A', title: 'lp2', formatText: 'Vinyl · 12"' }),
+      fakeRecord({ artist: 'A', title: 'single', formatText: 'Vinyl · 7"' }),
+      fakeRecord({ artist: 'B', title: 'b', formatText: 'Vinyl · 7"' }),
     ]
     const options = { sort: 'chronological' as const, separateSizeClasses: true }
     const plan = planCabinet({ releases, cabinet: cabinetWith([10, 10]), options })
@@ -873,10 +563,10 @@ describe('planCabinet', () => {
 
   it('still reports an artist whose records of one size cross shelves', () => {
     const releases = [
-      fake({ artist: 'A', title: 'lp1', formatText: 'Vinyl · 12"' }),
-      fake({ artist: 'A', title: 'lp2', formatText: 'Vinyl · 12"' }),
-      fake({ artist: 'A', title: 'lp3', formatText: 'Vinyl · 12"' }),
-      fake({ artist: 'A', title: 'single', formatText: 'Vinyl · 7"' }),
+      fakeRecord({ artist: 'A', title: 'lp1', formatText: 'Vinyl · 12"' }),
+      fakeRecord({ artist: 'A', title: 'lp2', formatText: 'Vinyl · 12"' }),
+      fakeRecord({ artist: 'A', title: 'lp3', formatText: 'Vinyl · 12"' }),
+      fakeRecord({ artist: 'A', title: 'single', formatText: 'Vinyl · 7"' }),
     ]
     const plan = planCabinet({
       releases,
@@ -888,7 +578,7 @@ describe('planCabinet', () => {
   })
 
   it('fills shelves by the sleeves it learns from the notes', () => {
-    const releases = [1, 2, 3].map((id) => fake({ artist: 'A', title: `a${id}`, id, formatText: 'Vinyl · LP' }))
+    const releases = [1, 2, 3].map((id) => fakeRecord({ artist: 'A', title: `a${id}`, id, formatText: 'Vinyl · LP' }))
     const cabinet = cabinetWith([3])
     expect(planCabinet({ releases, cabinet }).unplaced).toEqual([])
     const plan = planCabinet({ releases, cabinet, sleeves: { notes: { '1': 'Gatefold sleeve.' } } })
@@ -898,9 +588,9 @@ describe('planCabinet', () => {
 
   it('counts a gatefold as two spaces against shelf capacity', () => {
     const releases = [
-      fake({ id: 1, artist: 'A', title: 'gatefold', formatText: 'Vinyl · 12" · Gatefold' }),
-      fake({ id: 2, artist: 'B', title: 'normal' }),
-      fake({ id: 3, artist: 'C', title: 'overflow' }),
+      fakeRecord({ id: 1, artist: 'A', title: 'gatefold', formatText: 'Vinyl · 12" · Gatefold' }),
+      fakeRecord({ id: 2, artist: 'B', title: 'normal' }),
+      fakeRecord({ id: 3, artist: 'C', title: 'overflow' }),
     ]
     const plan = planCabinet({ releases, cabinet: cabinetWith([3]) })
     expect(plan.slots[0].used).toBe(3)
@@ -910,7 +600,7 @@ describe('planCabinet', () => {
 
   it('leaves a gatefold unplaced when no shelf has room for both spaces', () => {
     const releases = [
-      fake({ id: 1, artist: 'A', title: 'gatefold', formatText: 'Vinyl · 12" · Gatefold' }),
+      fakeRecord({ id: 1, artist: 'A', title: 'gatefold', formatText: 'Vinyl · 12" · Gatefold' }),
     ]
     const plan = planCabinet({ releases, cabinet: cabinetWith([1, 1]) })
     expect(plan.unplaced).toEqual([releases[0]])
@@ -918,8 +608,8 @@ describe('planCabinet', () => {
 
   it('leaves the caller collection untouched', () => {
     const releases = [
-      fake({ artist: 'B', title: 'b', id: 1 }),
-      fake({ artist: 'A', title: 'a', id: 2 }),
+      fakeRecord({ artist: 'B', title: 'b', id: 1 }),
+      fakeRecord({ artist: 'A', title: 'a', id: 2 }),
     ]
     const before = [...releases]
     planCabinet({ releases, cabinet: cabinetWith([5, 5]) })
@@ -928,8 +618,8 @@ describe('planCabinet', () => {
 
   it('orders slot contents by the selected mode', () => {
     const releases = [
-      fake({ artist: 'A', title: 'Zebra', id: 1 }),
-      fake({ artist: 'A', title: 'Apple', id: 2 }),
+      fakeRecord({ artist: 'A', title: 'Zebra', id: 1 }),
+      fakeRecord({ artist: 'A', title: 'Apple', id: 2 }),
     ]
     const plan = planCabinet({
       releases,

@@ -212,7 +212,7 @@ Every change is checked with `npm run build && npm test`; CI runs the same on ea
     ├── hooks/                           # collection sync, cabinet, tracklists, dialogs, …
     ├── utils/                           # filing sort, grouping and filters, the shelf planner
     ├── components/                      # screens and cards
-    └── theme.ts + styles.css            # CSS-variable themes and all styles
+    └── theme.ts + styles/               # CSS-variable themes, one stylesheet per area
 ```
 
 Architecture notes for contributors live in [`AGENTS.md`](AGENTS.md).

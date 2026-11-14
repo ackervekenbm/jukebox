@@ -9,14 +9,14 @@ import { makeSortKey } from '../utils/sortName'
 import * as store from '../db/cabinet'
 import * as syncApi from '../api/sync'
 import type { CabinetDoc, LegacyCabinetDoc } from '../shared/cabinetDoc'
+import { useCabinet } from './useCabinet'
 import {
   buildCabinetDoc,
   defaultCabinet,
   nextSlotId,
   rebaseCabinetDoc,
-  useCabinet,
   withUniqueSlotIds,
-} from './useCabinet'
+} from '../utils/cabinetModel'
 
 // The release-notes scan has its own tests; here it reports whatever notes the
 // test sets, and never touches the network.

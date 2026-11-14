@@ -1,0 +1,460 @@
+/* Settings card, Advanced storage figures and the info tooltip. */
+
+/* ---------- Settings ---------- */
+
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: grid;
+  place-items: center;
+  padding: calc(20px + env(safe-area-inset-top, 0px))
+    calc(20px + env(safe-area-inset-right, 0px))
+    calc(20px + env(safe-area-inset-bottom, 0px))
+    calc(20px + env(safe-area-inset-left, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: 50;
+  /* Same viewport clamp as the detail overlay (issue #112): a wide row must
+     not let the auto column size the card past the padded viewport. */
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.settings-overlay-content {
+  width: 100%;
+  min-width: 0;
+  max-width: 600px;
+}
+
+.settings-card {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: var(--card-head) var(--close-inset) 22px;
+  max-height: calc(
+    100vh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  /* 100dvh excludes iOS Safari's toolbar, so the bottom stays visible. */
+  max-height: calc(
+    100dvh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+.settings-logo {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  background-clip: padding-box;
+  border: 6px solid var(--bg);
+  display: grid;
+  place-items: center;
+}
+
+.settings-card h1 {
+  margin: 8px 0 4px;
+  text-align: center;
+  font-size: 26px;
+  letter-spacing: 0.01em;
+  font-family: var(--font-display);
+}
+
+.settings-sub {
+  margin: 0 0 6px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.settings-build {
+  margin: 18px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-faint);
+  line-height: 1.5;
+}
+
+.settings-build a {
+  color: var(--text-faint);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.settings-build a:hover {
+  color: var(--text-dim);
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.settings-form input {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 15px;
+}
+
+.settings-form button[type='submit'] {
+  margin-top: 6px;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: none;
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+
+.settings-form button[type='submit']:hover {
+  filter: brightness(1.08);
+}
+
+.settings-help {
+  color: var(--text-faint);
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.settings-help a {
+  color: var(--accent-text);
+}
+
+.secondary-btn {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.secondary-btn.danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+
+.secondary-btn.danger:hover {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.theme-section {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.theme-heading {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.theme-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.picker-skip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.picker-skip input {
+  width: 74px;
+  text-align: center;
+  padding: 8px 6px;
+  border-radius: 10px;
+}
+
+.picker-skip input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.settings-refresh {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.setting-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.setting-toggle input {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.theme-section .settings-help {
+  display: block;
+  margin-top: 8px;
+}
+
+.theme-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 6px 7px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  width: 74px;
+}
+
+.theme-chip:hover {
+  border-color: var(--accent-strong);
+}
+
+.theme-chip.active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.theme-swatch {
+  width: 42px;
+  height: 42px;
+  border-radius: 9px;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  display: grid;
+  place-items: center;
+}
+
+.theme-swatch-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.theme-label {
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* ---------- Advanced / storage diagnostics ---------- */
+
+.advanced-section {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.advanced-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.advanced-toggle:hover {
+  background: transparent;
+}
+
+.advanced-body {
+  margin-top: 12px;
+  padding: 18px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+/* -- stats rows ---------------------------------------------------------- */
+
+.stats-wrap {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.stats-block + .stats-block {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.stats-block h3 {
+  margin: 0 0 10px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+.stats-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.stats-label {
+  color: var(--text-dim);
+}
+
+.stats-value {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.stats-sub {
+  padding-left: 14px;
+}
+
+.stats-sub .stats-label,
+.stats-sub .stats-value {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.stats-bar {
+  height: 8px;
+  margin: 8px 0 12px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  overflow: hidden;
+}
+
+.stats-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+.stats-bar-fill.warn {
+  background: var(--accent-strong);
+}
+
+.stats-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.45;
+}
+
+.stats-note.error {
+  color: var(--danger);
+}
+
+.advanced-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+/* -- info tooltip -------------------------------------------------------- */
+
+.info-holder {
+  position: relative;
+  display: inline-block;
+}
+
+.info-trigger {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin: 0 0 2px 6px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--text-faint);
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: help;
+}
+
+.info-trigger:hover {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.info-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: 230px;
+  z-index: 10;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+}
+
+.info-bubble::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--border);
+}
+
+.storage-action-btn {
+  display: block;
+  margin: 12px auto 0;
+}

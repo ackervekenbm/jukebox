@@ -4,7 +4,10 @@
 import type {
   DiscogsArtistRef,
   DiscogsCollectionRelease,
+  DiscogsFormat,
 } from '../types/discogs'
+import type { DisplayRelease } from '../utils/collection'
+import { makeSortKey } from '../utils/sortName'
 
 export function artist(ref: Partial<DiscogsArtistRef> = {}): DiscogsArtistRef {
   return {
@@ -43,5 +46,49 @@ export function release(
       formats: [{ name: 'LP', qty: '1', descriptions: ['Album'] }],
     },
     ...override,
+  }
+}
+
+interface FakeInput {
+  artist: string
+  title: string
+  id?: number
+  year?: number
+  formatText?: string
+  /** Raw formats; by default one format named like the start of formatText. */
+  formats?: DiscogsFormat[]
+}
+
+let counter = 0
+
+/** A collection record shaped for the shelf planner and the physical-facts checks. */
+export function fakeRecord(input: FakeInput): DisplayRelease {
+  const id = input.id ?? ++counter
+  const year = input.year ?? 2020
+  const formatText = input.formatText ?? 'Vinyl · 12" · LP'
+  return {
+    key: `${id}-${id}`,
+    instanceId: id,
+    id,
+    title: input.title,
+    titleKey: makeSortKey(input.title),
+    year,
+    originalYear: year,
+    artistName: input.artist,
+    genres: [],
+    styles: [],
+    labels: [],
+    country: '',
+    // Like real data: the format name is what the format text starts with.
+    formatNames: [formatText.split(' · ')[0]],
+    formatText,
+    coverImage: '',
+    thumb: '',
+    release: {
+      basic_information: {
+        formats: input.formats ?? [{ name: formatText.split(' · ')[0], qty: '1' }],
+      },
+    } as unknown as DiscogsCollectionRelease,
+    dateAdded: '2024-01-01T00:00:00-00:00',
   }
 }

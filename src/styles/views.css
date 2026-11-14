@@ -1,0 +1,388 @@
+/* Saved views menu. */
+
+/* ---------- Saved views ---------- */
+
+.views-toggle-label {
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The button stands in for the name of the view in use, so it carries the
+   active accent itself. */
+.views-toggle.edited {
+  border-color: var(--accent-strong);
+  border-style: dashed;
+}
+
+.views-toggle.edited .views-toggle-label::after {
+  content: ' *';
+  color: var(--accent-text);
+}
+
+.views-panel {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 10px 0 4px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.22);
+}
+
+.views-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.views-panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.views-panel-hint-inline {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.views-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+}
+
+.views-notice-text {
+  font-size: 13px;
+  color: var(--text);
+  min-width: 0;
+}
+
+.views-notice-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.views-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 264px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.views-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: var(--bg-elevated);
+}
+
+.views-row.current {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-elevated));
+}
+
+.views-apply {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+}
+
+.views-apply:hover {
+  background: transparent;
+}
+
+.views-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.views-row.current .views-name {
+  color: var(--accent-text);
+}
+
+.views-desc {
+  font-size: 12px;
+  color: var(--text-faint);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.views-count {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  min-width: 3.2em;
+  text-align: right;
+}
+
+/* Muted at rest so the list stays calm, but never hidden: they are the only
+   way to reach rename/delete, and hoverless pointers can't reveal anything. */
+.views-row-actions {
+  display: flex;
+  gap: 2px;
+  flex: 0 0 auto;
+  opacity: 0.6;
+  transition: opacity 120ms ease;
+}
+
+.views-row:hover .views-row-actions,
+.views-row:focus-within .views-row-actions {
+  opacity: 1;
+}
+
+.views-icon-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  border-radius: 8px;
+}
+
+.views-icon-btn:hover {
+  background: var(--panel-hover);
+  color: var(--text);
+}
+
+.views-rename {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.views-rename-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  padding: 6px 9px;
+  border-color: var(--accent-strong);
+}
+
+.views-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.views-confirm-text {
+  font-size: 13px;
+  color: var(--text);
+  min-width: 0;
+}
+
+.views-mini-btn {
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.views-mini-btn:hover {
+  background: var(--panel-hover);
+  color: var(--text);
+}
+
+.views-mini-btn.primary {
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--on-accent);
+}
+
+/* Each theme pairs its hover fill with a text colour that reads on it. */
+.views-mini-btn.primary:hover,
+.views-save-btn:hover:not(:disabled) {
+  background: var(--accent-fill-hover);
+  border-color: var(--accent-fill-hover);
+  color: var(--on-accent-hover);
+}
+
+.views-mini-btn.danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+
+.views-mini-btn.danger:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+}
+
+.views-save {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.views-save-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.views-save-row {
+  display: flex;
+  gap: 8px;
+}
+
+.views-save-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.views-save-btn {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--on-accent);
+}
+
+/* A half-transparent accent reads as "on" rather than "off", so an inert save
+   button drops the accent altogether instead of leaning on opacity. */
+.views-save-btn:disabled {
+  opacity: 1;
+  background: var(--bg-elevated);
+  border-color: var(--border);
+  color: var(--text-faint);
+}
+
+.views-hint,
+.views-error {
+  margin: 7px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-faint);
+}
+
+.views-error {
+  color: var(--danger);
+}
+
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.filter-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.filter-panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.filter-reset {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.filter-field-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 5px;
+}
+
+.filter-field select {
+  width: 100%;
+  background: var(--bg-elevated);
+  font-size: 14px;
+}
+
+.filter-year-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-year-row input {
+  width: 100%;
+  background: var(--bg-elevated);
+  font-size: 14px;
+}
+
+.filter-year-sep {
+  color: var(--text-faint);
+  font-size: 14px;
+}
+
+.summary {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin: 4px 0 14px;
+}
+
+.summary p {
+  margin: 0;
+}
