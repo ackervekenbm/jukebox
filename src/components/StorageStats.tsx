@@ -32,6 +32,7 @@ export function StorageStats({ username, onClearData }: StorageStatsProps) {
   const [error, setError] = useState<string | null>(null)
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const [persistInfoOpen, setPersistInfoOpen] = useState(false)
+  const [confirmingClear, setConfirmingClear] = useState(false)
   const mountedRef = useRef(true)
 
   const load = useCallback(async () => {
@@ -251,21 +252,53 @@ export function StorageStats({ username, onClearData }: StorageStatsProps) {
           {/* -------------------------------------------------------------- */}
           {/*  Actions                                                        */}
           {/* -------------------------------------------------------------- */}
-          <div className="storage-block advanced-actions">
-            <button type="button" className="secondary-btn" onClick={handleClearTracklists}>
-              Clear tracklists
-            </button>
-            {cacheReadable && (
-              <button type="button" className="secondary-btn" onClick={handleClearArt}>
-                Clear album art
+          {confirmingClear && onClearData ? (
+            <div className="storage-block storage-confirm" role="group" aria-label="Clear everything?">
+              <p className="storage-confirm-text">
+                This removes everything Jukebox keeps in this browser and signs you out. Your
+                cabinet on the server stays.
+              </p>
+              {stats.indexedDb.cabinet?.unsynced && (
+                <p className="storage-confirm-text storage-confirm-warning">
+                  Your latest cabinet changes haven't reached the server yet and will be lost.
+                </p>
+              )}
+              <div className="advanced-actions">
+                {/* Cancel first and focused: the safe choice is the default one. */}
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => setConfirmingClear(false)}
+                  autoFocus
+                >
+                  Cancel
+                </button>
+                <button type="button" className="secondary-btn danger" onClick={onClearData}>
+                  Clear everything
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="storage-block advanced-actions">
+              <button type="button" className="secondary-btn" onClick={handleClearTracklists}>
+                Clear tracklists
               </button>
-            )}
-            {onClearData && (
-              <button type="button" className="secondary-btn danger" onClick={onClearData}>
-                Clear everything
-              </button>
-            )}
-          </div>
+              {cacheReadable && (
+                <button type="button" className="secondary-btn" onClick={handleClearArt}>
+                  Clear album art
+                </button>
+              )}
+              {onClearData && (
+                <button
+                  type="button"
+                  className="secondary-btn danger"
+                  onClick={() => setConfirmingClear(true)}
+                >
+                  Clear everything…
+                </button>
+              )}
+            </div>
+          )}
         </>
       )}
     </section>

@@ -239,7 +239,8 @@ describe('grouped pressings', () => {
 
     await user.click(screen.getByRole('button', { name: 'Settings' }))
     await user.click(await screen.findByRole('button', { name: 'Advanced' }))
-    await user.click(await screen.findByRole('button', { name: 'Clear everything' }))
+    await user.click(await screen.findByRole('button', { name: 'Clear everything…' }))
+    await user.click(screen.getByRole('button', { name: 'Clear everything' }))
 
     await waitFor(() => expect(localStorage.getItem(PREFS_KEY)).toBeNull())
     expect(await screen.findByLabelText(/Discogs username/)).toBeInTheDocument()

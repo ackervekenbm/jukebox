@@ -89,6 +89,8 @@ export interface CabinetStat {
   slots: number
   /** Gatefold calls the user made themselves. */
   sleeveCalls: number
+  /** Local edits that haven't reached the server yet. */
+  unsynced: boolean
 }
 
 export interface IndexedDbStat {
@@ -141,6 +143,7 @@ export async function scanIndexedDb(username: string): Promise<IndexedDbStat> {
       ? {
           slots: cabinetRow.doc.cabinets.reduce((sum, cabinet) => sum + cabinet.slots.length, 0),
           sleeveCalls: Object.keys(cabinetRow.doc.sleeves ?? {}).length,
+          unsynced: cabinetRow.dirty,
         }
       : null,
   }
