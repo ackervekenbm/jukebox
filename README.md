@@ -204,10 +204,9 @@ Every change is checked with `npm run build && npm test`; CI runs the same on ea
 │   ├── docker-build.yml                 # smoke-test, then publish the multi-arch image to GHCR
 │   └── discogs-contract.yml             # nightly: refresh real Discogs payloads, rerun the parsers
 ├── scripts/                             # demo Discogs, screenshots, fixtures, icons
-├── tests/                               # API route tests (Vitest, node, supertest)
 └── src/
     ├── api/                             # Discogs client (proxy, pacing, retries) and cabinet sync
-    ├── server/                          # Express: sync store, Discogs proxy, health, static + SPA
+    ├── server/                          # Express: sync store, Discogs proxy, health, static + SPA (+ route tests)
     ├── shared/cabinetDoc.ts             # sync document schema (server validates, client types)
     ├── db/                              # IndexedDB stores + localStorage settings, views, picker
     ├── hooks/                           # collection sync, cabinet, tracklists, dialogs, …

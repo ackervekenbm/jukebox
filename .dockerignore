@@ -7,3 +7,9 @@ data
 .gitignore
 .dockerignore
 README.md
+.env
+.env.*
+.claude
+coverage
+docs
+.github

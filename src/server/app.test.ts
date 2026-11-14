@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { rm } from 'node:fs/promises'
 import request from 'supertest'
 import type { Express } from 'express'
-import type { CabinetDoc, LegacyCabinetDoc } from '../src/shared/cabinetDoc'
+import type { CabinetDoc, LegacyCabinetDoc } from '../shared/cabinetDoc'
 
 const identityCalls = vi.hoisted(() => ({ count: 0 }))
 
@@ -32,8 +32,8 @@ vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
   return new Response('Not Found', { status: 404 })
 })
 
-const { createApp, SYNC_BODY_LIMIT_BYTES } = await import('../src/server/app')
-const { closeDb, getCabinetRow } = await import('../src/server/db')
+const { createApp, SYNC_BODY_LIMIT_BYTES } = await import('./app')
+const { closeDb, getCabinetRow } = await import('./db')
 
 const app: Express = createApp()
 
@@ -415,7 +415,7 @@ describe('cabinet document versions', () => {
   })
 
   it('hands out a row stored before version 2 as version 2', async () => {
-    const { putCabinetRow } = await import('../src/server/db')
+    const { putCabinetRow } = await import('./db')
     putCabinetRow('carol', JSON.stringify(legacyDoc('Attic')), 'force')
     const carol = { Authorization: 'Discogs token=token-carol' }
     knownTokens['token-carol'] = 'carol'

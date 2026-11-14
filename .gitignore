@@ -12,6 +12,12 @@ data/
 *.log
 npm-debug.log*
 
+# Test coverage
+coverage/
+
+# Local Claude Code state (worktrees, personal settings)
+.claude/
+
 # Editor / OS
 .DS_Store
 .idea/
