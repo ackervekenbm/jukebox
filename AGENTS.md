@@ -68,12 +68,25 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
 
 - Name the branch `fix/...`, `feat/...` or `chore/...` (one per issue).
 - Put `Fixes #<n>` on its own line in the PR body so the issue auto-closes on merge.
-- Stack branches only when fixes are directly related; otherwise branch off `main`.
+- One issue, one PR, branched off the latest `main`. Every PR targets `main`
+  (CI only runs on PRs into `main`, and `Fixes #<n>` only closes issues from there).
+- Don't stack by default. Work that needs an unmerged PR goes into that PR, as
+  its own commit with its own `Fixes #<n>` line, or waits until it has merged.
+- When a stack is unavoidable, keep it small and say "merge #<n> first" in the
+  PR body. A squash lands the lower PR as a new commit, so the next PR conflicts
+  wherever it edits those lines again. Right after each merge, rebase the next
+  branch with `git fetch && git rebase origin/main` (git skips the commit that
+  already landed; add `--update-refs` from the top branch to move the whole
+  stack), then `git push --force-with-lease`. If the merged PR had several
+  commits, git can't match its squash: use
+  `git rebase --onto origin/main <old tip of the merged branch>`.
 
 ## Git / PR conventions
 
-- `main` is protected: **no direct pushes** — every change lands via a pull
-  request and a **squash merge**. Required check: `check` (CI).
+- `main` is protected (ruleset `main-branch-protection`): **no direct pushes**,
+  linear history, and every change lands via a pull request and a **squash
+  merge** (the only merge method). Required check: `check` (CI), on a branch
+  that is up to date with `main` (the PR's **Update branch** button, or a rebase).
 - After merging, GitHub auto-deletes the head branch (`delete-branch-on-merge` is on).
 - Pattern: create branch → implement → update README/docs → `npm run build && npm test` → push → `gh pr create`
   → merge once `check` passes. Use `gh pr merge --squash` when asked to merge.
