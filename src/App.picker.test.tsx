@@ -76,6 +76,10 @@ function seedSettings() {
 const fab = () =>
   screen.getByRole('button', { name: "Pick a random release from what's shown" })
 
+/** The same shuffle button, as the open release shows it. */
+const reroll = async () =>
+  within(await screen.findByRole('dialog')).getByRole('button', { name: 'Pick another random release' })
+
 async function renderApp() {
   const user = userEvent.setup()
   render(<App />)
@@ -108,7 +112,7 @@ describe('random picker listen log', () => {
     // window (default 10 over a 3-release collection) forces a different one.
     // The re-roll is async — it reads then writes the listen log before it
     // swaps the release — so wait for the dialog to move off the first pick.
-    await user.click(fab())
+    await user.click(await reroll())
     await waitFor(() =>
       expect(screen.getByRole('dialog')).not.toHaveAccessibleName(first),
     )
@@ -182,7 +186,7 @@ describe('random picker listen log', () => {
     const user = await renderApp()
 
     await user.click(fab())
-    await user.click(fab())
+    await user.click(await reroll())
     expect(await getListenLog('alice')).toHaveLength(2)
 
     await user.click(screen.getByRole('button', { name: 'Close release details' }))

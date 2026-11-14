@@ -98,6 +98,13 @@
   transform: translateY(-2px);
 }
 
+/* An open release shows its own copy (ReleaseDetail). This one only hides
+   once the sheet has made it inert, after the sheet noted it had focus, so
+   closing the release brings focus back here. */
+.random-fab[inert] {
+  visibility: hidden;
+}
+
 .random-fab:disabled {
   opacity: 0.45;
   cursor: not-allowed;

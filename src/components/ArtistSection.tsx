@@ -92,7 +92,7 @@ export function ArtistSection({
       </header>
 
       {!collapsed && (
-        <div className="artist-releases" id={releasesId} role="region" aria-label={`Releases by ${artist.name}`}>
+        <div className="artist-releases" id={releasesId}>
           {grouped
             ? albumGroups.map((group) =>
                 group.pressings.length > 1 ? (

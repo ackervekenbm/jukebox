@@ -39,7 +39,9 @@ describe('ArtistSection header', () => {
     const toggle = renderSection()
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     const controlled = document.getElementById(toggle.getAttribute('aria-controls') ?? '')
-    expect(controlled).toBe(screen.getByRole('region', { name: 'Releases by Herbie Hancock' }))
+    expect(controlled).toHaveClass('artist-releases')
+    // One landmark per artist would flood a screen reader's landmark list.
+    expect(screen.queryByRole('region')).toBeNull()
   })
 
   it('folds and unfolds, and drops aria-controls while nothing is shown', async () => {
@@ -49,7 +51,7 @@ describe('ArtistSection header', () => {
     await user.click(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     expect(toggle).not.toHaveAttribute('aria-controls')
-    expect(screen.queryByRole('region')).toBeNull()
+    expect(document.querySelector('.artist-releases')).toBeNull()
 
     toggle.focus()
     await user.keyboard('{Enter}')
