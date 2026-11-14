@@ -28,6 +28,19 @@ genuinely needs an install/postinstall script cannot be added without revisiting
 `check` job (`npm ci && npm run build && npm test`) on every PR, and a green
 `check` is required to merge. There is no other test suite.
 
+## README upkeep (MANDATORY)
+
+`README.md` is the project's public front page, so it has to match the app.
+Before opening a PR, check the README against your change and update it in
+the **same PR** when you add, remove or rename a feature, a control or a setting;
+change a command, script, port, environment variable or image tag; change what
+is stored where (browser, server, sync document); or change a screen shown in
+the screenshots (regenerate them, see below). Keep its style: short highlights
+up top, detail in the collapsible sections, plain user-facing wording, no
+internal jargon. If nothing in the README is affected, say so in the PR
+description. AGENTS.md (architecture) and `docs/deploy/` (deployment) follow
+the same rule.
+
 ## Demo and README screenshots
 
 `npm run demo` runs the app against `scripts/demo-discogs.mjs`, a local stand-in
@@ -55,7 +68,7 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
 - `main` is protected: **no direct pushes** — every change lands via a pull
   request and a **squash merge**. Required check: `check` (CI).
 - After merging, GitHub auto-deletes the head branch (`delete-branch-on-merge` is on).
-- Pattern: create branch → implement → `npm run build` → push → `gh pr create`
+- Pattern: create branch → implement → update README/docs → `npm run build && npm test` → push → `gh pr create`
   → merge once `check` passes. Use `gh pr merge --squash` when asked to merge.
 - **Never merge your own PR.** Ready PRs are handed over to a reviewer to merge;
   if the author merges, the other party reviews the squash only after the fact.
