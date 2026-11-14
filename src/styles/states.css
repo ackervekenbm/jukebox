@@ -1,0 +1,197 @@
+/* Loading, error and empty states; reduced motion, touch sizes, small screens. */
+
+/* ---------- States ---------- */
+
+.full-state {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.full-state p {
+  margin: 0;
+}
+
+.full-state h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 20px;
+}
+
+.full-state .progress-text {
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.error-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 2px solid var(--danger);
+  color: var(--danger);
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.error-message {
+  max-width: 480px;
+  color: var(--danger);
+}
+
+.error-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.rr-vinyl {
+  animation: spin 1.6s linear infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+  will-change: transform;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rp-label {
+  fill: var(--accent-strong);
+}
+
+.rp-led {
+  animation: rp-blink 2.4s ease-in-out infinite;
+}
+
+.rp-power-led {
+  fill: var(--accent);
+}
+
+@keyframes rp-blink {
+  0%,
+  65% {
+    opacity: 1;
+  }
+  75%,
+  95% {
+    opacity: 0.1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rr-vinyl {
+    animation: none;
+  }
+  .release-card:hover,
+  .random-fab:hover {
+    transform: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Fingers need about 44px: grow the small controls on touch screens only, so
+   mouse layouts keep their compact look. */
+@media (pointer: coarse) {
+  .icon-btn,
+  .stack-step {
+    width: 44px;
+    height: 44px;
+  }
+
+  .folder-chip,
+  .sort-toggle button {
+    min-height: 44px;
+  }
+
+  /* The rename/delete icons sit in a dense list: a bigger hit area, same look. */
+  .views-icon-btn {
+    position: relative;
+  }
+
+  .views-icon-btn::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
+}
+
+/* ---------- Small screens ---------- */
+
+@media (max-width: 640px) {
+  .artist-releases,
+  .recent-releases {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+  }
+
+  .artist-header {
+    flex-wrap: wrap;
+  }
+
+  /* Mobile toolbar: instead of controls wrapping wherever they happen to
+     fit, stack them into deliberate rows — search full width, then Filters
+     and Views as equal halves, then the View and Sort segmented controls
+     side by side with their labels stacked above. */
+  .toolbar {
+    gap: 8px;
+  }
+
+  .search-input {
+    flex: 1 1 100%;
+  }
+
+  .filter-toggle {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
+  }
+
+  .global-view,
+  .global-sort {
+    flex: 1 1 calc(50% - 4px);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+  }
+
+  /* The Recent view has no Sort control, so let View take the full row. */
+  .toolbar:not(:has(.global-sort)) .global-view {
+    flex-basis: 100%;
+  }
+
+  .global-sort-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .global-view .sort-toggle,
+  .global-sort .sort-toggle {
+    display: flex;
+    width: 100%;
+  }
+
+  .global-view .sort-toggle button,
+  .global-sort .sort-toggle button {
+    flex: 1;
+    padding: 8px 10px;
+  }
+}

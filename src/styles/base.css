@@ -1,0 +1,185 @@
+/* Theme tokens, the four themes and the base element styles. */
+
+:root {
+  color-scheme: dark;
+
+  --bg: #0b1020;
+  --bg-elevated: #121830;
+  --panel: #171f3a;
+  --panel-hover: #1d2747;
+  --border: #26305a;
+  --text: #e7e9f3;
+  --text-dim: #9aa1c0;
+  --text-faint: #67708f;
+  --accent: #ffd27a;
+  --accent-strong: #d97a1e;
+  /* Filled accent controls (and their hover), the text on them, and
+     accent-coloured text on panels; each pair keeps 4.5:1 in its theme. */
+  --accent-fill: #ffd27a;
+  --accent-fill-hover: #d97a1e;
+  --on-accent: #0b1020;
+  --on-accent-hover: #0b1020;
+  --accent-text: #ffd27a;
+  --danger: #ff7a7a;
+  --ok: #7ad9a0;
+
+  --radius: 12px;
+  --font-display: inherit;
+  --header-h: 96px;
+  --card-pad: 28px;
+  --close-inset: 6px;
+  --close-size: 34px;
+  --close-gap: 6px;
+  --card-head: calc(var(--close-inset) + var(--close-size) + var(--close-gap));
+}
+
+/* ---------- Themes ---------- */
+
+html[data-theme='paper'] {
+  color-scheme: light;
+
+  --bg: #f4efe6;
+  --bg-elevated: #fffaf0;
+  --panel: #ffffff;
+  --panel-hover: #f7efe0;
+  --border: #e0d5c1;
+  --text: #2c2620;
+  --text-dim: #665c4f;
+  --text-faint: #a79c8b;
+  --accent: #c2571c;
+  --accent-strong: #9b4313;
+  --accent-fill: #9b4313;
+  --accent-fill-hover: #7d360f;
+  --on-accent: #ffffff;
+  --on-accent-hover: #ffffff;
+  --accent-text: #9b4313;
+  --danger: #b3261e;
+  --ok: #1d7a4f;
+
+  --radius: 8px;
+  --font-display:
+    'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+}
+
+html[data-theme='club'] {
+  color-scheme: dark;
+
+  --bg: #0c0c12;
+  --bg-elevated: #16161f;
+  --panel: #1d1d2a;
+  --panel-hover: #262637;
+  --border: #37354f;
+  --text: #f1f0ff;
+  --text-dim: #aaa7c9;
+  --text-faint: #6f6c90;
+  --accent: #ff4fd8;
+  --accent-strong: #c41f8f;
+  --accent-fill: #ff4fd8;
+  --accent-fill-hover: #c41f8f;
+  --on-accent: #0c0c12;
+  --on-accent-hover: #ffffff;
+  --accent-text: #ff4fd8;
+  --danger: #ff5370;
+  --ok: #3be8b0;
+
+  --radius: 16px;
+}
+
+html[data-theme='forest'] {
+  color-scheme: dark;
+
+  --bg: #0a120e;
+  --bg-elevated: #101f18;
+  --panel: #132920;
+  --panel-hover: #1a3a2d;
+  --border: #244135;
+  --text: #e6efe9;
+  --text-dim: #9fb8ae;
+  --text-faint: #6d877d;
+  --accent: #f0b54a;
+  --accent-strong: #c98d2b;
+  --accent-fill: #f0b54a;
+  --accent-fill-hover: #c98d2b;
+  --on-accent: #0a120e;
+  --on-accent-hover: #0a120e;
+  --accent-text: #f0b54a;
+  --danger: #ff8a7a;
+  --ok: #7ad9a0;
+
+  --radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  overflow-y: scroll;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 7px 14px;
+}
+
+button:hover {
+  background: var(--panel-hover);
+}
+
+/* Every text field and select starts themed; a component only sets layout.
+   Without this, iOS draws an unstyled field as a black box (#175). */
+input:not([type='checkbox']):not([type='radio']):not([type='range']),
+select,
+textarea {
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-faint);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

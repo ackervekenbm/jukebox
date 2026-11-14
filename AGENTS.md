@@ -139,6 +139,8 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   rules (`compareReleases` / `sortYear` in `src/utils/collection.ts`:
   original year, undated last), so change ordering there, never in a second
   copy. A record credited to several artists is filed once, under the first.
+  What a record physically is lives in `src/utils/physical.ts` (size class,
+  discs, gatefold, shelf space); the planner only reads it.
   Size class (`sizeClassOf`) is judged per format of a release and only
   vinyl formats count: a vinyl format is 12" unless it states a smaller size,
   the largest wins (an LP with a bonus 7" is 12"), and a release with no vinyl
@@ -190,7 +192,8 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   while it was in flight (an edit counter), so a quick second edit is never
   lost. Shelf ids are unique: the schema rejects duplicates and loading
   repairs them (`withUniqueSlotIds`), since older clients numbered shelves by
-  count. Client sync
+  count. Building, rebasing and repairing the synced document are plain
+  functions in `src/utils/cabinetModel.ts`. Client sync
   lives in `src/api/sync.ts`; the screen is `src/components/CabinetScreen.tsx`.
   Storage-first and local-wins are the invariants: browser data is the
   source of truth and the server copy is only the cross-device echo.
@@ -220,9 +223,11 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   `settings.ts`, `views.ts`, `cabinetOptions.ts` and `picker.ts` in the same
   folder are the localStorage counterparts, all through `local.ts` (blocked
   storage never throws).
-- `src/theme.ts` + `src/styles.css` — CSS-variable themes
+- `src/theme.ts` + `src/styles/` — CSS-variable themes
   (`midnight`/`paper`/`club`/`forest`); new UI styles must use existing `--*`
-  tokens, never hardcoded colors.
+  tokens, never hardcoded colors. One file per area (`base`, `shell`,
+  `collection`, `detail`, `cabinet`, …), pulled in by `src/styles.css` in
+  cascade order; put a rule in its area's file, keeping that order in mind.
 - PWA via `vite-plugin-pwa`: app-shell precache + `album-art` runtime cache
   (500 entries, 30-day expiry). `vite.config.ts`.
 

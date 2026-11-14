@@ -27,7 +27,7 @@ import {
   type ViewMode,
 } from './utils/collection'
 import { CabinetScreen } from './components/CabinetScreen'
-import { isGatefold, sizeClassOf, sleeveSource } from './utils/cabinet'
+import { isGatefold, sizeClassOf, sleeveSource } from './utils/physical'
 import { useCabinet } from './hooks/useCabinet'
 import { useDebounced } from './hooks/useDebounced'
 import { useReleaseDetail } from './hooks/useReleaseDetail'

@@ -6,14 +6,8 @@ import { useScrollLock } from '../hooks/useScrollLock'
 import { useDialog } from '../hooks/useDialog'
 import type { CabinetStatus, RemovedSlot, UseCabinetResult } from '../hooks/useCabinet'
 import { useDiscogsWaitNote } from '../hooks/useDiscogsWait'
-import {
-  SIZE_CLASS_LABELS,
-  conflictLabel,
-  discCountOf,
-  isGatefold,
-  sizeClassOf,
-  spaceUnitsOf,
-} from '../utils/cabinet'
+import { conflictLabel } from '../utils/cabinet'
+import { SIZE_CLASS_LABELS, discCountOf, isGatefold, sizeClassOf, spaceUnitsOf } from '../utils/physical'
 import { plural } from '../utils/format'
 import { CloseIcon, TrashIcon } from './icons'
 import { SegmentedControl } from './SegmentedControl'

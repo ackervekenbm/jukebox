@@ -1,0 +1,347 @@
+/* Artist sections, the Recent timeline, release and stack cards. */
+
+/* ---------- Artist sections ---------- */
+
+.global-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.global-sort-label {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.global-sort .sort-toggle button {
+  padding: 8px 12px;
+}
+
+.global-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.global-view .sort-toggle button {
+  padding: 8px 12px;
+}
+
+.artist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ---------- Recently added view ---------- */
+
+.recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.recent-month {
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.recent-month-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--panel);
+}
+
+.recent-month-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-month-count {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.recent-releases {
+  padding: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+.artist-section {
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.artist-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--panel);
+  cursor: pointer;
+  user-select: none;
+}
+
+.artist-header:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.artist-avatar {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 10px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--accent-text);
+}
+
+.artist-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.artist-heading {
+  min-width: 0;
+}
+
+.artist-name {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-display);
+}
+
+.artist-count {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.collapse-indicator {
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.sort-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.sort-toggle button {
+  border: none;
+  border-radius: 0;
+  padding: 5px 10px;
+  font-size: 12px;
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.sort-toggle button.active {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.artist-releases {
+  padding: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+/* ---------- Release cards ---------- */
+
+.release-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease;
+}
+
+.release-card:hover,
+.release-card:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--accent-strong);
+  outline: none;
+}
+
+.release-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.release-cover {
+  aspect-ratio: 1 / 1;
+  background: var(--panel);
+}
+
+.release-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.release-cover.missing {
+  display: grid;
+  place-items: center;
+  opacity: 0.6;
+}
+
+.release-meta {
+  padding: 9px 10px 11px;
+}
+
+.release-artist {
+  margin: 0 0 2px;
+  color: var(--text-dim);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.release-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.release-years {
+  margin-top: 4px;
+}
+
+.release-years .release-year {
+  margin: 2px 0 0;
+}
+
+.release-year {
+  color: var(--accent-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.release-year-label {
+  color: var(--text-faint);
+  font-weight: 400;
+  margin-right: 5px;
+}
+
+.release-format {
+  margin: 3px 0 0;
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---------- Stacked card: one album, every pressing ---------- */
+
+/* A grouped card is a plain card (its `overflow: hidden` keeps the cover
+   clipped to the rounded corners) with a count chip anchored to it. */
+.stack-card {
+  position: relative;
+}
+
+.stack-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
+}
+
+/* ---------- Stack navigation in the detail view ---------- */
+
+.detail-stack-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.stack-step {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.stack-step:hover {
+  border-color: var(--accent-strong);
+  color: var(--accent-text);
+}
+
+.stack-step:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.stack-position {
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
+}
