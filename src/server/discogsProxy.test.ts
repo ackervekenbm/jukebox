@@ -26,8 +26,8 @@ vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
   })
 })
 
-const { createApp } = await import('../src/server/app')
-const { closeDb } = await import('../src/server/db')
+const { createApp } = await import('./app')
+const { closeDb } = await import('./db')
 
 const app: Express = createApp()
 

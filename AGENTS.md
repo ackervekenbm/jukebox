@@ -114,7 +114,8 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   passed through); `auth.ts` verifies `Authorization: Discogs token=…` via
   Discogs `/oauth/identity` (10-min in-memory memo, tokens never stored);
   `db.ts` = better-sqlite3 (WAL) with the `cabinet_docs` sync table. Tests for
-  routes live in `tests/` (node environment, supertest + temp `DATA_DIR`).
+  routes sit next to the server code (`src/server/*.test.ts`, node environment via
+  a `// @vitest-environment node` first line, supertest + temp `DATA_DIR`).
 - `src/shared/cabinetDoc.ts` — zod schema + types for the sync document,
   imported by both server (validation) and client (types only, so zod never
   enters the browser bundle). Version 2 holds only what devices read back:
