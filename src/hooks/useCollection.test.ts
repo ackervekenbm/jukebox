@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import * as api from '../api/discogs'
 import * as db from '../db/collection'
+import { clearAllLocalData } from '../db/wipe'
 import type { Settings } from '../db/settings'
 import { release } from '../test/factories'
 import type { DiscogsCollectionRelease } from '../types/discogs'
@@ -19,16 +20,11 @@ vi.mock('../api/discogs', () => ({
 vi.mock('../db/collection', () => ({
   getCachedCollection: vi.fn(),
   setCachedCollection: vi.fn(),
-  removeCachedCollection: vi.fn(),
   getMasterYears: vi.fn(),
   setMasterYears: vi.fn(),
-  clearMasterYears: vi.fn(),
-  clearReleaseDetails: vi.fn(),
-  clearReleaseNotes: vi.fn(),
-  removeCachedCollectionValue: vi.fn(),
 }))
 
-vi.mock('../utils/storage', () => ({ clearAlbumArtCache: vi.fn() }))
+vi.mock('../db/wipe', () => ({ clearAllLocalData: vi.fn() }))
 
 const alice: Settings = { username: 'alice', token: 'tok', theme: 'midnight' }
 const folders = [{ id: 0, name: 'All', count: 2, resource_url: '' }]
@@ -179,17 +175,13 @@ describe('useCollection', () => {
     expect(result.current.status).toBe('idle')
   })
 
-  it('wipes every cache and the collection on screen', async () => {
+  it('wipes all local data and the collection on screen', async () => {
     const { result } = renderHook(() => useCollection(alice))
     await synced(result)
 
     await act(() => result.current.wipeCache())
 
-    expect(db.removeCachedCollection).toHaveBeenCalledWith('alice')
-    expect(db.clearMasterYears).toHaveBeenCalled()
-    expect(db.clearReleaseDetails).toHaveBeenCalled()
-    expect(db.clearReleaseNotes).toHaveBeenCalled()
-    expect(db.removeCachedCollectionValue).toHaveBeenCalledWith('alice')
+    expect(clearAllLocalData).toHaveBeenCalled()
     expect(result.current.releases).toEqual([])
     expect(result.current.masterYears).toEqual({})
   })

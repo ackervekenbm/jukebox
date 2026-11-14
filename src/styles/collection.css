@@ -85,6 +85,7 @@
 }
 
 .artist-header {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -94,7 +95,36 @@
   user-select: none;
 }
 
-.artist-header:focus-visible {
+/* The toggle reads as the artist name, but its hit area is the whole header. */
+.artist-toggle {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.artist-toggle:hover {
+  background: none;
+}
+
+.artist-toggle::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.artist-toggle:focus-visible {
+  outline: none;
+}
+
+.artist-header:has(.artist-toggle:focus-visible) {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }

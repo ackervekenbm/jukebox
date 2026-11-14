@@ -49,7 +49,7 @@ export function SettingsOverlay({
                 className="advanced-toggle"
                 onClick={onToggleAdvanced}
                 aria-expanded={advancedOpen}
-                aria-controls="advanced-panel"
+                aria-controls={advancedOpen ? 'advanced-panel' : undefined}
               >
                 <span>Advanced</span>
                 <span className="collapse-indicator" aria-hidden="true">

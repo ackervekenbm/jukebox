@@ -36,3 +36,17 @@ export function removeKey(key: string): void {
     // Storage is blocked: nothing to remove.
   }
 }
+
+/** Removes every key starting with `prefix` ("clear everything"). */
+export function removeKeysStartingWith(prefix: string): void {
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key?.startsWith(prefix)) keys.push(key)
+    }
+    for (const key of keys) localStorage.removeItem(key)
+  } catch {
+    // Storage is blocked: nothing to remove.
+  }
+}

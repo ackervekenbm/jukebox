@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import type { Settings as SettingsType } from './db/settings'
-import { loadSettings, saveSettings, clearSettings } from './db/settings'
+import { loadSettings, saveSettings } from './db/settings'
 import type { ThemeId } from './theme'
 import { applyTheme } from './theme'
 import { useCollection } from './hooks/useCollection'
@@ -47,18 +47,14 @@ import { RecentList } from './components/RecentList'
 import { ReleaseDetail } from './components/ReleaseDetail'
 import { StatsPanel } from './components/StatsPanel'
 import { ShuffleIcon } from './components/icons'
-import { clearCabinet } from './db/cabinet'
 import {
   clampSkip,
-  clearPickerConfig,
   DEFAULT_SKIP,
   loadPickerConfig,
   savePickerConfig,
 } from './db/picker'
-import { clearListenLog } from './db/listenLog'
 import {
   DEFAULT_PREFERENCES,
-  clearPreferences,
   loadPreferences,
   savePreferences,
   type Preferences,
@@ -271,21 +267,13 @@ export default function App() {
   }, [])
 
   const onClearData = async () => {
+    // Clears every store and setting in this browser (clearAllLocalData);
+    // what follows only resets what the screens still hold in memory.
     await wipeCache()
-    // The listen log and the skip preference are user data too: "clear
-    // everything" has to take them down, not just the caches.
-    await clearListenLog()
-    clearPickerConfig()
-    clearPreferences()
-    // The cabinet document is synced to the server but the local copy is user
-    // data; wiping everything has to drop it too.
-    await clearCabinet()
+    await cabinet.reset()
     setPickerSkip(DEFAULT_SKIP)
     setPreferences(DEFAULT_PREFERENCES)
     detail.close()
-    clearSettings()
-    // Saved views live in their own storage key, so "clear everything" has to
-    // take them down explicitly to keep reclaiming everything it claims to.
     savedViews.wipe()
     setSettings(null)
     setShowSettings(true)

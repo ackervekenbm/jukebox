@@ -61,13 +61,20 @@ export function useReleaseDetail({ releases, masterYears, candidates, username, 
 
   const pickRandom = useCallback(async () => {
     if (candidates.length === 0 || !username) return
-    const recentIds = await getRecentListenIds(username, pickerSkip)
+    // The listen log only steers and annotates the pick: if IndexedDB fails,
+    // pick from everything and open the release without its history.
+    const recentIds = await getRecentListenIds(username, pickerSkip).catch(() => [])
     const picked = pickAvoiding(candidates, recentIds, pickerSkip)
     if (!picked) return
-    // Every pick is logged — including re-rolls from an open detail view —
-    // so the skip window always reflects what the picker actually served.
-    await logListen(username, picked.id)
-    const entries = await getListenLog(username)
+    let entries: ListenEntry[] = []
+    try {
+      // Every pick is logged — including re-rolls from an open detail view —
+      // so the skip window always reflects what the picker actually served.
+      await logListen(username, picked.id)
+      entries = await getListenLog(username)
+    } catch (err) {
+      console.warn('[picker] could not update the listen log', err)
+    }
     setRecentPicks(toRecentPicks(entries, picked.id, releases))
     setSelected(toDisplayRelease(picked, masterYears))
     setStack(null)

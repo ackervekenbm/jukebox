@@ -241,12 +241,18 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   `src/db/listenLog.ts` and `src/db/cabinet.ts` are the typed store APIs;
   `settings.ts`, `views.ts`, `cabinetOptions.ts` and `picker.ts` in the same
   folder are the localStorage counterparts, all through `local.ts` (blocked
-  storage never throws).
+  storage never throws). "Clear everything" is `clearAllLocalData`
+  (`src/db/wipe.ts`): it clears every IndexedDB store, every `vinyl-vault:`
+  key and the album-art cache by walking what exists, so new stores and
+  settings are covered without being listed.
 - `src/theme.ts` + `src/styles/` — CSS-variable themes
   (`midnight`/`paper`/`club`/`forest`); new UI styles must use existing `--*`
   tokens, never hardcoded colors. One file per area (`base`, `shell`,
   `collection`, `detail`, `cabinet`, …), pulled in by `src/styles.css` in
   cascade order; put a rule in its area's file, keeping that order in mind.
+  Each screen has its own class prefix (`stats-` for the stats screen,
+  `storage-` for Settings → Advanced, `cabinet-`, …); never reuse another
+  screen's classes, or its rules leak in (#187, #193).
 - PWA via `vite-plugin-pwa`: app-shell precache + `album-art` runtime cache
   (500 entries, 30-day expiry). `vite.config.ts`.
 
