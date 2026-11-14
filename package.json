@@ -11,6 +11,8 @@
     "dev": "concurrently -k -n api,ui \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "tsx watch src/server/index.ts",
     "dev:client": "vite",
+    "demo": "concurrently -k -n discogs,api,ui \"node scripts/demo-discogs.mjs\" \"npm:demo:server\" \"npm:dev:client\"",
+    "demo:server": "DISCOGS_API_BASE=http://127.0.0.1:3999 DATA_DIR=data/demo tsx watch src/server/index.ts",
     "build": "npm run typecheck && npm run lint && npm run build:client && npm run build:server",
     "typecheck": "tsc --noEmit",
     "build:client": "vite build",
