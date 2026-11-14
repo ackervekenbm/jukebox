@@ -2,7 +2,8 @@
 // Copyright (C) 2025-2026 ackervekenbm
 
 /**
- * Regenerates the README screenshots in docs/screenshots/ from the demo
+ * Regenerates the README images in docs/screenshots/: the banner (from
+ * scripts/banner.html) and the screenshots, taken from the demo
  * collection (scripts/demo-discogs.mjs), so no real collection or cover art
  * ever lands in the repo.
  *
@@ -63,6 +64,18 @@ async function shot(page, name) {
   const png = await page.screenshot()
   await sharp(png).webp({ quality: 82 }).toFile(path.join(OUT, `${name}.webp`))
   console.log('wrote', name)
+}
+
+// The README banner, from its own page (no app needed).
+{
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH })
+  const page = await browser.newPage({ viewport: { width: 1280, height: 400 }, deviceScaleFactor: 2 })
+  await page.goto(new URL('banner.html', import.meta.url).href)
+  await page.evaluate(() => document.fonts.ready)
+  const png = await page.locator('#banner').screenshot({ omitBackground: true })
+  await sharp(png).webp({ quality: 90, alphaQuality: 100 }).toFile(path.join(OUT, 'banner.webp'))
+  console.log('wrote banner')
+  await browser.close()
 }
 
 // First run: load the collection and its original years.

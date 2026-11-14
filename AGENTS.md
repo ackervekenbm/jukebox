@@ -49,7 +49,8 @@ as `demo`, any token; data in `data/demo`). The README images in
 `docs/screenshots/` come from it via `scripts/screenshots.mjs` (Playwright,
 installed with `--no-save`, deliberately not a dependency). Never put a real
 collection or real cover art in the repo. When a screen in the screenshots
-changes visibly, regenerate them.
+changes visibly, regenerate them. The README banner is `scripts/banner.html`,
+rendered by the same script to `docs/screenshots/banner.webp`.
 
 ## Issue-first workflow (MANDATORY)
 
