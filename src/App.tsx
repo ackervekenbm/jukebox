@@ -34,6 +34,7 @@ import { StorageStats } from './components/StorageStats'
 import { CabinetScreen } from './components/CabinetScreen'
 import { isGatefold, sizeClassOf, sleeveSource } from './utils/cabinet'
 import { useCabinet } from './hooks/useCabinet'
+import { useDialog } from './hooks/useDialog'
 import { useScrollLock } from './hooks/useScrollLock'
 import { useDatabaseState } from './hooks/useDatabaseState'
 import { useDiscogsWaitNote } from './hooks/useDiscogsWait'
@@ -170,6 +171,11 @@ export default function App() {
   // it is showing; null for a release opened straight from the grid.
   const [stack, setStack] = useState<{ pressings: DisplayRelease[]; index: number } | null>(null)
   const [showStats, setShowStats] = useState(false)
+  // Escape closes settings only once there is an account to go back to.
+  const settingsDialogRef = useDialog<HTMLDivElement>(
+    settings ? () => setShowSettings(false) : undefined,
+    showSettings,
+  )
   const toolbarRef = useRef<HTMLDivElement>(null)
 
   // The valuation is a single cheap request, but it is still only asked for
@@ -483,6 +489,7 @@ export default function App() {
       {/* Full-screen settings (no saved settings, or opened from menu) */}
       {showSettings && (
         <div
+          ref={settingsDialogRef}
           className="settings-overlay"
           role="dialog"
           aria-modal="true"
@@ -709,6 +716,8 @@ export default function App() {
                 <span className="global-sort-label">Sort</span>
                 <div className="sort-toggle" role="group" aria-label="Sort releases by">
                   <button
+                    type="button"
+                    aria-pressed={artistSortMode === 'chronological'}
                     className={artistSortMode === 'chronological' ? 'active' : ''}
                     onClick={() => setArtistSortMode('chronological')}
                     title="Oldest to newest within each artist"
@@ -716,6 +725,8 @@ export default function App() {
                     Year
                   </button>
                   <button
+                    type="button"
+                    aria-pressed={artistSortMode === 'byName'}
                     className={artistSortMode === 'byName' ? 'active' : ''}
                     onClick={() => setArtistSortMode('byName')}
                     title="By album name within each artist"
@@ -777,19 +788,21 @@ export default function App() {
                   ? `Nothing matches “${activeView.name}”${folderScopeLabel}.`
                   : 'No releases match your search or filters.'}
               </p>
-              {activeView && (
-                <div className="empty-actions">
-                  {viewDirty ? (
-                    <button type="button" onClick={() => applyView(activeView)}>
-                      Revert to “{activeView.name}”
-                    </button>
-                  ) : (
-                    <button type="button" onClick={clearView}>
-                      Show all releases
-                    </button>
-                  )}
-                </div>
-              )}
+              <div className="empty-actions">
+                {!activeView ? (
+                  <button type="button" onClick={clearView}>
+                    Clear search &amp; filters
+                  </button>
+                ) : viewDirty ? (
+                  <button type="button" onClick={() => applyView(activeView)}>
+                    Revert to “{activeView.name}”
+                  </button>
+                ) : (
+                  <button type="button" onClick={clearView}>
+                    Show all releases
+                  </button>
+                )}
+              </div>
             </div>
           ) : viewMode === 'recent' ? (
             <RecentList sections={recentSections} onSelectRelease={openRelease} />

@@ -2,6 +2,7 @@
 // Copyright (C) 2025-2026 ackervekenbm
 
 import { useMemo, useId } from 'react'
+import { useDialog } from '../hooks/useDialog'
 import type { MasterYears } from '../api/discogs'
 import type { DiscogsCollectionRelease } from '../types/discogs'
 import type { CollectionValueState } from '../hooks/useCollectionValue'
@@ -184,6 +185,7 @@ export function StatsPanel({
   value: CollectionValueState
   onClose?: () => void
 }) {
+  const dialogRef = useDialog<HTMLDivElement>(onClose)
   const stats: CollectionStats = useMemo(
     () => computeCollectionStats(releases, masterYears),
     [releases, masterYears],
@@ -191,7 +193,7 @@ export function StatsPanel({
 
   if (stats.totalReleases === 0) {
     return (
-      <div className="settings-overlay" role="dialog" aria-modal="true" aria-label="Collection stats">
+      <div ref={dialogRef} className="settings-overlay" role="dialog" aria-modal="true" aria-label="Collection stats">
         <div className="settings-overlay-content">
           <div className="settings-card">
             {onClose && (
@@ -216,7 +218,7 @@ export function StatsPanel({
   }
 
   return (
-    <div className="settings-overlay" role="dialog" aria-modal="true" aria-label="Collection stats">
+    <div ref={dialogRef} className="settings-overlay" role="dialog" aria-modal="true" aria-label="Collection stats">
       <div className="settings-overlay-content">
         <div className="settings-card">
           {onClose && (

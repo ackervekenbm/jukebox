@@ -6,6 +6,7 @@ import type { DisplayRelease } from '../utils/collection'
 import { artistDisplayName, creditedArtists, effectiveYears } from '../utils/collection'
 import { useReleaseTracklist } from '../hooks/useReleaseTracklist'
 import { useScrollLock } from '../hooks/useScrollLock'
+import { useDialog } from '../hooks/useDialog'
 import { formatRelativeTime } from '../utils/time'
 import { CloseIcon, ChevronIcon } from './icons'
 
@@ -56,12 +57,11 @@ export function ReleaseDetail({
   onToggleGatefold,
 }: ReleaseDetailProps) {
   useScrollLock(true)
+  const dialogRef = useDialog<HTMLDivElement>(onClose)
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose()
-      } else if (event.key === 'ArrowLeft' && onPrev) {
+      if (event.key === 'ArrowLeft' && onPrev) {
         event.preventDefault()
         onPrev()
       } else if (event.key === 'ArrowRight' && onNext) {
@@ -71,7 +71,7 @@ export function ReleaseDetail({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, onPrev, onNext])
+  }, [onPrev, onNext])
 
   const showStackNav = Boolean(position && position.total > 1 && onPrev && onNext)
 
@@ -95,6 +95,7 @@ export function ReleaseDetail({
 
   return (
     <div
+      ref={dialogRef}
       className="detail-overlay"
       role="dialog"
       aria-modal="true"
