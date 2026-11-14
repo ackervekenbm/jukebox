@@ -26,6 +26,12 @@ interface ReleaseDetailProps {
   displayed?: boolean
   /** Puts this copy on display or back in the cabinet; no toggle without it. */
   onToggleDisplayed?: () => void
+  /** The cabinet counts this release as a gatefold (two spaces). */
+  gatefold?: boolean
+  /** Where that call comes from (Discogs or the user), shown under the toggle. */
+  gatefoldSource?: string
+  /** Flips the sleeve call; vinyl only, no toggle without it. */
+  onToggleGatefold?: () => void
 }
 
 export interface RecentPick {
@@ -45,6 +51,9 @@ export function ReleaseDetail({
   position,
   displayed = false,
   onToggleDisplayed,
+  gatefold = false,
+  gatefoldSource,
+  onToggleGatefold,
 }: ReleaseDetailProps) {
   useScrollLock(true)
 
@@ -168,25 +177,43 @@ export function ReleaseDetail({
             </div>
           )}
 
-          {onToggleDisplayed && (
+          {(onToggleDisplayed || onToggleGatefold) && (
             <div className="detail-section">
               <span className="detail-section-title">Record cabinet</span>
-              <div className="detail-display">
-                <button
-                  type="button"
-                  className={`cabinet-sleeve-btn${displayed ? ' active' : ''}`}
-                  aria-pressed={displayed}
-                  aria-describedby="detail-display-hint"
-                  onClick={onToggleDisplayed}
-                >
-                  On display
-                </button>
-                <span className="detail-display-hint" id="detail-display-hint">
-                  {displayed
-                    ? 'This copy needs no shelf. Press to put it back in the cabinet.'
-                    : 'Press if this copy is on display elsewhere, so it needs no shelf.'}
-                </span>
-              </div>
+              {onToggleGatefold && (
+                <div className="detail-display">
+                  <button
+                    type="button"
+                    className={`cabinet-sleeve-btn${gatefold ? ' active' : ''}`}
+                    aria-pressed={gatefold}
+                    aria-describedby="detail-gatefold-hint"
+                    onClick={onToggleGatefold}
+                  >
+                    Gatefold
+                  </button>
+                  <span className="detail-display-hint" id="detail-gatefold-hint">
+                    {gatefoldSource}
+                  </span>
+                </div>
+              )}
+              {onToggleDisplayed && (
+                <div className="detail-display">
+                  <button
+                    type="button"
+                    className={`cabinet-sleeve-btn${displayed ? ' active' : ''}`}
+                    aria-pressed={displayed}
+                    aria-describedby="detail-display-hint"
+                    onClick={onToggleDisplayed}
+                  >
+                    On display
+                  </button>
+                  <span className="detail-display-hint" id="detail-display-hint">
+                    {displayed
+                      ? 'This copy needs no shelf. Press to put it back in the cabinet.'
+                      : 'Press if this copy is on display elsewhere, so it needs no shelf.'}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 

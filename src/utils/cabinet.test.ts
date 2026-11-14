@@ -15,6 +15,7 @@ import {
   mentionsGatefold,
   planCabinet,
   sizeClassOf,
+  sleeveSource,
   spaceUnitsOf,
 } from './cabinet'
 
@@ -208,6 +209,13 @@ describe('spaceUnitsOf', () => {
     // Marked as gatefold before the notes said so: it now agrees, so it's Discogs' call.
     expect(isUserCall(lp, { notes: { '1': 'Gatefold sleeve' }, overrides: { '1': true } })).toBe(false)
     expect(isUserCall(lp)).toBe(false)
+  })
+
+  it('says where the sleeve call comes from', () => {
+    const lp = fake({ artist: 'A', title: 'T', id: 1, formatText: 'Vinyl · LP' })
+    expect(sleeveSource(lp)).toMatch(/^Standard sleeve\. Press/)
+    expect(sleeveSource(lp, { notes: { '1': 'Gatefold sleeve' } })).toMatch(/according to Discogs/)
+    expect(sleeveSource(lp, { overrides: { '1': true } })).toMatch(/^Gatefold, marked by you/)
   })
 
   it('gives a multi-disc set one space per disc, gatefold or not', () => {

@@ -149,6 +149,34 @@ describe('ReleaseDetail stack navigation', () => {
   })
 })
 
+describe('ReleaseDetail gatefold', () => {
+  it('has no gatefold toggle without a handler (not vinyl, or no cabinet)', () => {
+    render(<ReleaseDetail display={display} token="tok" onClose={vi.fn()} onToggleDisplayed={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'Gatefold' })).not.toBeInTheDocument()
+  })
+
+  it('shows the sleeve call and where it comes from, and toggles it', async () => {
+    const user = userEvent.setup()
+    const onToggle = vi.fn()
+    render(
+      <ReleaseDetail
+        display={display}
+        token="tok"
+        onClose={vi.fn()}
+        gatefold
+        gatefoldSource="Gatefold, marked by you."
+        onToggleGatefold={onToggle}
+      />,
+    )
+    const toggle = screen.getByRole('button', { name: 'Gatefold' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    expect(toggle).toHaveAccessibleDescription('Gatefold, marked by you.')
+    expect(screen.queryByRole('button', { name: 'On display' })).not.toBeInTheDocument()
+    await user.click(toggle)
+    expect(onToggle).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('ReleaseDetail on display', () => {
   it('has no display toggle without a cabinet to put it in', () => {
     render(<ReleaseDetail display={display} token="tok" onClose={vi.fn()} />)

@@ -132,6 +132,18 @@ export function isUserCall(display: DisplayRelease, facts: SleeveFacts = {}): bo
   return call !== undefined && call !== detectedGatefold(display, facts)
 }
 
+/** Where the sleeve call comes from, so a wrong one can be traced and corrected. */
+export function sleeveSource(display: DisplayRelease, facts: SleeveFacts = {}): string {
+  if (isUserCall(display, facts)) {
+    return isGatefold(display, facts)
+      ? 'Gatefold, marked by you. Press again to go back to what Discogs says.'
+      : 'Standard sleeve, marked by you. Press again to go back to what Discogs says.'
+  }
+  return detectedGatefold(display, facts)
+    ? 'Gatefold, according to Discogs. Press if it is a standard sleeve.'
+    : 'Standard sleeve. Press to mark it as a gatefold.'
+}
+
 /**
  * Discs that take their own space: the vinyl discs of the release's largest
  * size ("2×Vinyl, LP" is two). A bonus 7" or flexi tucked in an LP's sleeve
