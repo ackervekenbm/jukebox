@@ -474,6 +474,7 @@ export function useCabinet({
     if (username) await clearCabinet(username)
     setCabinets([defaultCabinet()])
     setOverrides({})
+    setOptions({ ...DEFAULT_CABINET_OPTIONS })
     setDisplayedIds([])
     setRevision(0)
     setDirty(false)

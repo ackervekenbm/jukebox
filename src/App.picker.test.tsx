@@ -177,7 +177,8 @@ describe('random picker listen log', () => {
     expect(input).toHaveValue(0)
   })
 
-  it('clears the listen log and the picker preference with "clear everything"', async () => {
+  it('clears the listen log and every setting, cabinet options included, with "clear everything"', async () => {
+    localStorage.setItem('vinyl-vault:cabinet-options', JSON.stringify({ sort: 'byName', separateSizeClasses: true }))
     const user = await renderApp()
 
     await user.click(fab())
@@ -191,6 +192,7 @@ describe('random picker listen log', () => {
 
     await waitFor(async () => expect(await getListenLog('alice')).toEqual([]))
     expect(localStorage.getItem(PICKER_KEY)).toBeNull()
+    expect(Object.keys(localStorage).filter((key) => key.startsWith('vinyl-vault:'))).toEqual([])
     // The account is gone, so the setup form asks for credentials again.
     expect(screen.getByLabelText(/Discogs username/)).toBeInTheDocument()
   })

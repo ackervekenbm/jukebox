@@ -241,7 +241,10 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   `src/db/listenLog.ts` and `src/db/cabinet.ts` are the typed store APIs;
   `settings.ts`, `views.ts`, `cabinetOptions.ts` and `picker.ts` in the same
   folder are the localStorage counterparts, all through `local.ts` (blocked
-  storage never throws).
+  storage never throws). "Clear everything" is `clearAllLocalData`
+  (`src/db/wipe.ts`): it clears every IndexedDB store, every `vinyl-vault:`
+  key and the album-art cache by walking what exists, so new stores and
+  settings are covered without being listed.
 - `src/theme.ts` + `src/styles/` — CSS-variable themes
   (`midnight`/`paper`/`club`/`forest`); new UI styles must use existing `--*`
   tokens, never hardcoded colors. One file per area (`base`, `shell`,
