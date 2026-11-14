@@ -480,6 +480,7 @@ export default function App() {
               : undefined
           }
           onClose={detail.close}
+          onPickAnother={!showCabinet && !showStats && filtered.length > 0 ? detail.pickRandom : undefined}
         />
       )}
 
@@ -498,8 +499,6 @@ export default function App() {
         <button
           type="button"
           className="random-fab"
-          // Floats over a release it picked and re-rolls it, so Tab reaches it there.
-          data-modal-companion
           onClick={detail.pickRandom}
           disabled={filtered.length === 0}
           title="Pick a random release from what's shown"

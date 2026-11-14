@@ -124,7 +124,8 @@
   outline: none;
 }
 
-.artist-header:has(.artist-toggle:focus-visible) {
+/* The ring goes on the hit area, so it frames the whole header. */
+.artist-toggle:focus-visible::after {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
