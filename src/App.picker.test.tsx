@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
+import * as listenLog from './db/listenLog'
 import { clearListenLog, getListenLog } from './db/listenLog'
 import { artist, release } from './test/factories'
 import type { DiscogsCollectionRelease } from './types/discogs'
@@ -91,6 +92,7 @@ beforeEach(async () => {
 })
 afterEach(() => {
   localStorage.clear()
+  vi.restoreAllMocks()
 })
 
 describe('random picker listen log', () => {
@@ -128,6 +130,19 @@ describe('random picker listen log', () => {
     await user.click(historyButton)
     expect(screen.getByRole('dialog')).toHaveAccessibleName(first)
     await waitFor(async () => expect(await getListenLog('alice')).toHaveLength(2))
+  })
+
+  it('still opens the pick when the listen log cannot be read or written', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(listenLog, 'getRecentListenIds').mockRejectedValue(new Error('IndexedDB is gone'))
+    vi.spyOn(listenLog, 'logListen').mockRejectedValue(new Error('IndexedDB is gone'))
+    const user = await renderApp()
+
+    await user.click(fab())
+
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+    expect(screen.queryByText('Recent picks')).toBeNull()
+    expect(warn).toHaveBeenCalled()
   })
 
   it('shows no history when a release is opened from the grid', async () => {
