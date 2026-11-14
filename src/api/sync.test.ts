@@ -7,11 +7,11 @@ import {
   fetchCabinet,
   CABINET_TOO_LARGE,
   pushCabinet,
-  revisionEtag,
   revisionFromEtag,
   SyncConflictError,
   SyncError,
 } from './sync'
+import { etagForRevision } from '../shared/etag'
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -44,10 +44,10 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('revisionEtag', () => {
+describe('etagForRevision', () => {
   it('formats the wire ETag the server expects', () => {
-    expect(revisionEtag(0)).toBe('"r0"')
-    expect(revisionEtag(12)).toBe('"r12"')
+    expect(etagForRevision(0)).toBe('"r0"')
+    expect(etagForRevision(12)).toBe('"r12"')
   })
 })
 

@@ -4,6 +4,7 @@
 import Database from 'better-sqlite3'
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
+import { DATA_DIR as dataDir } from './config'
 
 export interface CabinetRow {
   username: string
@@ -19,7 +20,6 @@ export class ConflictError extends Error {
   }
 }
 
-const dataDir = path.resolve(process.env.DATA_DIR ?? path.resolve(process.cwd(), 'data'))
 mkdirSync(dataDir, { recursive: true })
 
 const db = new Database(path.join(dataDir, 'jukebox.db'))

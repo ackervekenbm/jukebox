@@ -3,6 +3,7 @@
 
 import type { ThemeId } from '../theme'
 import { isThemeId } from '../theme'
+import { readJson, removeKey, writeJson } from './local'
 
 export interface Settings {
   username: string
@@ -13,30 +14,15 @@ export interface Settings {
 const KEY = 'vinyl-vault:settings'
 
 export function loadSettings(): Settings | null {
-  try {
-    const raw = localStorage.getItem(KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as Settings
-    if (!parsed.username || !parsed.token) return null
-    return { ...parsed, theme: isThemeId(parsed.theme) ? parsed.theme : 'midnight' }
-  } catch {
-    return null
-  }
+  const parsed = readJson(KEY) as Partial<Settings> | null
+  if (!parsed?.username || !parsed.token) return null
+  return { ...(parsed as Settings), theme: isThemeId(parsed.theme) ? parsed.theme : 'midnight' }
 }
 
 export function saveSettings(settings: Settings): void {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(settings))
-  } catch {
-    // Storage can be blocked (quota, private mode, disabled cookies). The app
-    // should keep working in-memory rather than crash the save flow.
-  }
+  writeJson(KEY, settings)
 }
 
 export function clearSettings(): void {
-  try {
-    localStorage.removeItem(KEY)
-  } catch {
-    // Ignore; nothing else to do if storage is unavailable.
-  }
+  removeKey(KEY)
 }

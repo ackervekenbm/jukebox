@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { clearReleaseDetails } from '../db/collection'
+import { formatTime, plural } from '../utils/format'
 import {
   formatBytes,
   gatherStorageStats,
@@ -14,14 +15,10 @@ import {
 
 /** "2 shelves", plus the user's own gatefold calls when there are any. */
 function cabinetSummary(cabinet: CabinetStat): string {
-  const shelves = `${cabinet.slots} ${cabinet.slots === 1 ? 'shelf' : 'shelves'}`
+  const shelves = plural(cabinet.slots, 'shelf', 'shelves')
   if (cabinet.sleeveCalls === 0) return shelves
-  const calls = `${cabinet.sleeveCalls.toLocaleString()} gatefold ${cabinet.sleeveCalls === 1 ? 'correction' : 'corrections'}`
+  const calls = plural(cabinet.sleeveCalls, 'gatefold correction')
   return `${shelves} · ${calls}`
-}
-
-function formatTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
 interface StorageStatsProps {

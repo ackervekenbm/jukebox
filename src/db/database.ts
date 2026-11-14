@@ -3,6 +3,8 @@
 
 import { openDB } from 'idb'
 
+// The app's name before Jukebox. Renaming it would orphan every browser's
+// cached collection, so it (and the `vinyl-vault:` localStorage keys) stays.
 export const DB_NAME = 'vinyl-vault'
 
 /**

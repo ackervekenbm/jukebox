@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2025-2026 ackervekenbm
 
+import { readJson, removeKey, writeJson } from './local'
+
 const KEY = 'vinyl-vault:prefs'
 
 /**
@@ -15,32 +17,14 @@ export interface Preferences {
 export const DEFAULT_PREFERENCES: Preferences = { groupPressings: false }
 
 export function loadPreferences(): Preferences {
-  try {
-    const raw = localStorage.getItem(KEY)
-    if (!raw) return { ...DEFAULT_PREFERENCES }
-    const parsed: unknown = JSON.parse(raw)
-    const groupPressings = (parsed as { groupPressings?: unknown } | null)?.groupPressings
-    return { groupPressings: typeof groupPressings === 'boolean' ? groupPressings : false }
-  } catch {
-    return { ...DEFAULT_PREFERENCES }
-  }
+  const groupPressings = (readJson(KEY) as { groupPressings?: unknown } | null)?.groupPressings
+  return { groupPressings: typeof groupPressings === 'boolean' ? groupPressings : false }
 }
 
 export function savePreferences(preferences: Preferences): void {
-  try {
-    localStorage.setItem(
-      KEY,
-      JSON.stringify({ groupPressings: Boolean(preferences.groupPressings) }),
-    )
-  } catch {
-    // Storage can be blocked; keep the in-memory preference working.
-  }
+  writeJson(KEY, { groupPressings: Boolean(preferences.groupPressings) })
 }
 
 export function clearPreferences(): void {
-  try {
-    localStorage.removeItem(KEY)
-  } catch {
-    // Ignore; nothing else to do if storage is unavailable.
-  }
+  removeKey(KEY)
 }

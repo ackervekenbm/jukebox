@@ -2,12 +2,10 @@
 // Copyright (C) 2025-2026 ackervekenbm
 
 import { createApp } from './app'
+import { HOST as host, PORT as port } from './config'
 import { closeDb } from './db'
 
 const app = createApp()
-
-const port = Number(process.env.PORT ?? 3000)
-const host = process.env.HOST ?? '127.0.0.1'
 
 const server = app.listen(port, host, () => {
   console.info(`[jukebox] http://${host}:${port} (client + API)`)

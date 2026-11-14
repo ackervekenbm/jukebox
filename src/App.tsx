@@ -66,6 +66,7 @@ import {
 } from './db/preferences'
 import { pickAvoiding } from './utils/picker'
 import { creditedArtists } from './utils/collection'
+import { formatTime } from './utils/format'
 import {
   createSavedView,
   hasCriteria,
@@ -85,11 +86,6 @@ function useDebounced<T>(value: T, delay: number): [T, (next: T) => void] {
     return () => clearTimeout(id)
   }, [value, delay])
   return [debounced, setDebounced]
-}
-
-function formatTime(ts: number): string {
-  const d = new Date(ts)
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
 function progressText(progress: SyncProgress): string {
