@@ -8,10 +8,8 @@ import { useDiscogsWaitNote } from '../hooks/useDiscogsWait'
 import {
   SIZE_CLASS_LABELS,
   conflictLabel,
-  detectedGatefold,
   discCountOf,
   isGatefold,
-  isUserCall,
   plural,
   sizeClassOf,
   spaceUnitsOf,
@@ -114,6 +112,8 @@ interface CabinetScreenProps {
   releases: DisplayRelease[]
   /** The collection has loaded (not enriching, no error); the gatefold scan waits for it. */
   collectionReady?: boolean
+  /** Opens a record's detail, where its sleeve and display calls are made. */
+  onOpenRelease: (record: DisplayRelease) => void
   onClose: () => void
 }
 
@@ -121,6 +121,7 @@ export function CabinetScreen({
   cabinet,
   releases,
   collectionReady = true,
+  onOpenRelease,
   onClose,
 }: CabinetScreenProps) {
   useScrollLock(true)
@@ -138,8 +139,6 @@ export function CabinetScreen({
     restoreSlot,
     setSort,
     setSeparateSizeClasses,
-    toggleGatefold,
-    toggleDisplayed,
     displayed,
     retry,
   } = cabinet
@@ -179,6 +178,8 @@ export function CabinetScreen({
   const unplacedExpanded = expanded.has(UNPLACED_ID)
   const displayedExpanded = expanded.has(DISPLAYED_ID)
   const [adding, setAdding] = useState(false)
+  // Capacity and remove stay out of the way until asked for.
+  const [editing, setEditing] = useState(false)
   const [newCapacity, setNewCapacity] = useState(DEFAULT_SHELF_SIZE)
   const [newCapacityError, setNewCapacityError] = useState(false)
   const [removed, setRemoved] = useState<(RemovedSlot & { name: string }) | null>(null)
@@ -250,78 +251,36 @@ export function CabinetScreen({
     setRemoved(null)
   }
 
-  // Says where the sleeve call comes from, so a wrong one can be traced.
-  const sleeveSource = (record: DisplayRelease) => {
-    if (isUserCall(record, sleeves)) {
-      return isGatefold(record, sleeves)
-        ? 'Gatefold, marked by you. Press again to go back to what Discogs says.'
-        : 'Standard sleeve, marked by you. Press again to go back to what Discogs says.'
-    }
-    return detectedGatefold(record, sleeves)
-      ? 'Gatefold, according to Discogs. Press if it is a standard sleeve.'
-      : 'Standard sleeve. Press to mark it as a gatefold.'
-  }
-
-  const recordRow = (record: DisplayRelease, onDisplay = false) => {
+  // Title and artist get the row; the sleeve and display calls live in the
+  // release detail a tap opens (#173). Only a record that takes more than one
+  // space carries a mark, with its reason (discs or sleeve) spelled out.
+  const recordRow = (record: DisplayRelease) => {
     const units = spaceUnitsOf(record, sleeves)
     const discs = discCountOf(record)
-    const gatefold = isGatefold(record, sleeves)
-    const vinyl = sizeClassOf(record) !== 'other'
-    const yours = isUserCall(record, sleeves)
+    const year = sortYear(record)
     return (
-    <li className="cabinet-record" key={record.key}>
-      {record.thumb ? (
-        <img className="cabinet-record-art" src={record.thumb} alt="" loading="lazy" />
-      ) : (
-        <span className="cabinet-record-art placeholder" aria-hidden="true" />
-      )}
-      <span className="cabinet-record-text">
-        <span className="cabinet-record-title">{record.title}</span>
-        <span className="cabinet-record-artist">{record.artistName}</span>
-      </span>
-      {sortYear(record) > 0 && <span className="cabinet-record-year">{sortYear(record)}</span>}
-      {/* Sleeve chips sit right-aligned on the artist's line, under the year, so
-          the years line up whatever chips a record has; the Display button
-          every row has comes last, so it and the Gatefold button line up too. */}
-      <span className="cabinet-record-tags">
-        {/* Says why it takes more than one space: its discs, or (with the
-            Gatefold button pressed next to it) its sleeve. */}
-        {units > 1 && (
-          <span className="cabinet-record-space">
-            {discs > 1 ? `${discs} discs` : `${units} spaces`}
+      <li key={record.key}>
+        <button type="button" className="cabinet-record" onClick={() => onOpenRelease(record)}>
+          {record.thumb ? (
+            <img className="cabinet-record-art" src={record.thumb} alt="" loading="lazy" />
+          ) : (
+            <span className="cabinet-record-art placeholder" aria-hidden="true" />
+          )}
+          <span className="cabinet-record-text">
+            <span className="cabinet-record-title">{record.title}</span>
+            <span className="cabinet-record-artist">{record.artistName}</span>
           </span>
-        )}
-        {vinyl && (
-          <button
-            type="button"
-            className={`cabinet-sleeve-btn${gatefold ? ' active' : ''}`}
-            aria-pressed={gatefold}
-            aria-label={`Gatefold: ${record.title}`}
-            aria-description={sleeveSource(record)}
-            title={sleeveSource(record)}
-            onClick={() => toggleGatefold(record)}
-          >
-            Gatefold
-            {/* Shown, not only told: a tooltip never appears on a touch screen. */}
-            {yours && <span className="cabinet-sleeve-yours">you</span>}
-          </button>
-        )}
-        <button
-          type="button"
-          className={`cabinet-sleeve-btn${onDisplay ? ' active' : ''}`}
-          aria-pressed={onDisplay}
-          aria-label={`On display: ${record.title}`}
-          title={
-            onDisplay
-              ? 'On display, so it needs no shelf. Press to put it back in the cabinet.'
-              : 'Press if this copy is on display elsewhere, so it needs no shelf.'
-          }
-          onClick={() => toggleDisplayed(record)}
-        >
-          Display
+          {year > 0 && <span className="cabinet-record-year">{year}</span>}
+          {units > 1 && (
+            <span className="cabinet-record-space">
+              <span aria-hidden="true">{units}×</span>
+              <span className="cabinet-visually-hidden">
+                {discs > 1 ? `${discs} discs` : `${units} spaces`}
+              </span>
+            </span>
+          )}
         </button>
-      </span>
-    </li>
+      </li>
     )
   }
 
@@ -416,7 +375,7 @@ export function CabinetScreen({
                       ? gatefoldScanError
                       : !collectionReady
                         ? 'Release notes are checked once your collection has loaded.'
-                        : 'Read from each record\'s format and release notes. Correct one with its Gatefold button.'}
+                        : 'Read from each record\'s format and release notes. Open a record to correct it.'}
                 </span>
                 <span className="cabinet-visually-hidden" role="status" aria-label="Release notes check">
                   {scanAnnouncement}
@@ -456,7 +415,6 @@ export function CabinetScreen({
                         inputMode="numeric"
                         min={MIN_SHELF_SIZE}
                         max={MAX_SHELF_SIZE}
-                        // The visible label is hidden on phones; this name isn't.
                         aria-label="Shelf size"
                         aria-invalid={newCapacityError}
                         aria-describedby={newCapacityError ? 'cabinet-new-size-error' : undefined}
@@ -486,17 +444,29 @@ export function CabinetScreen({
                   )}
                 </div>
               ) : (
-                <button
-                  type="button"
-                  className="cabinet-primary-btn"
-                  ref={addButtonRef}
-                  onClick={() => {
-                    setNewCapacity(DEFAULT_SHELF_SIZE)
-                    setAdding(true)
-                  }}
-                >
-                  Add shelf
-                </button>
+                <div className="cabinet-shelf-actions">
+                  {plan.slots.length > 0 && (
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      aria-pressed={editing}
+                      onClick={() => setEditing(!editing)}
+                    >
+                      {editing ? 'Done' : 'Edit shelves'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="cabinet-primary-btn"
+                    ref={addButtonRef}
+                    onClick={() => {
+                      setNewCapacity(DEFAULT_SHELF_SIZE)
+                      setAdding(true)
+                    }}
+                  >
+                    Add shelf
+                  </button>
+                </div>
               )}
             </div>
           </section>
@@ -575,25 +545,27 @@ export function CabinetScreen({
                     <span className="cabinet-slot-chevron">{isExpanded ? '▾' : '▸'}</span>
                   </button>
 
+                  {editing && (
+                    <div className="cabinet-slot-tools">
+                      <CapacityInput
+                        shelfName={shelfName}
+                        capacity={slot.slot.capacity}
+                        onChange={(capacity) => updateSlot(slot.slot.id, { capacity })}
+                      />
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={() => handleRemove(slot.slot.id, shelfName)}
+                        title="Remove shelf"
+                        aria-label={`Remove ${shelfName}`}
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
+                  )}
+
                   {isExpanded && (
                     <div id={`cabinet-slot-${slot.slot.id}`} className="cabinet-slot-body">
-                      <div className="cabinet-slot-tools">
-                        <CapacityInput
-                          shelfName={shelfName}
-                          capacity={slot.slot.capacity}
-                          onChange={(capacity) => updateSlot(slot.slot.id, { capacity })}
-                        />
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          onClick={() => handleRemove(slot.slot.id, shelfName)}
-                          title="Remove shelf"
-                          aria-label={`Remove ${shelfName}`}
-                        >
-                          <TrashIcon />
-                        </button>
-                      </div>
-
                       {slot.records.length === 0 ? (
                         <p className="cabinet-empty">Nothing on this shelf yet.</p>
                       ) : (
@@ -653,10 +625,10 @@ export function CabinetScreen({
                 {displayedExpanded && (
                   <div id="cabinet-displayed" className="cabinet-slot-body">
                     <p className="cabinet-hint">
-                      Displayed elsewhere, so they need no shelf. Press Display to put one back.
+                      Displayed elsewhere, so they need no shelf. Open one to put it back on a shelf.
                     </p>
                     <ul className="cabinet-records">
-                      {displayed.map((record) => recordRow(record, true))}
+                      {displayed.map((record) => recordRow(record))}
                     </ul>
                   </div>
                 )}

@@ -146,8 +146,9 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   sizes are kept apart), artist-split (per size run when sizes are kept
   apart), out-of-order (back-filled records) and unplaced. Layout is fully
   automatic — there are no manual pins; the only per-record call besides the
-  sleeve is "on display" (cabinet row or release detail), which takes a copy
-  off the shelves.
+  sleeve is "on display", which takes a copy
+  off the shelves. Both calls live in the release detail, which a tap on a
+  cabinet row opens; the rows themselves only show the record (#173).
 - Record cabinet — `src/hooks/useCabinet.ts` orchestrates it (called in `App`,
   on while the cabinet or a release detail is open; the release-notes scan
   runs only with the cabinet open): storage-first

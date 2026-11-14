@@ -32,6 +32,7 @@ import {
 import { SettingsForm } from './components/Settings'
 import { StorageStats } from './components/StorageStats'
 import { CabinetScreen } from './components/CabinetScreen'
+import { isGatefold, sizeClassOf, sleeveSource } from './utils/cabinet'
 import { useCabinet } from './hooks/useCabinet'
 import { useScrollLock } from './hooks/useScrollLock'
 import { useDatabaseState } from './hooks/useDatabaseState'
@@ -814,6 +815,7 @@ export default function App() {
           cabinet={cabinet}
           releases={displayReleases}
           collectionReady={status === 'idle'}
+          onOpenRelease={openRelease}
           onClose={() => setShowCabinet(false)}
         />
       )}
@@ -832,6 +834,13 @@ export default function App() {
           }
           displayed={cabinet.displayed.some((record) => record.instanceId === selected.instanceId)}
           onToggleDisplayed={settings ? () => cabinet.toggleDisplayed(selected) : undefined}
+          gatefold={isGatefold(selected, cabinet.sleeves)}
+          gatefoldSource={sleeveSource(selected, cabinet.sleeves)}
+          onToggleGatefold={
+            settings && sizeClassOf(selected) !== 'other'
+              ? () => cabinet.toggleGatefold(selected)
+              : undefined
+          }
           onClose={() => {
             setRecentPicks(null)
             setStack(null)
@@ -851,7 +860,7 @@ export default function App() {
       )}
 
       {/* Random picker (hidden while first-loading or when loading failed with no data) */}
-      {!showSettings && !isLoadingFirst && !isLoadingFailed && (
+      {!showSettings && !showCabinet && !showStats && !isLoadingFirst && !isLoadingFailed && (
         <button
           type="button"
           className="random-fab"

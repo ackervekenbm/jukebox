@@ -1798,6 +1798,10 @@ button:disabled {
   gap: 10px;
 }
 
+.detail-display + .detail-display {
+  margin-top: 10px;
+}
+
 .detail-display-hint {
   font-size: 12px;
   color: var(--text-dim);
@@ -2704,6 +2708,13 @@ button:disabled {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  padding: 0 14px 10px;
+}
+
+.cabinet-shelf-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .cabinet-slot-tools .icon-btn {
@@ -2721,8 +2732,14 @@ button:disabled {
 }
 
 .cabinet-slot-capacity input {
-  width: 68px;
-  padding: 4px 6px;
+  width: 72px;
+  min-height: 40px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
   text-align: right;
 }
 
@@ -2760,17 +2777,30 @@ button:disabled {
   color: var(--danger);
 }
 
-/* Art | title + artist | year on the title's line and the sleeve chips on the
-   artist's line, both right-aligned. */
+/* One tappable row: art | title + artist | year, with the space mark under
+   the year. The right column stays narrow so the names keep the width. */
 .cabinet-record {
+  width: 100%;
+  min-height: 52px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
   column-gap: 10px;
-  /* Breathing room between the year and the chips under it. */
-  row-gap: 4px;
-  padding: 6px 0;
+  row-gap: 2px;
+  padding: 8px 0;
+  background: transparent;
+  border: none;
   border-top: 1px solid var(--border);
+  border-radius: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+@media (hover: hover) {
+  .cabinet-record:hover {
+    background: var(--panel-hover);
+  }
 }
 
 .cabinet-empty {
@@ -2787,8 +2817,8 @@ button:disabled {
 
 .cabinet-record-art {
   grid-row: 1 / span 2;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border-radius: 6px;
   object-fit: cover;
   flex-shrink: 0;
@@ -2804,29 +2834,25 @@ button:disabled {
   flex-direction: column;
 }
 
+/* Up to two lines each, so a long title stays readable on a phone. */
+.cabinet-record-title,
+.cabinet-record-artist {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
 .cabinet-record-title {
   font-size: 0.86rem;
   color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .cabinet-record-artist {
   font-size: 0.76rem;
   color: var(--text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cabinet-record-tags {
-  grid-column: 3;
-  grid-row: 2;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 6px;
 }
 
 .cabinet-record-year {
@@ -2841,15 +2867,13 @@ button:disabled {
 }
 
 .cabinet-record-space {
-  flex-shrink: 0;
-  font-size: 0.64rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--accent-text);
+  grid-column: 3;
+  grid-row: 2;
+  justify-self: end;
+  font-size: 0.76rem;
+  font-weight: 600;
   color: var(--accent-text);
+  font-variant-numeric: tabular-nums;
 }
 
 .cabinet-sleeve-btn {
@@ -2893,15 +2917,6 @@ button:disabled {
   }
 }
 
-/* "you": the user made this call, shown rather than only in a tooltip. */
-.cabinet-sleeve-yours {
-  padding: 0 4px;
-  border-radius: 999px;
-  border: 1px solid currentColor;
-  font-size: 0.6rem;
-  line-height: 1.3;
-}
-
 /* Read by screen readers, not shown. */
 .cabinet-visually-hidden {
   position: absolute;
@@ -2919,10 +2934,6 @@ button:disabled {
 }
 
 @media (max-width: 560px) {
-  .cabinet-slot-capacity span {
-    display: none;
-  }
-
   /* Narrow screens: the control drops below its text. */
   .cabinet-setting {
     flex-direction: column;
@@ -2932,7 +2943,8 @@ button:disabled {
 
   .cabinet-setting .cabinet-switch,
   .cabinet-setting .cabinet-segmented,
-  .cabinet-setting .cabinet-primary-btn {
+  .cabinet-setting .cabinet-primary-btn,
+  .cabinet-shelf-actions {
     align-self: flex-start;
   }
 }
