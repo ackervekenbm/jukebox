@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2025-2026 ackervekenbm
 
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import type {
   DisplayRelease,
   GroupedArtist,
@@ -35,6 +35,8 @@ export function ArtistSection({
   onOpenStack,
 }: ArtistSectionProps) {
   const [collapsed, setCollapsed] = useState(false)
+  // Artist ids are names ("Herbie Hancock"), which can't be an id reference.
+  const releasesId = useId()
 
   const sorted = useMemo(
     () => [...artist.releases].sort((a, b) => compareReleases(a, b, sortMode)),
@@ -55,20 +57,9 @@ export function ArtistSection({
 
   return (
     <section className="artist-section">
-      <header
-        className="artist-header"
-        role="button"
-        tabIndex={0}
-        aria-expanded={!collapsed}
-        aria-controls={`artist-${artist.id}`}
-        onClick={() => setCollapsed((value) => !value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault()
-            setCollapsed((value) => !value)
-          }
-        }}
-      >
+      {/* The heading stays a heading; the toggle inside it covers the whole
+          header (.artist-toggle::after), so a tap anywhere still folds it. */}
+      <header className="artist-header">
         <span className="artist-avatar" aria-hidden="true">
           {thumbnail ? (
             <img src={thumbnail} alt="" loading="lazy" />
@@ -78,7 +69,17 @@ export function ArtistSection({
         </span>
 
         <div className="artist-heading">
-          <h2 className="artist-name">{artist.name}</h2>
+          <h2 className="artist-name">
+            <button
+              type="button"
+              className="artist-toggle"
+              aria-expanded={!collapsed}
+              aria-controls={collapsed ? undefined : releasesId}
+              onClick={() => setCollapsed((value) => !value)}
+            >
+              {artist.name}
+            </button>
+          </h2>
           <span className="artist-count">
             {sorted.length} {sorted.length === 1 ? 'release' : 'releases'} ·{' '}
             {uniqueAlbums} unique {uniqueAlbums === 1 ? 'album' : 'albums'}
@@ -91,7 +92,7 @@ export function ArtistSection({
       </header>
 
       {!collapsed && (
-        <div className="artist-releases" id={`artist-${artist.id}`} role="region">
+        <div className="artist-releases" id={releasesId} role="region" aria-label={`Releases by ${artist.name}`}>
           {grouped
             ? albumGroups.map((group) =>
                 group.pressings.length > 1 ? (
