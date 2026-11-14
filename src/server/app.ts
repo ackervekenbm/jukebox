@@ -4,9 +4,11 @@
 import express, { type ErrorRequestHandler, type Request, type Response } from 'express'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { anyCabinetDocSchema, etagForRevision, parseEtag, type CabinetDoc } from '../shared/cabinetDoc'
+import { anyCabinetDocSchema, type CabinetDoc } from '../shared/cabinetDoc'
+import { etagForRevision, parseEtag } from '../shared/etag'
 import { AuthError, parseToken, resolveUsername } from './auth'
 import { dbReady, getCabinetRow, putCabinetRow, ConflictError } from './db'
+import { CLIENT_DIST as distDir } from './config'
 import { discogsProxy } from './discogsProxy'
 
 /**
@@ -15,7 +17,6 @@ import { discogsProxy } from './discogsProxy'
  */
 export const SYNC_BODY_LIMIT_BYTES = 256 * 1024
 
-const distDir = path.resolve(process.env.CLIENT_DIST ?? path.resolve(process.cwd(), 'dist'))
 
 const NO_CACHE_FILES = ['index.html', 'sw.js', 'manifest.webmanifest']
 

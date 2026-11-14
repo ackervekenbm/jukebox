@@ -2,21 +2,15 @@
 // Copyright (C) 2025-2026 ackervekenbm
 
 import type { CabinetDoc } from '../shared/cabinetDoc'
+import { parseEtag } from '../shared/etag'
 
 const SYNC_URL = '/api/sync/cabinet'
 const FETCH_TIMEOUT_MS = 20_000
 
-/**
- * The wire ETag for a stored revision ("r3"). Duplicated from the shared
- * contract on purpose: `src/shared/cabinetDoc.ts` imports zod, and the client
- * must never pull zod into the browser bundle just for one template literal.
- */
-export const revisionEtag = (revision: number): string => `"r${revision}"`
-
 /** Reads a revision back out of a wire ETag, falling back when it is unusable. */
 export function revisionFromEtag(etag: string, fallback: number): number {
-  const match = /^"?r(\d+)"?$/.exec(etag.trim())
-  return match ? Number(match[1]) : fallback
+  const revision = parseEtag(etag)
+  return typeof revision === 'number' ? revision : fallback
 }
 
 export interface SyncSnapshot {

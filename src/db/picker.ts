@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2025-2026 ackervekenbm
 
+import { readJson, removeKey, writeJson } from './local'
+
 const KEY = 'vinyl-vault:picker'
 
 /** How many recent picks the picker tries to avoid by default. */
@@ -24,29 +26,14 @@ export function clampSkip(value: number): number {
  * falls back to the default instead of breaking the picker.
  */
 export function loadPickerConfig(): PickerConfig {
-  try {
-    const raw = localStorage.getItem(KEY)
-    if (!raw) return { skip: DEFAULT_SKIP }
-    const parsed: unknown = JSON.parse(raw)
-    const skip = (parsed as { skip?: unknown } | null)?.skip
-    return { skip: typeof skip === 'number' ? clampSkip(skip) : DEFAULT_SKIP }
-  } catch {
-    return { skip: DEFAULT_SKIP }
-  }
+  const skip = (readJson(KEY) as { skip?: unknown } | null)?.skip
+  return { skip: typeof skip === 'number' ? clampSkip(skip) : DEFAULT_SKIP }
 }
 
 export function savePickerConfig(config: PickerConfig): void {
-  try {
-    localStorage.setItem(KEY, JSON.stringify({ skip: clampSkip(config.skip) }))
-  } catch {
-    // Storage can be blocked; keep the in-memory preference working.
-  }
+  writeJson(KEY, { skip: clampSkip(config.skip) })
 }
 
 export function clearPickerConfig(): void {
-  try {
-    localStorage.removeItem(KEY)
-  } catch {
-    // Ignore; nothing else to do if storage is unavailable.
-  }
+  removeKey(KEY)
 }

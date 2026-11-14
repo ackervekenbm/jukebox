@@ -3,6 +3,11 @@
 
 import { z } from 'zod'
 
+/**
+ * A shelf. The screens say "shelf"; the code and the stored documents say
+ * "slot" (the earlier name), and renaming the stored field would break sync
+ * with older apps.
+ */
 export const slotSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
@@ -26,7 +31,9 @@ const sleevesSchema = z.record(z.string().regex(/^\d+$/), z.boolean())
 
 /** How the shelves are laid out: it decides where records physically go. */
 const optionsSchema = z.object({
+  /** Order inside each artist; artists themselves are always in filing order. */
   sort: z.enum(['chronological', 'byName']),
+  /** Keep each record size on its own shelves where the space allows. */
   separateSizeClasses: z.boolean(),
 })
 
@@ -82,16 +89,8 @@ export const anyCabinetDocSchema = z
 export type Slot = z.infer<typeof slotSchema>
 export type Cabinet = z.infer<typeof cabinetSchema>
 export type CabinetDoc = z.infer<typeof cabinetDocSchema>
+/** The layout options, synced and fed to the planner (`planCabinet`). */
+export type CabinetOptions = z.infer<typeof optionsSchema>
 export type LegacyCabinetDoc = z.infer<typeof legacyCabinetDocSchema>
 /** A document as a browser may still hold it: written before version 2, or since. */
 export type StoredCabinetDoc = CabinetDoc | LegacyCabinetDoc
-
-export const etagForRevision = (revision: number): string => `"r${revision}"`
-
-export const parseEtag = (header: string): number | 'force' | null => {
-  const value = header.trim()
-  if (value === '*') return 'force'
-  const unquoted = value.replace(/^"(.*)"$/, '$1')
-  const match = /^r(\d+)$/.exec(unquoted)
-  return match ? Number(match[1]) : null
-}

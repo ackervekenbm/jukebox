@@ -20,7 +20,6 @@ import { abortableSleep, discogsBudget, type Priority } from './rateLimit'
 // opaque CORS error and year enrichment can never finish. Through the proxy a
 // 429 is a normal, Retry-After-retryable response.
 const API_BASE = '/discogs'
-const USER_AGENT = 'Jukebox/0.1 (+local personal collection viewer)'
 // Cap how long a single request may take. Stalled connections (flaky proxy,
 // network pause, API hang) otherwise leave the sync spinning forever.
 const FETCH_TIMEOUT_MS = 20_000
@@ -61,7 +60,6 @@ async function discogsFetch(
       signal: controller.signal,
       headers: {
         Authorization: `Discogs token=${token}`,
-        'User-Agent': USER_AGENT,
         Accept: 'application/json',
       },
     })

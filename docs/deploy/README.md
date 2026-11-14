@@ -61,7 +61,7 @@ listens on `127.0.0.1` by default; `HOST=0.0.0.0` opens it to every interface.
 
 | Item | Value |
 | --- | --- |
-| Port | The app listens on `3000`. In Docker that is fixed, and you choose the host side (the examples use `8080`) |
+| Port | The app listens on `3000` (`PORT` for bare Node; a value that isn't a positive whole number stops startup with a message). In Docker that is fixed, and you choose the host side (the examples use `8080`) |
 | Listen address | `HOST`: `127.0.0.1` for bare Node, `0.0.0.0` in the image |
 | Data | `DATA_DIR` (default `./data`, `/app/data` in the image) holds `jukebox.db`. The only server-side state |
 | Web app files | `CLIENT_DIST` (default `./dist`) |

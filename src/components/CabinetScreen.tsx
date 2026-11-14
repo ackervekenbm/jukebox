@@ -11,10 +11,10 @@ import {
   conflictLabel,
   discCountOf,
   isGatefold,
-  plural,
   sizeClassOf,
   spaceUnitsOf,
 } from '../utils/cabinet'
+import { plural } from '../utils/format'
 import { CloseIcon, TrashIcon } from './icons'
 import { useEffect, useRef, useState } from 'react'
 

@@ -113,7 +113,8 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   `discogsProxy.ts` forwards `/discogs/*` (GET/HEAD only, rate-limit headers
   passed through); `auth.ts` verifies `Authorization: Discogs token=…` via
   Discogs `/oauth/identity` (10-min in-memory memo, tokens never stored);
-  `db.ts` = better-sqlite3 (WAL) with the `cabinet_docs` sync table. Tests for
+  `db.ts` = better-sqlite3 (WAL) with the `cabinet_docs` sync table. `config.ts`
+  reads and checks every environment variable once, at startup. Tests for
   routes sit next to the server code (`src/server/*.test.ts`, node environment via
   a `// @vitest-environment node` first line, supertest + temp `DATA_DIR`).
 - `src/shared/cabinetDoc.ts` — zod schema + types for the sync document,
@@ -211,7 +212,8 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   `useDatabaseState` turns into an app-wide banner. `src/db/collection.ts`,
   `src/db/listenLog.ts` and `src/db/cabinet.ts` are the typed store APIs;
   `settings.ts`, `views.ts`, `cabinetOptions.ts` and `picker.ts` in the same
-  folder are the localStorage counterparts.
+  folder are the localStorage counterparts, all through `local.ts` (blocked
+  storage never throws).
 - `src/theme.ts` + `src/styles.css` — CSS-variable themes
   (`midnight`/`paper`/`club`/`forest`); new UI styles must use existing `--*`
   tokens, never hardcoded colors.

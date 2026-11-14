@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2025-2026 ackervekenbm
 
-import type { Cabinet, Slot } from '../shared/cabinetDoc'
+import type { Cabinet, CabinetOptions, Slot } from '../shared/cabinetDoc'
 import { compareReleases, type ArtistSortMode, type DisplayRelease } from './collection'
 import { compareSortKeys, makeSortKey } from './sortName'
+import { plural } from './format'
 
 /** Physical size buckets the planner keeps apart where it can. */
 export type SizeClass = '12-inch' | 'small' | 'other'
@@ -195,14 +196,7 @@ export function needsNotesCheck(display: DisplayRelease, facts: SleeveFacts = {}
  */
 export type CabinetSortMode = ArtistSortMode
 
-export interface CabinetPlanOptions {
-  /** Order inside each artist; artists themselves are always in filing order. */
-  sort: CabinetSortMode
-  /** Keep each size class in its own slot(s) where the space allows. */
-  separateSizeClasses: boolean
-}
-
-export const DEFAULT_PLAN_OPTIONS: CabinetPlanOptions = {
+export const DEFAULT_PLAN_OPTIONS: CabinetOptions = {
   sort: 'chronological',
   separateSizeClasses: false,
 }
@@ -251,7 +245,7 @@ export interface CabinetPlan {
 export interface CabinetPlanInput {
   releases: DisplayRelease[]
   cabinet: Cabinet
-  options?: CabinetPlanOptions
+  options?: CabinetOptions
   sleeves?: SleeveFacts
 }
 
@@ -765,11 +759,6 @@ export function planCabinet(input: CabinetPlanInput): CabinetPlan {
     unplaced,
     conflicts,
   }
-}
-
-/** "1 shelf", "3 shelves". */
-export function plural(count = 0, one: string, many = `${one}s`): string {
-  return `${count.toLocaleString()} ${count === 1 ? one : many}`
 }
 
 export function conflictLabel(conflict: CabinetConflict): string {

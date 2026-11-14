@@ -2,7 +2,8 @@
 // Copyright (C) 2025-2026 ackervekenbm
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Cabinet, CabinetDoc, Slot, StoredCabinetDoc } from '../shared/cabinetDoc'
+import type { Cabinet, CabinetDoc, CabinetOptions, Slot, StoredCabinetDoc } from '../shared/cabinetDoc'
+import { etagForRevision } from '../shared/etag'
 import type { DisplayRelease } from '../utils/collection'
 import {
   detectedGatefold,
@@ -17,12 +18,10 @@ import {
   DEFAULT_CABINET_OPTIONS,
   loadCabinetOptions,
   saveCabinetOptions,
-  type CabinetOptions,
 } from '../db/cabinetOptions'
 import {
   fetchCabinet,
   pushCabinet,
-  revisionEtag,
   revisionFromEtag,
   SyncConflictError,
 } from '../api/sync'
@@ -280,7 +279,7 @@ export function useCabinet({
 
       for (let attempt = 0; attempt < MAX_PUSH_ATTEMPTS; attempt++) {
         try {
-          const result = await pushCabinet(authToken, nextDoc, revisionEtag(nextRevision))
+          const result = await pushCabinet(authToken, nextDoc, etagForRevision(nextRevision))
           const savedRevision = revisionFromEtag(result.etag, nextRevision + 1)
           setRevision(savedRevision)
           // A push queued behind this one must start from the saved revision.
