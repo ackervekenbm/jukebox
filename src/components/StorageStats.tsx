@@ -87,9 +87,9 @@ export function StorageStats({ username, onClearData }: StorageStatsProps) {
   const artCache = stats?.caches?.find((c) => c.name === 'album-art') ?? null
 
   return (
-    <section className="stats-wrap" aria-label="Storage and diagnostics">
-      {loading && <p className="stats-note">Loading…</p>}
-      {error && <p className="stats-note error">{error}</p>}
+    <section className="storage-wrap" aria-label="Storage and diagnostics">
+      {loading && <p className="storage-note">Loading…</p>}
+      {error && <p className="storage-note error">{error}</p>}
 
       {!loading && !error && stats && (
         <>
@@ -97,22 +97,22 @@ export function StorageStats({ username, onClearData }: StorageStatsProps) {
           {/*  Origin storage (HTTPS / secure context only)                   */}
           {/* -------------------------------------------------------------- */}
           {stats.origin && (
-            <div className="stats-block">
+            <div className="storage-block">
               <h3>Storage quota</h3>
-              <div className="stats-row">
-                <span className="stats-label">Used</span>
-                <span className="stats-value">
+              <div className="storage-row">
+                <span className="storage-label">Used</span>
+                <span className="storage-value">
                   {formatBytes(stats.origin.usage)} / {formatBytes(stats.origin.quota)}
                 </span>
               </div>
-              <div className="stats-bar">
+              <div className="storage-bar">
                 <div
-                  className={`stats-bar-fill${quotaPercent >= 80 ? ' warn' : ''}`}
+                  className={`storage-bar-fill${quotaPercent >= 80 ? ' warn' : ''}`}
                   style={{ width: `${quotaPercent}%` }}
                 />
               </div>
-              <div className="stats-row">
-                <span className="stats-label">
+              <div className="storage-row">
+                <span className="storage-label">
                   Persistent storage
                   <span
                     className="info-holder"
@@ -137,7 +137,7 @@ export function StorageStats({ username, onClearData }: StorageStatsProps) {
                     )}
                   </span>
                 </span>
-                <span className="stats-value">{persisted ? 'Yes' : 'No'}</span>
+                <span className="storage-value">{persisted ? 'Yes' : 'No'}</span>
               </div>
               {!persisted && persisted !== null && (
                 <button
@@ -149,13 +149,13 @@ export function StorageStats({ username, onClearData }: StorageStatsProps) {
                 </button>
               )}
               {persisted === null && (
-                <p className="stats-note">Not supported in this browser context.</p>
+                <p className="storage-note">Not supported in this browser context.</p>
               )}
             </div>
           )}
 
           {!stats.origin && !stats.caches && (
-            <p className="stats-note">
+            <p className="storage-note">
               Served over plain HTTP: browser quota, persistence and image caching
               aren&apos;t measurable until the app is served over HTTPS.
             </p>
@@ -164,36 +164,36 @@ export function StorageStats({ username, onClearData }: StorageStatsProps) {
           {/* -------------------------------------------------------------- */}
           {/*  Breakdown                                                      */}
           {/* -------------------------------------------------------------- */}
-          <div className="stats-block">
+          <div className="storage-block">
             <h3>What&apos;s stored here</h3>
 
-            <div className="stats-row">
-              <span className="stats-label">Collection</span>
-              <span className="stats-value">
+            <div className="storage-row">
+              <span className="storage-label">Collection</span>
+              <span className="storage-value">
                 {stats.indexedDb.collection
                   ? `${stats.indexedDb.collection.releaseCount.toLocaleString()} releases`
                   : 'empty'}
               </span>
             </div>
             {stats.indexedDb.collection?.fetchedAt && (
-              <div className="stats-row stats-sub">
-                <span className="stats-label">Last synced</span>
-                <span className="stats-value">
+              <div className="storage-row storage-sub">
+                <span className="storage-label">Last synced</span>
+                <span className="storage-value">
                   {formatTime(stats.indexedDb.collection.fetchedAt)}
                 </span>
               </div>
             )}
 
-            <div className="stats-row">
-              <span className="stats-label">Master releases</span>
-              <span className="stats-value">
+            <div className="storage-row">
+              <span className="storage-label">Master releases</span>
+              <span className="storage-value">
                 {stats.indexedDb.masterYears.cachedIds.toLocaleString()} saved
               </span>
             </div>
 
-            <div className="stats-row">
-              <span className="stats-label">Album art</span>
-              <span className="stats-value">
+            <div className="storage-row">
+              <span className="storage-label">Album art</span>
+              <span className="storage-value">
                 {cacheReadable
                   ? artCache
                     ? `${artCache.entries} image${artCache.entries !== 1 ? 's' : ''}${
@@ -204,33 +204,33 @@ export function StorageStats({ username, onClearData }: StorageStatsProps) {
               </span>
             </div>
 
-            <div className="stats-row">
-              <span className="stats-label">Tracklists</span>
-              <span className="stats-value">
+            <div className="storage-row">
+              <span className="storage-label">Tracklists</span>
+              <span className="storage-value">
                 {stats.indexedDb.detailCount.toLocaleString()} saved
               </span>
             </div>
 
-            <div className="stats-row">
-              <span className="stats-label">Listen log</span>
-              <span className="stats-value">
+            <div className="storage-row">
+              <span className="storage-label">Listen log</span>
+              <span className="storage-value">
                 {stats.indexedDb.listenCount.toLocaleString()}{' '}
                 {stats.indexedDb.listenCount === 1 ? 'pick' : 'picks'}
               </span>
             </div>
 
-            <div className="stats-row">
-              <span className="stats-label">Record cabinet</span>
-              <span className="stats-value">
+            <div className="storage-row">
+              <span className="storage-label">Record cabinet</span>
+              <span className="storage-value">
                 {stats.indexedDb.cabinet
                   ? cabinetSummary(stats.indexedDb.cabinet)
                   : 'not set up'}
               </span>
             </div>
 
-            <div className="stats-row">
-              <span className="stats-label">App shell</span>
-              <span className="stats-value">
+            <div className="storage-row">
+              <span className="storage-label">App shell</span>
+              <span className="storage-value">
                 {cacheReadable
                   ? shellCache
                     ? `${shellCache.entries} file${shellCache.entries !== 1 ? 's' : ''}`
@@ -239,9 +239,9 @@ export function StorageStats({ username, onClearData }: StorageStatsProps) {
               </span>
             </div>
 
-            <div className="stats-row">
-              <span className="stats-label">Settings</span>
-              <span className="stats-value">
+            <div className="storage-row">
+              <span className="storage-label">Settings</span>
+              <span className="storage-value">
                 {stats.localStorage.keys} key{stats.localStorage.keys !== 1 ? 's' : ''} ·{' '}
                 {formatBytes(stats.localStorage.bytes)}
               </span>
@@ -251,7 +251,7 @@ export function StorageStats({ username, onClearData }: StorageStatsProps) {
           {/* -------------------------------------------------------------- */}
           {/*  Actions                                                        */}
           {/* -------------------------------------------------------------- */}
-          <div className="stats-block advanced-actions">
+          <div className="storage-block advanced-actions">
             <button type="button" className="secondary-btn" onClick={handleClearTracklists}>
               Clear tracklists
             </button>

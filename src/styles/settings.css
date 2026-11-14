@@ -306,20 +306,20 @@
   border-radius: 12px;
 }
 
-/* -- stats rows ---------------------------------------------------------- */
+/* -- storage rows (Settings → Advanced; stats.css owns the stats-* classes) -- */
 
-.stats-wrap {
+.storage-wrap {
   font-size: 13px;
   line-height: 1.5;
 }
 
-.stats-block + .stats-block {
+.storage-block + .storage-block {
   margin-top: 18px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
 }
 
-.stats-block h3 {
+.storage-block h3 {
   margin: 0 0 10px;
   font-size: 11px;
   letter-spacing: 0.06em;
@@ -328,7 +328,7 @@
   font-weight: 700;
 }
 
-.stats-row {
+.storage-row {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -336,27 +336,27 @@
   padding: 4px 0;
 }
 
-.stats-label {
+.storage-label {
   color: var(--text-dim);
 }
 
-.stats-value {
+.storage-value {
   color: var(--text);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
-.stats-sub {
+.storage-sub {
   padding-left: 14px;
 }
 
-.stats-sub .stats-label,
-.stats-sub .stats-value {
+.storage-sub .storage-label,
+.storage-sub .storage-value {
   color: var(--text-faint);
   font-size: 12px;
 }
 
-.stats-bar {
+.storage-bar {
   height: 8px;
   margin: 8px 0 12px;
   border-radius: 999px;
@@ -364,25 +364,25 @@
   overflow: hidden;
 }
 
-.stats-bar-fill {
+.storage-bar-fill {
   height: 100%;
   border-radius: 999px;
   background: var(--accent);
   transition: width 0.2s ease;
 }
 
-.stats-bar-fill.warn {
+.storage-bar-fill.warn {
   background: var(--accent-strong);
 }
 
-.stats-note {
+.storage-note {
   margin: 6px 0 0;
   font-size: 12px;
   color: var(--text-faint);
   line-height: 1.45;
 }
 
-.stats-note.error {
+.storage-note.error {
   color: var(--danger);
 }
 
