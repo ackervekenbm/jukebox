@@ -209,8 +209,10 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   dirty, and a 409 rebase-and-retry when the server copy moved. Pushes run one
   at a time, and a push only marks the cabinet clean when no edit happened
   while it was in flight (an edit counter), so a quick second edit is never
-  lost. Shelf ids are unique: the schema rejects duplicates and loading
-  repairs them (`withUniqueSlotIds`), since older clients numbered shelves by
+  lost; a reset ("Clear everything") makes a push still in flight drop its
+  answer, so it can't write the cabinet back. Shelf ids are unique: the
+  schema rejects duplicates and loading repairs
+  them (`withUniqueSlotIds`), since older clients numbered shelves by
   count. Building, rebasing and repairing the synced document are plain
   functions in `src/utils/cabinetModel.ts`. Client sync
   lives in `src/api/sync.ts`; the screen is `src/components/CabinetScreen.tsx`.
