@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2025-2026 ackervekenbm
 
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { rm } from 'node:fs/promises'
 import request from 'supertest'
 import type { Express } from 'express'
@@ -36,6 +36,10 @@ const app: Express = createApp()
 const syncAs = (token: string) =>
   request(app).get('/api/sync/cabinet').set('Authorization', `Discogs token=${token}`)
 
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
 afterAll(async () => {
   vi.unstubAllGlobals()
   closeDb()
@@ -49,8 +53,10 @@ describe('Discogs identity check', () => {
     expect(res.body.username).toBe('alice')
   })
 
-  it.each(['revoked', 'forbidden'])('answers 401 when Discogs refuses the token (%s)', async (token) => {
+  it.each(['revoked', 'forbidden'])('answers 401 when Discogs refuses the token (%s), without logging it', async (token) => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect((await syncAs(token)).status).toBe(401)
+    expect(error).not.toHaveBeenCalled()
   })
 
   it('passes a Discogs rate limit on as 429 with its Retry-After, not as a bad token', async () => {
@@ -59,13 +65,20 @@ describe('Discogs identity check', () => {
     expect(res.status).toBe(429)
     expect(res.headers['retry-after']).toBe('7')
     expect(error).toHaveBeenCalled()
-    error.mockRestore()
   })
 
-  it.each(['down', 'unreachable'])('answers 502 when Discogs is %s, and logs it', async (token) => {
+  it.each(['down', 'unreachable'])('answers 502 when Discogs is %s, and logs it without the token', async (token) => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect((await syncAs(token)).status).toBe(502)
     expect(error).toHaveBeenCalled()
-    error.mockRestore()
+    const logged = error.mock.calls.flat().map((arg) => (arg instanceof Error ? `${arg.message} ${String(arg.cause)}` : String(arg)))
+    expect(logged.join(' ')).not.toContain(`token=${token}`)
+  })
+
+  it('keeps why Discogs could not be reached', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await syncAs('unreachable')
+    const logged = error.mock.calls.flat().find((arg) => arg instanceof Error) as Error
+    expect(logged.cause).toBeInstanceOf(TypeError)
   })
 })

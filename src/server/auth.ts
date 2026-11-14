@@ -10,8 +10,9 @@ export class AuthError extends Error {
     message: string,
     /** Discogs' Retry-After, passed on with a 429. */
     readonly retryAfter?: string,
+    options?: ErrorOptions,
   ) {
-    super(message)
+    super(message, options)
     this.name = 'AuthError'
   }
 }
@@ -42,14 +43,16 @@ export async function resolveUsername(token: string): Promise<string> {
       },
       signal: AbortSignal.timeout(15_000),
     })
-  } catch {
-    throw new AuthError(502, 'Discogs identity check is unreachable')
+  } catch (err) {
+    throw new AuthError(502, 'Discogs identity check is unreachable', undefined, { cause: err })
   }
 
+  // Only an OK answer is read; let go of any other body at once.
+  if (!response.ok) await response.body?.cancel()
   if (response.status === 401 || response.status === 403) {
     throw new AuthError(401, 'Discogs rejected the token')
   }
-  // Busy or down is not a bad token: the client should try again, not sign out.
+  // Busy or down is not a bad token, so it is not answered as one (401).
   if (response.status === 429) {
     throw new AuthError(429, 'Discogs is rate limiting the identity check', response.headers.get('retry-after') ?? undefined)
   }
