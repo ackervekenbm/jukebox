@@ -19,6 +19,12 @@ interface SettingsProps {
   pickerSkip: number
   /** Fires on every edit; the caller clamps and persists immediately. */
   onPickerSkipChange: (skip: number) => void
+  /** Re-reads the collection from Discogs; no button without it (first run). */
+  onRefresh?: () => void
+  /** A sync is running, so a second one can't start. */
+  refreshing?: boolean
+  /** When the collection was last read from Discogs, already formatted. */
+  lastSynced?: string
   onClose?: () => void
   children?: ReactNode
 }
@@ -32,6 +38,9 @@ export function SettingsForm({
   onGroupPressingsChange,
   pickerSkip,
   onPickerSkipChange,
+  onRefresh,
+  refreshing = false,
+  lastSynced,
   onClose,
   children,
 }: SettingsProps) {
@@ -142,6 +151,17 @@ export function SettingsForm({
               Shows one stacked card per album instead of a card per pressing. Open a stack and use
               the arrows to step through its pressings.
             </span>
+            {onRefresh && (
+              <div className="settings-refresh">
+                <button type="button" className="secondary-btn" onClick={onRefresh} disabled={refreshing}>
+                  {refreshing ? 'Refreshing…' : 'Refresh from Discogs'}
+                </button>
+                <span className="settings-help">
+                  {lastSynced ? `Last synced ${lastSynced}. ` : ''}
+                  Jukebox also checks Discogs each time it opens.
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="theme-section">
