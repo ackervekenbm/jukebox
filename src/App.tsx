@@ -3,11 +3,10 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import type { Settings as SettingsType } from './db/settings'
-import type { DiscogsCollectionRelease } from './types/discogs'
 import { loadSettings, saveSettings, clearSettings } from './db/settings'
 import type { ThemeId } from './theme'
 import { applyTheme } from './theme'
-import { useCollection, type SyncProgress } from './hooks/useCollection'
+import { useCollection } from './hooks/useCollection'
 import { useCollectionValue } from './hooks/useCollectionValue'
 import {
   filterReleases,
@@ -23,31 +22,32 @@ import {
   DEFAULT_FILTERS,
   selectFolderReleases,
   toggleFolder,
-  type DisplayRelease,
   type Filters,
-  type PressingGroup,
   type ArtistSortMode,
   type ViewMode,
 } from './utils/collection'
-import { SettingsForm } from './components/Settings'
-import { StorageStats } from './components/StorageStats'
 import { CabinetScreen } from './components/CabinetScreen'
 import { isGatefold, sizeClassOf, sleeveSource } from './utils/cabinet'
 import { useCabinet } from './hooks/useCabinet'
-import { useDialog } from './hooks/useDialog'
+import { useDebounced } from './hooks/useDebounced'
+import { useReleaseDetail } from './hooks/useReleaseDetail'
+import { useSavedViews } from './hooks/useSavedViews'
 import { useScrollLock } from './hooks/useScrollLock'
 import { useDatabaseState } from './hooks/useDatabaseState'
 import { useDiscogsWaitNote } from './hooks/useDiscogsWait'
-import { SearchBar } from './components/SearchBar'
-import { FiltersButton, FilterPanel } from './components/FilterMenu'
-import { ViewsButton, ViewsPanel } from './components/ViewsMenu'
+import { AppHeader } from './components/AppHeader'
+import { FolderBar } from './components/FolderBar'
+import { SettingsOverlay } from './components/SettingsOverlay'
+import { DatabaseBanner, FirstLoad, LoadFailed, SyncBanner, SyncFailedBanner } from './components/SyncStatus'
+import { Toolbar } from './components/Toolbar'
+import { FilterPanel } from './components/FilterMenu'
+import { ViewsPanel } from './components/ViewsMenu'
 import { ArtistSection } from './components/ArtistSection'
 import { RecentList } from './components/RecentList'
-import { ReleaseDetail, type RecentPick } from './components/ReleaseDetail'
+import { ReleaseDetail } from './components/ReleaseDetail'
 import { StatsPanel } from './components/StatsPanel'
-import { SettingsIcon, ShuffleIcon, ChevronIcon, RecordPlayer, StatsIcon, CabinetIcon } from './components/icons'
+import { ShuffleIcon } from './components/icons'
 import { clearCabinet } from './db/cabinet'
-import { loadViews, saveViews, clearViews } from './db/views'
 import {
   clampSkip,
   clearPickerConfig,
@@ -55,8 +55,7 @@ import {
   loadPickerConfig,
   savePickerConfig,
 } from './db/picker'
-import { clearListenLog, getListenLog, getRecentListenIds, logListen } from './db/listenLog'
-import type { ListenEntry } from './db/listenLog'
+import { clearListenLog } from './db/listenLog'
 import {
   DEFAULT_PREFERENCES,
   clearPreferences,
@@ -64,57 +63,7 @@ import {
   savePreferences,
   type Preferences,
 } from './db/preferences'
-import { pickAvoiding } from './utils/picker'
-import { creditedArtists } from './utils/collection'
 import { formatTime } from './utils/format'
-import {
-  createSavedView,
-  hasCriteria,
-  sameCriteria,
-  type SavedView,
-} from './utils/views'
-
-/**
- * Debounces the search box while typing, but also hands back a setter that
- * applies a value immediately — a saved view should switch the listing at once
- * rather than wait out the typing delay.
- */
-function useDebounced<T>(value: T, delay: number): [T, (next: T) => void] {
-  const [debounced, setDebounced] = useState(value)
-  useEffect(() => {
-    const id = setTimeout(() => setDebounced(value), delay)
-    return () => clearTimeout(id)
-  }, [value, delay])
-  return [debounced, setDebounced]
-}
-
-function progressText(progress: SyncProgress): string {
-  if (progress.phase === 'years') {
-    return `Retrieving original release years… ${progress.loaded.toLocaleString()} / ${progress.total.toLocaleString()}`
-  }
-  return `Fetching releases… ${progress.loaded.toLocaleString()} / ${progress.total.toLocaleString()}`
-}
-
-/** Shapes the stored log for the picker history in the detail overlay. */
-function toRecentPicks(
-  entries: ListenEntry[],
-  currentId: number,
-  releases: DiscogsCollectionRelease[],
-): RecentPick[] {
-  return entries
-    .filter((entry) => entry.id !== currentId)
-    .slice(0, 5)
-    .map((entry) => {
-      const basic = releases.find((release) => release.id === entry.id)?.basic_information
-      if (!basic) return { id: entry.id, at: entry.at, label: `Release #${entry.id}` }
-      const artist = basic.artists?.length ? creditedArtists(basic.artists) : ''
-      return {
-        id: entry.id,
-        at: entry.at,
-        label: artist ? `${artist} — ${basic.title}` : basic.title,
-      }
-    })
-}
 
 export default function App() {
   const databaseState = useDatabaseState()
@@ -148,30 +97,16 @@ export default function App() {
   const [debouncedQuery, setDebouncedQuery] = useDebounced(query, 150)
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [views, setViews] = useState<SavedView[]>(loadViews)
   const [viewsOpen, setViewsOpen] = useState(false)
-  const [activeViewId, setActiveViewId] = useState<string | null>(null)
   // Collection folders on screen; empty means every folder ("All"). Folder
   // chips are toggles so several folders can be browsed as one list.
   const [folderSelection, setFolderSelection] = useState<number[]>([])
   const [artistSortMode, setArtistSortMode] = useState<ArtistSortMode>('chronological')
   const [viewMode, setViewMode] = useState<ViewMode>('artists')
-  const [selected, setSelected] = useState<DisplayRelease | null>(null)
   const [showCabinet, setShowCabinet] = useState(false)
-  // Recent-pick history shown in the detail overlay; non-null only while the
-  // release on screen came from the random picker.
-  const [recentPicks, setRecentPicks] = useState<RecentPick[] | null>(null)
   const [pickerSkip, setPickerSkip] = useState(() => loadPickerConfig().skip)
   const [preferences, setPreferences] = useState<Preferences>(loadPreferences)
-  // The master whose stack is open in the detail view, and which pressing of
-  // it is showing; null for a release opened straight from the grid.
-  const [stack, setStack] = useState<{ pressings: DisplayRelease[]; index: number } | null>(null)
   const [showStats, setShowStats] = useState(false)
-  // Escape closes settings only once there is an account to go back to.
-  const settingsDialogRef = useDialog<HTMLDivElement>(
-    settings ? () => setShowSettings(false) : undefined,
-    showSettings,
-  )
   const toolbarRef = useRef<HTMLDivElement>(null)
 
   // The valuation is a single cheap request, but it is still only asked for
@@ -191,28 +126,9 @@ export default function App() {
     if (showStats) openValue()
   }, [showStats, openValue])
 
-  useScrollLock(showSettings)
   useScrollLock(showStats)
 
   const accountKey = settings ? `${settings.username}\u0001${settings.token}` : ''
-
-  useEffect(() => {
-    // Reset the browsing state for a new account only. Keying on the whole
-    // settings object would also wipe search/filters/sort whenever a
-    // preference (e.g. the UI theme) changes for the same account.
-    /* eslint-disable react-hooks/set-state-in-effect */
-    setQuery('')
-    setFilters(DEFAULT_FILTERS)
-    setFolderSelection([])
-    setArtistSortMode('chronological')
-    setViewMode('artists')
-    setSelected(null)
-    setRecentPicks(null)
-    setStack(null)
-    setActiveViewId(null)
-    setShowCabinet(false)
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [accountKey])
 
   const folderReleases = useMemo(
     () => selectFolderReleases(releases, folderSelection),
@@ -247,6 +163,44 @@ export default function App() {
     () => releases.map((release) => toDisplayRelease(release, masterYears)),
     [releases, masterYears],
   )
+
+  const closeViews = useCallback(() => setViewsOpen(false), [])
+
+  // Switching views swaps the whole listing, so bring the user back to the
+  // controls that changed it instead of leaving them mid-grid.
+  const revealToolbar = useCallback(() => {
+    toolbarRef.current?.scrollIntoView({ block: 'start' })
+  }, [])
+
+  const showSelection = useCallback(
+    (nextQuery: string, nextFilters: Filters) => {
+      setQuery(nextQuery)
+      setDebouncedQuery(nextQuery)
+      setFilters(nextFilters)
+      setViewsOpen(false)
+      revealToolbar()
+    },
+    [revealToolbar, setDebouncedQuery],
+  )
+
+  const savedViews = useSavedViews({
+    query,
+    filters,
+    scope: folderReleases,
+    masterYears,
+    onSelect: showSelection,
+  })
+  const { activeView, dirty: viewDirty } = savedViews
+
+  const detail = useReleaseDetail({
+    releases,
+    masterYears,
+    candidates: filtered,
+    username: settings?.username ?? null,
+    pickerSkip,
+  })
+  const { selected } = detail
+
   // Loaded while the cabinet or a release is open: both can put a record on display.
   const cabinet = useCabinet({
     username: settings?.username ?? '',
@@ -257,101 +211,27 @@ export default function App() {
     collectionReady: showCabinet && status === 'idle',
   })
 
+  const { close: closeDetail } = detail
+  const { deselect: deselectView } = savedViews
+  useEffect(() => {
+    // Reset the browsing state for a new account only. Keying on the whole
+    // settings object would also wipe search/filters/sort whenever a
+    // preference (e.g. the UI theme) changes for the same account.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setQuery('')
+    setFilters(DEFAULT_FILTERS)
+    setFolderSelection([])
+    setArtistSortMode('chronological')
+    setViewMode('artists')
+    closeDetail()
+    deselectView()
+    setShowCabinet(false)
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [accountKey, closeDetail, deselectView])
+
   const artistCount = grouped.length
   const totalMatching = filtered.length
   const uniqueMatching = useMemo(() => countUniqueAlbums(filtered), [filtered])
-
-  // A view is only "in use" while the live selection still matches it exactly;
-  // any hand edit to the search box or filters marks it as changed.
-  const activeView = useMemo(
-    () => views.find((view) => view.id === activeViewId) ?? null,
-    [views, activeViewId],
-  )
-  const viewDirty = activeView ? !sameCriteria(activeView, query, filters) : false
-  const canSaveView = hasCriteria(query, filters)
-
-  // Live match counts, so a stale view (a label the collection no longer has)
-  // shows 0 instead of silently promising results.
-  const viewCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    for (const view of views) {
-      counts[view.id] = filterReleases(
-        folderReleases,
-        { ...view.filters, query: view.query },
-        masterYears,
-      ).length
-    }
-    return counts
-  }, [views, folderReleases, masterYears])
-
-  const persistViews = useCallback((next: SavedView[]) => {
-    setViews(next)
-    saveViews(next)
-  }, [])
-
-  const closeViews = useCallback(() => setViewsOpen(false), [])
-
-  // Switching views swaps the whole listing, so bring the user back to the
-  // controls that changed it instead of leaving them mid-grid.
-  const revealToolbar = useCallback(() => {
-    toolbarRef.current?.scrollIntoView({ block: 'start' })
-  }, [])
-
-  const applyView = useCallback(
-    (view: SavedView) => {
-      setQuery(view.query)
-      setDebouncedQuery(view.query)
-      setFilters({ ...view.filters })
-      setActiveViewId(view.id)
-      setViewsOpen(false)
-      revealToolbar()
-    },
-    [revealToolbar, setDebouncedQuery],
-  )
-
-  const clearView = useCallback(() => {
-    setQuery('')
-    setDebouncedQuery('')
-    setFilters(DEFAULT_FILTERS)
-    setActiveViewId(null)
-    setViewsOpen(false)
-    revealToolbar()
-  }, [revealToolbar, setDebouncedQuery])
-
-  const addView = useCallback(
-    (name: string) => {
-      persistViews([...views, createSavedView(name, query, filters)])
-    },
-    [persistViews, views, query, filters],
-  )
-
-  const renameView = useCallback(
-    (id: string, name: string) => {
-      persistViews(views.map((view) => (view.id === id ? { ...view, name: name.trim() } : view)))
-    },
-    [persistViews, views],
-  )
-
-  const deleteView = useCallback(
-    (id: string) => {
-      persistViews(views.filter((view) => view.id !== id))
-      setActiveViewId((current) => (current === id ? null : current))
-    },
-    [persistViews, views],
-  )
-
-  const updateView = useCallback(
-    (view: SavedView) => {
-      persistViews(
-        views.map((entry) =>
-          entry.id === view.id
-            ? { ...entry, query: query.trim(), filters: { ...filters } }
-            : entry,
-        ),
-      )
-    },
-    [persistViews, views, query, filters],
-  )
 
   const onSaveSettings = (newSettings: SettingsType) => {
     saveSettings({ ...newSettings, theme })
@@ -376,58 +256,8 @@ export default function App() {
     // Folder switching resets the filters, so a saved view is no longer what's
     // on screen: drop it rather than claim it is still applied.
     setFilters(DEFAULT_FILTERS)
-    setActiveViewId(null)
+    savedViews.deselect()
   }
-
-  const pickRandom = useCallback(async () => {
-    if (filtered.length === 0 || !settings) return
-    const recentIds = await getRecentListenIds(settings.username, pickerSkip)
-    const picked = pickAvoiding(filtered, recentIds, pickerSkip)
-    if (!picked) return
-    // Every pick is logged — including re-rolls from an open detail view —
-    // so the skip window always reflects what the picker actually served.
-    await logListen(settings.username, picked.id)
-    const entries = await getListenLog(settings.username)
-    setRecentPicks(toRecentPicks(entries, picked.id, releases))
-    setSelected(toDisplayRelease(picked, masterYears))
-    setStack(null)
-  }, [filtered, masterYears, releases, settings, pickerSkip])
-
-  /** Opening a card is browsing, not a listen: no history, no stack. */
-  const openRelease = useCallback((display: DisplayRelease) => {
-    setRecentPicks(null)
-    setStack(null)
-    setSelected(display)
-  }, [])
-
-  /** Opening a stack starts at the primary pressing; the arrows step onward. */
-  const openStack = useCallback((group: PressingGroup) => {
-    const pressings = group.rows.map((row) => row.release)
-    if (pressings.length === 0) return
-    setRecentPicks(null)
-    setStack({ pressings, index: 0 })
-    setSelected(pressings[0])
-  }, [])
-
-  /** Steps through the open stack, wrapping around at either end. */
-  const stepStack = useCallback((delta: number) => {
-    if (!stack || stack.pressings.length === 0) return
-    const total = stack.pressings.length
-    const index = (stack.index + delta + total) % total
-    setStack({ ...stack, index })
-    setSelected(stack.pressings[index])
-  }, [stack])
-
-  /** History hops swap the release without logging another listen. */
-  const openPick = useCallback(
-    (id: number) => {
-      const found = releases.find((release) => release.id === id)
-      if (!found) return
-      setStack(null)
-      setSelected(toDisplayRelease(found, masterYears))
-    },
-    [releases, masterYears],
-  )
 
   const changePickerSkip = useCallback((value: number) => {
     const skip = clampSkip(value)
@@ -452,14 +282,11 @@ export default function App() {
     await clearCabinet()
     setPickerSkip(DEFAULT_SKIP)
     setPreferences(DEFAULT_PREFERENCES)
-    setRecentPicks(null)
-    setStack(null)
+    detail.close()
     clearSettings()
     // Saved views live in their own storage key, so "clear everything" has to
     // take them down explicitly to keep reclaiming everything it claims to.
-    clearViews()
-    setViews([])
-    setActiveViewId(null)
+    savedViews.wipe()
     setSettings(null)
     setShowSettings(true)
   }
@@ -469,271 +296,84 @@ export default function App() {
 
   return (
     <>
-      {databaseState !== 'ok' && (
-        <div className="sync-banner error database-banner" role="alert">
-          {databaseState === 'blocked'
-            ? 'Jukebox is updating its storage. Close Jukebox in your other tabs or windows to continue.'
-            : 'Jukebox was updated in another tab. Reload to continue.'}
-          {databaseState === 'outdated' && (
-            <button type="button" onClick={() => window.location.reload()}>
-              Reload
-            </button>
-          )}
-        </div>
-      )}
+      {databaseState !== 'ok' && <DatabaseBanner state={databaseState} />}
 
       {/* Full-screen settings (no saved settings, or opened from menu) */}
       {showSettings && (
-        <div
-          ref={settingsDialogRef}
-          className="settings-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Settings"
-          onClick={settings ? () => setShowSettings(false) : undefined}
-        >
-          <div className="settings-overlay-content" onClick={(e) => e.stopPropagation()}>
-            <SettingsForm
-              initial={settings ?? { username: '', token: '', theme }}
-              theme={theme}
-              onThemeChange={onThemeChange}
-              onSave={onSaveSettings}
-              groupPressings={preferences.groupPressings}
-              onGroupPressingsChange={changeGroupPressings}
-              pickerSkip={pickerSkip}
-              onPickerSkipChange={changePickerSkip}
-              onRefresh={
-                settings
-                  ? () => {
-                      // Close, so the sync banner shows what's happening.
-                      setShowSettings(false)
-                      refresh()
-                    }
-                  : undefined
-              }
-              refreshing={status === 'loading'}
-              lastSynced={fetchedAt ? formatTime(fetchedAt) : undefined}
-              onClose={settings ? () => setShowSettings(false) : undefined}
-            >
-              {settings && (
-                <section className="advanced-section">
-                  <button
-                    type="button"
-                    className="advanced-toggle"
-                    onClick={() => setAdvancedOpen((open) => !open)}
-                    aria-expanded={advancedOpen}
-                    aria-controls="advanced-panel"
-                  >
-                    <span>Advanced</span>
-                    <span className="collapse-indicator" aria-hidden="true">
-                      <ChevronIcon direction={advancedOpen ? 'up' : 'down'} />
-                    </span>
-                  </button>
-                  {advancedOpen && (
-                    <div id="advanced-panel" className="advanced-body">
-                      <StorageStats username={settings.username} onClearData={onClearData} />
-                    </div>
-                  )}
-                </section>
-              )}
-            </SettingsForm>
-          </div>
-        </div>
+        <SettingsOverlay
+          username={settings?.username ?? null}
+          initial={settings ?? { username: '', token: '', theme }}
+          theme={theme}
+          onThemeChange={onThemeChange}
+          onSave={onSaveSettings}
+          groupPressings={preferences.groupPressings}
+          onGroupPressingsChange={changeGroupPressings}
+          pickerSkip={pickerSkip}
+          onPickerSkipChange={changePickerSkip}
+          onRefresh={
+            settings
+              ? () => {
+                  // Close, so the sync banner shows what's happening.
+                  setShowSettings(false)
+                  refresh()
+                }
+              : undefined
+          }
+          refreshing={status === 'loading'}
+          lastSynced={fetchedAt ? formatTime(fetchedAt) : undefined}
+          onClose={settings ? () => setShowSettings(false) : undefined}
+          advancedOpen={advancedOpen}
+          onToggleAdvanced={() => setAdvancedOpen((open) => !open)}
+          onClearData={onClearData}
+        />
       )}
 
-      {/* First-load spinner */}
-      {isLoadingFirst && (
-        <div className="full-state">
-          <RecordPlayer size={150} />
-          <p>Loading your collection…</p>
-          {progress && (
-            <p className="progress-text">
-              {progressText(progress)}
-              {syncWait && ` — ${syncWait}`}
-            </p>
-          )}
-        </div>
-      )}
+      {isLoadingFirst && <FirstLoad progress={progress} wait={syncWait} />}
 
       {/* First-load error (no cached data) */}
       {isLoadingFailed && (
-        <div className="full-state error">
-          <div className="error-icon" role="img" aria-label="Error">
-            !
-          </div>
-          <h2>Could not load your collection</h2>
-          <p className="error-message">{error}</p>
-          <div className="error-actions">
-            <button type="button" onClick={refresh}>
-              Try again
-            </button>
-            <button type="button" onClick={() => setShowSettings(true)}>
-              Change settings
-            </button>
-          </div>
-        </div>
+        <LoadFailed error={error} onRetry={refresh} onOpenSettings={() => setShowSettings(true)} />
       )}
 
       {/* Main app (have data or background-refreshing) */}
       {!isLoadingFirst && !isLoadingFailed && settings && (
         <div className="app">
-          <header className="app-header">
-            <div className="header-top">
-              <h1 className="app-title">Jukebox</h1>
-              <div className="header-actions">
-                <button
-                  type="button"
-                  className="icon-btn"
-                  onClick={() => setShowCabinet(true)}
-                  title="Record cabinet"
-                  aria-label="Record cabinet"
-                >
-                  <CabinetIcon />
-                </button>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  onClick={() => setShowStats(true)}
-                  title="Collection stats"
-                  aria-label="Collection stats"
-                >
-                  <StatsIcon />
-                </button>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  onClick={() => setShowSettings(true)}
-                  title="Settings"
-                  aria-label="Settings"
-                >
-                  <SettingsIcon />
-                </button>
-              </div>
-            </div>
-            <div className="header-meta">
-              <span>{releases.length.toLocaleString()} releases</span>
-              {fetchedAt && <span className="meta-separator">·</span>}
-              {fetchedAt && <span>Last synced {formatTime(fetchedAt)}</span>}
-            </div>
-          </header>
+          <AppHeader
+            releaseCount={releases.length}
+            fetchedAt={fetchedAt}
+            onOpenCabinet={() => setShowCabinet(true)}
+            onOpenStats={() => setShowStats(true)}
+            onOpenSettings={() => setShowSettings(true)}
+          />
 
-          {status === 'loading' && releases.length > 0 && (
-            <div className="sync-banner">
-              {/* Announced: that it syncs, and why it waits. The count is not:
-                  it moves about once a second while years come in. */}
-              <span role="status">
-                Syncing…
-                {syncWait && ` — ${syncWait}`}
-              </span>
-              {progress && <span> {progressText(progress)}</span>}
-            </div>
-          )}
+          {status === 'loading' && releases.length > 0 && <SyncBanner progress={progress} wait={syncWait} />}
+          {status === 'error' && releases.length > 0 && <SyncFailedBanner error={error} onRetry={refresh} />}
 
-          {status === 'error' && releases.length > 0 && (
-            <div className="sync-banner error" role="alert">
-              Failed to refresh: {error}. Showing cached data.
-              <button type="button" onClick={refresh}>
-                Retry
-              </button>
-            </div>
-          )}
+          <FolderBar folders={folders} selection={folderSelection} onToggle={onFolderChange} />
 
-          {folders.length > 0 && (
-            <div className="folder-bar" role="group" aria-label="Collection folders">
-              {folders.map((folder) => {
-                // "All" is the absence of a folder filter, so it is only active
-                // while no specific folder is picked.
-                const active =
-                  folder.id === 0
-                    ? folderSelection.length === 0
-                    : folderSelection.includes(folder.id)
-                return (
-                  <button
-                    key={folder.id}
-                    type="button"
-                    aria-pressed={active}
-                    className={`folder-chip${active ? ' active' : ''}`}
-                    onClick={() => onFolderChange(folder.id)}
-                  >
-                    <span className="folder-name">{folder.name}</span>
-                    <span className="folder-count">{folder.count.toLocaleString()}</span>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-
-          <div className="toolbar" ref={toolbarRef}>
-            <SearchBar value={query} onChange={setQuery} />
-            <FiltersButton
-              filters={filters}
-              open={filtersOpen}
-              onToggle={() => {
-                setFiltersOpen((open) => !open)
-                setViewsOpen(false)
-              }}
-            />
-            <ViewsButton
-              views={views}
-              activeView={activeView}
-              dirty={viewDirty}
-              open={viewsOpen}
-              onToggle={() => {
-                setViewsOpen((open) => !open)
-                setFiltersOpen(false)
-              }}
-            />
-            <div className="global-view">
-              <span className="global-sort-label">View</span>
-              <div className="sort-toggle" role="radiogroup" aria-label="Collection view">
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={viewMode === 'artists'}
-                  className={viewMode === 'artists' ? 'active' : ''}
-                  onClick={() => setViewMode('artists')}
-                  title="One card per release, on each artist's shelf"
-                >
-                  Artists
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={viewMode === 'recent'}
-                  className={viewMode === 'recent' ? 'active' : ''}
-                  onClick={() => setViewMode('recent')}
-                  title="A timeline of additions, newest month first"
-                >
-                  Recent
-                </button>
-              </div>
-            </div>
-            {viewMode !== 'recent' && (
-              <div className="global-sort">
-                <span className="global-sort-label">Sort</span>
-                <div className="sort-toggle" role="group" aria-label="Sort releases by">
-                  <button
-                    type="button"
-                    aria-pressed={artistSortMode === 'chronological'}
-                    className={artistSortMode === 'chronological' ? 'active' : ''}
-                    onClick={() => setArtistSortMode('chronological')}
-                    title="Oldest to newest within each artist"
-                  >
-                    Year
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={artistSortMode === 'byName'}
-                    className={artistSortMode === 'byName' ? 'active' : ''}
-                    onClick={() => setArtistSortMode('byName')}
-                    title="By album name within each artist"
-                  >
-                    A–Z
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <Toolbar
+            ref={toolbarRef}
+            query={query}
+            onQueryChange={setQuery}
+            filters={filters}
+            filtersOpen={filtersOpen}
+            onToggleFilters={() => {
+              setFiltersOpen((open) => !open)
+              setViewsOpen(false)
+            }}
+            views={savedViews.views}
+            activeView={activeView}
+            viewDirty={viewDirty}
+            viewsOpen={viewsOpen}
+            onToggleViews={() => {
+              setViewsOpen((open) => !open)
+              setFiltersOpen(false)
+            }}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            sortMode={artistSortMode}
+            onSortModeChange={setArtistSortMode}
+          />
 
           {filtersOpen && (
             <FilterPanel
@@ -750,17 +390,17 @@ export default function App() {
 
           {viewsOpen && (
             <ViewsPanel
-              views={views}
-              counts={viewCounts}
+              views={savedViews.views}
+              counts={savedViews.counts}
               activeView={activeView}
               dirty={viewDirty}
-              canSave={canSaveView}
-              onApply={applyView}
-              onClear={clearView}
-              onSave={addView}
-              onRename={renameView}
-              onDelete={deleteView}
-              onUpdate={updateView}
+              canSave={savedViews.canSave}
+              onApply={savedViews.apply}
+              onClear={savedViews.clear}
+              onSave={savedViews.add}
+              onRename={savedViews.rename}
+              onDelete={savedViews.remove}
+              onUpdate={savedViews.update}
               onClose={closeViews}
             />
           )}
@@ -787,22 +427,22 @@ export default function App() {
               </p>
               <div className="empty-actions">
                 {!activeView ? (
-                  <button type="button" onClick={clearView}>
+                  <button type="button" onClick={savedViews.clear}>
                     Clear search &amp; filters
                   </button>
                 ) : viewDirty ? (
-                  <button type="button" onClick={() => applyView(activeView)}>
+                  <button type="button" onClick={() => savedViews.apply(activeView)}>
                     Revert to “{activeView.name}”
                   </button>
                 ) : (
-                  <button type="button" onClick={clearView}>
+                  <button type="button" onClick={savedViews.clear}>
                     Show all releases
                   </button>
                 )}
               </div>
             </div>
           ) : viewMode === 'recent' ? (
-            <RecentList sections={recentSections} onSelectRelease={openRelease} />
+            <RecentList sections={recentSections} onSelectRelease={detail.openRelease} />
           ) : (
             <div className="artist-list">
               {grouped.map((artist) => (
@@ -811,8 +451,8 @@ export default function App() {
                   artist={artist}
                   sortMode={artistSortMode}
                   grouped={preferences.groupPressings}
-                  onSelectRelease={openRelease}
-                  onOpenStack={openStack}
+                  onSelectRelease={detail.openRelease}
+                  onOpenStack={detail.openStack}
                 />
               ))}
             </div>
@@ -825,7 +465,7 @@ export default function App() {
           cabinet={cabinet}
           releases={displayReleases}
           collectionReady={status === 'idle'}
-          onOpenRelease={openRelease}
+          onOpenRelease={detail.openRelease}
           onClose={() => setShowCabinet(false)}
         />
       )}
@@ -835,12 +475,12 @@ export default function App() {
         <ReleaseDetail
           display={selected}
           token={settings?.token ?? ''}
-          recentPicks={recentPicks ?? undefined}
-          onOpenPick={openPick}
-          onPrev={stack ? () => stepStack(-1) : undefined}
-          onNext={stack ? () => stepStack(1) : undefined}
+          recentPicks={detail.recentPicks ?? undefined}
+          onOpenPick={detail.openPick}
+          onPrev={detail.stack ? () => detail.stepStack(-1) : undefined}
+          onNext={detail.stack ? () => detail.stepStack(1) : undefined}
           position={
-            stack ? { index: stack.index + 1, total: stack.pressings.length } : undefined
+            detail.stack ? { index: detail.stack.index + 1, total: detail.stack.pressings.length } : undefined
           }
           displayed={cabinet.displayed.some((record) => record.instanceId === selected.instanceId)}
           onToggleDisplayed={settings ? () => cabinet.toggleDisplayed(selected) : undefined}
@@ -851,11 +491,7 @@ export default function App() {
               ? () => cabinet.toggleGatefold(selected)
               : undefined
           }
-          onClose={() => {
-            setRecentPicks(null)
-            setStack(null)
-            setSelected(null)
-          }}
+          onClose={detail.close}
         />
       )}
 
@@ -874,7 +510,7 @@ export default function App() {
         <button
           type="button"
           className="random-fab"
-          onClick={pickRandom}
+          onClick={detail.pickRandom}
           disabled={filtered.length === 0}
           title="Pick a random release from what's shown"
           aria-label="Pick a random release from what's shown"

@@ -191,32 +191,6 @@ export function StatsPanel({
     [releases, masterYears],
   )
 
-  if (stats.totalReleases === 0) {
-    return (
-      <div ref={dialogRef} className="settings-overlay" role="dialog" aria-modal="true" aria-label="Collection stats">
-        <div className="settings-overlay-content">
-          <div className="settings-card">
-            {onClose && (
-              <button
-                type="button"
-                className="card-close"
-                onClick={onClose}
-                aria-label="Close stats"
-              >
-                <CloseIcon />
-              </button>
-            )}
-            <h2 className="stats-title">Collection stats</h2>
-            <div className="card-scroll">
-              <CollectionValue state={valueState} />
-              <p className="stats-empty">No releases to summarise yet.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div ref={dialogRef} className="settings-overlay" role="dialog" aria-modal="true" aria-label="Collection stats">
       <div className="settings-overlay-content">
@@ -233,70 +207,79 @@ export function StatsPanel({
           )}
           <h2 className="stats-title">Collection stats</h2>
           <div className="card-scroll">
+            {stats.totalReleases === 0 ? (
+              <>
+                <CollectionValue state={valueState} />
+                <p className="stats-empty">No releases to summarise yet.</p>
+              </>
+            ) : (
+              <>
 
-        <div className="stats-totals">
-          <div className="stat-tile">
-            <span className="stat-tile-value">{stats.totalReleases.toLocaleString()}</span>
-            <span className="stat-tile-label">
-              {stats.totalReleases === 1 ? 'release' : 'releases'}
-            </span>
-          </div>
-          <div className="stat-tile">
-            <span className="stat-tile-value">{stats.uniqueAlbums.toLocaleString()}</span>
-            <span className="stat-tile-label">
-              {stats.uniqueAlbums === 1 ? 'unique album' : 'unique albums'}
-            </span>
-          </div>
-          <div className="stat-tile">
-            <span className="stat-tile-value">{stats.artists.toLocaleString()}</span>
-            <span className="stat-tile-label">
-              {stats.artists === 1 ? 'artist' : 'artists'}
-            </span>
-          </div>
-        </div>
+                <div className="stats-totals">
+                  <div className="stat-tile">
+                    <span className="stat-tile-value">{stats.totalReleases.toLocaleString()}</span>
+                    <span className="stat-tile-label">
+                      {stats.totalReleases === 1 ? 'release' : 'releases'}
+                    </span>
+                  </div>
+                  <div className="stat-tile">
+                    <span className="stat-tile-value">{stats.uniqueAlbums.toLocaleString()}</span>
+                    <span className="stat-tile-label">
+                      {stats.uniqueAlbums === 1 ? 'unique album' : 'unique albums'}
+                    </span>
+                  </div>
+                  <div className="stat-tile">
+                    <span className="stat-tile-value">{stats.artists.toLocaleString()}</span>
+                    <span className="stat-tile-label">
+                      {stats.artists === 1 ? 'artist' : 'artists'}
+                    </span>
+                  </div>
+                </div>
 
-        <CollectionValue state={valueState} />
+                <CollectionValue state={valueState} />
 
-        <div className="stats-section">
-          <h3>Release years</h3>
-          <ColumnChart
-            bins={stats.yearDistribution}
-            getKey={(b) => String((b as YearBin).year)}
-            getLabel={(b) => String((b as YearBin).year)}
-            emptyLabel="No year data available."
-            title="Releases by year"
-          />
-        </div>
+                <div className="stats-section">
+                  <h3>Release years</h3>
+                  <ColumnChart
+                    bins={stats.yearDistribution}
+                    getKey={(b) => String((b as YearBin).year)}
+                    getLabel={(b) => String((b as YearBin).year)}
+                    emptyLabel="No year data available."
+                    title="Releases by year"
+                  />
+                </div>
 
-        <div className="stats-section">
-          <h3>Acquired over time</h3>
-          <ColumnChart
-            bins={stats.acquisitionTimeline}
-            getKey={(b) => (b as TimelineBin).period}
-            getLabel={(b) => (b as TimelineBin).label}
-            emptyLabel="No acquisition dates available."
-            title="Releases added to collection over time"
-          />
-        </div>
+                <div className="stats-section">
+                  <h3>Acquired over time</h3>
+                  <ColumnChart
+                    bins={stats.acquisitionTimeline}
+                    getKey={(b) => (b as TimelineBin).period}
+                    getLabel={(b) => (b as TimelineBin).label}
+                    emptyLabel="No acquisition dates available."
+                    title="Releases added to collection over time"
+                  />
+                </div>
 
-        <div className="stats-section">
-          <h3>Top genres</h3>
-          <CountBars items={stats.topGenres} emptyLabel="No genre data available." />
-        </div>
-        <div className="stats-section">
-          <h3>Top styles</h3>
-          <CountBars items={stats.topStyles} emptyLabel="No style data available." />
-        </div>
+                <div className="stats-section">
+                  <h3>Top genres</h3>
+                  <CountBars items={stats.topGenres} emptyLabel="No genre data available." />
+                </div>
+                <div className="stats-section">
+                  <h3>Top styles</h3>
+                  <CountBars items={stats.topStyles} emptyLabel="No style data available." />
+                </div>
 
-        <div className="stats-section">
-          <h3>Top labels</h3>
-          <CountBars items={stats.topLabels} emptyLabel="No label data available." />
-        </div>
+                <div className="stats-section">
+                  <h3>Top labels</h3>
+                  <CountBars items={stats.topLabels} emptyLabel="No label data available." />
+                </div>
 
-        <div className="stats-section">
-          <h3>Top formats</h3>
-          <CountBars items={stats.topFormats} emptyLabel="No format data available." />
-        </div>
+                <div className="stats-section">
+                  <h3>Top formats</h3>
+                  <CountBars items={stats.topFormats} emptyLabel="No format data available." />
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -16,6 +16,8 @@ import {
 } from '../utils/cabinet'
 import { plural } from '../utils/format'
 import { CloseIcon, TrashIcon } from './icons'
+import { SegmentedControl } from './SegmentedControl'
+import { ARTIST_SORT_OPTIONS } from './sortOptions'
 import { useEffect, useRef, useState } from 'react'
 
 const STATUS_TEXT: Record<CabinetStatus, string> = {
@@ -49,11 +51,6 @@ const SHELF_SIZE_ERROR = `Enter a whole number from ${MIN_SHELF_SIZE} to ${MAX_S
 const UNDO_MS = 8000
 
 // The main view's in-artist order, with its labels; artists always come first.
-const SORTS = [
-  { id: 'chronological', label: 'Year', title: 'Oldest to newest within each artist' },
-  { id: 'byName', label: 'A–Z', title: 'By album name within each artist' },
-] as const
-
 /**
  * A shelf's capacity, edited as text so the field can be cleared while typing.
  * Only a valid size reaches the cabinet; anything else is shown as an error
@@ -324,24 +321,14 @@ export function CabinetScreen({
                   Artists are always filed by name, like the main view.
                 </span>
               </div>
-              <div
+              <SegmentedControl
+                kind="toggle"
                 className="sort-toggle cabinet-segmented"
-                role="group"
                 aria-labelledby="cabinet-order-title"
-              >
-                {SORTS.map((sort) => (
-                  <button
-                    key={sort.id}
-                    type="button"
-                    aria-pressed={options.sort === sort.id}
-                    className={options.sort === sort.id ? 'active' : ''}
-                    onClick={() => setSort(sort.id)}
-                    title={sort.title}
-                  >
-                    {sort.label}
-                  </button>
-                ))}
-              </div>
+                options={ARTIST_SORT_OPTIONS}
+                value={options.sort}
+                onChange={setSort}
+              />
             </div>
 
             <div className="cabinet-setting">
