@@ -152,6 +152,24 @@ button:hover {
   background: var(--panel-hover);
 }
 
+/* Every text field and select starts themed; a component only sets layout.
+   Without this, iOS draws an unstyled field as a black box (#175). */
+input:not([type='checkbox']):not([type='radio']):not([type='range']),
+select,
+textarea {
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-faint);
+}
+
 button:focus-visible,
 input:focus-visible,
 select:focus-visible {
@@ -201,6 +219,10 @@ button:disabled {
   padding: var(--card-head) var(--close-inset) 22px;
   max-height: calc(
     100vh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  /* 100dvh excludes iOS Safari's toolbar, so the bottom stays visible. */
+  max-height: calc(
+    100dvh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
   );
   display: flex;
   flex-direction: column;
@@ -270,17 +292,9 @@ button:disabled {
 }
 
 .settings-form input {
-  font: inherit;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
   font-size: 15px;
-}
-
-.settings-form input::placeholder {
-  color: var(--text-faint);
 }
 
 .settings-form button[type='submit'] {
@@ -290,8 +304,8 @@ button:disabled {
   font-weight: 600;
   border-radius: 10px;
   border: none;
-  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-  color: #140b02;
+  background: var(--accent-fill);
+  color: var(--on-accent);
 }
 
 .settings-form button[type='submit']:hover {
@@ -306,7 +320,7 @@ button:disabled {
 }
 
 .settings-help a {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .secondary-btn {
@@ -356,13 +370,9 @@ button:disabled {
 
 .picker-skip input {
   width: 74px;
-  font: inherit;
   text-align: center;
   padding: 8px 6px;
   border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
 }
 
 .picker-skip input:focus-visible {
@@ -800,9 +810,9 @@ button:disabled {
 }
 
 .folder-chip.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--bg);
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--on-accent);
 }
 
 .folder-count {
@@ -813,17 +823,10 @@ button:disabled {
 
 .search-input {
   flex: 1 1 260px;
-  font: inherit;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid var(--border);
   background: var(--bg-elevated);
-  color: var(--text);
   font-size: 15px;
-}
-
-.search-input::placeholder {
-  color: var(--text-faint);
 }
 
 .filter-toggle {
@@ -846,8 +849,8 @@ button:disabled {
   height: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: var(--accent);
-  color: var(--bg);
+  background: var(--accent-fill);
+  color: var(--on-accent);
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
@@ -880,7 +883,7 @@ button:disabled {
 
 .views-toggle.edited .views-toggle-label::after {
   content: ' *';
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .views-panel {
@@ -992,7 +995,7 @@ button:disabled {
 }
 
 .views-row.current .views-name {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .views-desc {
@@ -1057,13 +1060,9 @@ button:disabled {
 .views-rename-input {
   flex: 1 1 auto;
   min-width: 0;
-  font: inherit;
   font-size: 14px;
   padding: 6px 9px;
-  border-radius: 8px;
-  border: 1px solid var(--accent-strong);
-  background: var(--bg);
-  color: var(--text);
+  border-color: var(--accent-strong);
 }
 
 .views-confirm {
@@ -1097,19 +1096,17 @@ button:disabled {
 }
 
 .views-mini-btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--bg);
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--on-accent);
 }
 
-/* Hover lifts the fill towards the text colour instead of swapping to
-   --accent-strong: on the club theme that variant is dark enough that light
-   text on it disappears, and the label went with it. */
+/* Each theme pairs its hover fill with a text colour that reads on it. */
 .views-mini-btn.primary:hover,
 .views-save-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 88%, var(--text));
-  border-color: color-mix(in srgb, var(--accent) 88%, var(--text));
-  color: var(--bg);
+  background: var(--accent-fill-hover);
+  border-color: var(--accent-fill-hover);
+  color: var(--on-accent-hover);
 }
 
 .views-mini-btn.danger {
@@ -1144,17 +1141,7 @@ button:disabled {
 .views-save-input {
   flex: 1 1 auto;
   min-width: 0;
-  font: inherit;
   font-size: 14px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-}
-
-.views-save-input::placeholder {
-  color: var(--text-faint);
 }
 
 .views-save-btn {
@@ -1162,9 +1149,9 @@ button:disabled {
   font-size: 13px;
   font-weight: 600;
   border-radius: 8px;
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--bg);
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--on-accent);
 }
 
 /* A half-transparent accent reads as "on" rather than "off", so an inert save
@@ -1233,13 +1220,8 @@ button:disabled {
 }
 
 .filter-field select {
-  font: inherit;
   width: 100%;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
   background: var(--bg-elevated);
-  color: var(--text);
   font-size: 14px;
 }
 
@@ -1250,13 +1232,8 @@ button:disabled {
 }
 
 .filter-year-row input {
-  font: inherit;
   width: 100%;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
   background: var(--bg-elevated);
-  color: var(--text);
   font-size: 14px;
 }
 
@@ -1382,11 +1359,11 @@ button:disabled {
   overflow: hidden;
   display: grid;
   place-items: center;
-  background: #0a0a10;
+  background: var(--panel);
   border: 1px solid var(--border);
   font-size: 17px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .artist-avatar img {
@@ -1443,8 +1420,8 @@ button:disabled {
 }
 
 .sort-toggle button.active {
-  background: var(--accent);
-  color: #140b02;
+  background: var(--accent-fill);
+  color: var(--on-accent);
   font-weight: 600;
 }
 
@@ -1484,7 +1461,7 @@ button:disabled {
 
 .release-cover {
   aspect-ratio: 1 / 1;
-  background: #0a0a10;
+  background: var(--panel);
 }
 
 .release-cover img {
@@ -1533,7 +1510,7 @@ button:disabled {
 }
 
 .release-year {
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 12px;
   font-weight: 600;
 }
@@ -1573,8 +1550,8 @@ button:disabled {
   gap: 5px;
   padding: 4px 9px;
   border-radius: 999px;
-  background: var(--accent);
-  color: var(--bg);
+  background: var(--accent-fill);
+  color: var(--on-accent);
   font-size: 12px;
   font-weight: 700;
   line-height: 1;
@@ -1607,7 +1584,7 @@ button:disabled {
 
 .stack-step:hover {
   border-color: var(--accent-strong);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .stack-step:focus-visible {
@@ -1661,6 +1638,10 @@ button:disabled {
   max-height: calc(
     100vh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
   );
+  /* 100dvh excludes iOS Safari's toolbar, so the bottom stays visible. */
+  max-height: calc(
+    100dvh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
   display: flex;
   flex-direction: column;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
@@ -1702,16 +1683,16 @@ button:disabled {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--bg);
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--on-accent);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
 }
 
 .random-fab:hover {
-  background: var(--accent-strong);
-  border-color: var(--accent-strong);
-  color: var(--bg);
+  background: var(--accent-fill-hover);
+  border-color: var(--accent-fill-hover);
+  color: var(--on-accent-hover);
   transform: translateY(-2px);
 }
 
@@ -1760,7 +1741,7 @@ button:disabled {
 }
 
 .detail-year {
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 13px;
   font-weight: 600;
 }
@@ -1953,7 +1934,7 @@ button:disabled {
 }
 
 .detail-links a {
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
@@ -2058,10 +2039,42 @@ button:disabled {
 
 @media (prefers-reduced-motion: reduce) {
   .rr-vinyl {
-    animation-duration: 3.2s;
+    animation: none;
   }
-  .release-card:hover {
+  .release-card:hover,
+  .random-fab:hover {
     transform: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Fingers need about 44px: grow the small controls on touch screens only, so
+   mouse layouts keep their compact look. */
+@media (pointer: coarse) {
+  .icon-btn,
+  .stack-step {
+    width: 44px;
+    height: 44px;
+  }
+
+  .folder-chip,
+  .sort-toggle button {
+    min-height: 44px;
+  }
+
+  /* The rename/delete icons sit in a dense list: a bigger hit area, same look. */
+  .views-icon-btn {
+    position: relative;
+  }
+
+  .views-icon-btn::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
   }
 }
 
@@ -2150,7 +2163,7 @@ button:disabled {
   font-size: 1.6rem;
   font-weight: 700;
   line-height: 1.1;
-  color: var(--accent);
+  color: var(--accent-text);
   font-variant-numeric: tabular-nums;
 }
 
@@ -2304,7 +2317,7 @@ button:disabled {
 }
 
 .stats-link-btn:hover:not(:disabled) {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .stats-link-btn:disabled {
@@ -2735,11 +2748,6 @@ button:disabled {
   width: 72px;
   min-height: 40px;
   padding: 6px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  font: inherit;
   text-align: right;
 }
 

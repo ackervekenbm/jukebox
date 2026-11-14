@@ -377,13 +377,14 @@ describe('CabinetScreen', () => {
       expect(field).toHaveAttribute('aria-invalid', 'true')
     })
 
-    it('closes on Escape and returns focus to "Add shelf"', () => {
-      renderScreen()
+    it('closes on Escape and returns focus to "Add shelf", leaving the cabinet open', () => {
+      const onClose = renderScreen()
       fireEvent.click(screen.getByRole('button', { name: 'Add shelf' }))
       fireEvent.keyDown(screen.getByRole('spinbutton', { name: 'Shelf size' }), { key: 'Escape' })
 
       expect(screen.queryByRole('spinbutton', { name: 'Shelf size' })).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Add shelf' })).toHaveFocus()
+      expect(onClose).not.toHaveBeenCalled()
     })
   })
 
@@ -666,6 +667,12 @@ describe('CabinetScreen', () => {
     const onClose = renderScreen()
     fireEvent.click(screen.getByRole('button', { name: 'Close cabinet' }))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('closes on Escape', () => {
+    const onClose = renderScreen()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('still lays out a real plan from the planner', () => {
