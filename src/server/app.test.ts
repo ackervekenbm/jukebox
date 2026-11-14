@@ -13,19 +13,13 @@ const identityCalls = vi.hoisted(() => ({ count: 0 }))
 const dataDir = `${process.env.TMPDIR ?? '/tmp'}/jukebox-sync-${process.pid}-${Date.now()}`
 process.env.DATA_DIR = dataDir
 
-const knownTokens: Record<string, string> = {
-  'token-alice': 'alice',
-  'token-bob': 'bob',
-  'token-dave': 'dave',
-}
-
 vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
   const url = String(input)
   if (url.endsWith('/oauth/identity')) {
     const authorization = new Headers(init?.headers).get('authorization') ?? ''
-    const match = /^Discogs token=(\S+)$/.exec(authorization)
-    const username = match ? knownTokens[match[1]] : undefined
-    if (!username) return new Response('Unauthorized', { status: 401 })
+    // token-<name> belongs to <name>; Discogs refuses mallory's.
+    const username = /^Discogs token=token-(\w+)$/.exec(authorization)?.[1]
+    if (!username || username === 'mallory') return new Response('Unauthorized', { status: 401 })
     identityCalls.count += 1
     return Response.json({ id: 1, username })
   }
@@ -40,9 +34,17 @@ const app: Express = createApp()
 /** Every reply adds these, empty, for apps cached from before version 2. */
 const EMPTY_FOR_OLDER_APPS = { placements: {}, overrides: {}, unplaced: [] }
 
-const alice = { Authorization: 'Discogs token=token-alice' }
-const bob = { Authorization: 'Discogs token=token-bob' }
-const dave = { Authorization: 'Discogs token=token-dave' }
+let accounts = 0
+
+/**
+ * A fresh account for one test: its name and the header that signs in as it.
+ * Every test sets up the state it needs, so each one also passes on its own.
+ */
+function newAccount() {
+  accounts += 1
+  const name = `user${accounts}`
+  return { name, auth: { Authorization: `Discogs token=token-${name}` } }
+}
 
 const cabinetsNamed = (name: string) => [
   {
@@ -75,6 +77,10 @@ const legacyDoc = (name = 'Living room', records = 3): LegacyCabinetDoc => ({
   updatedAt: '2026-10-15T10:00:00.000Z',
 })
 
+/** Saves `doc` over whatever the account has (If-Match: *). */
+const save = (auth: Record<string, string>, doc: object) =>
+  request(app).put('/api/sync/cabinet').set(auth).set('If-Match', '*').send(doc)
+
 afterAll(async () => {
   vi.unstubAllGlobals()
   closeDb()
@@ -103,32 +109,36 @@ describe('GET /api/sync/cabinet', () => {
   })
 
   it('returns a null document for a fresh account', async () => {
-    const res = await request(app).get('/api/sync/cabinet').set(alice)
+    const { name, auth } = newAccount()
+    const res = await request(app).get('/api/sync/cabinet').set(auth)
     expect(res.status).toBe(200)
-    expect(res.body).toEqual({ username: 'alice', doc: null, etag: '"r0"' })
+    expect(res.body).toEqual({ username: name, doc: null, etag: '"r0"' })
   })
 
   it('memoizes the identity check', async () => {
+    const { auth } = newAccount()
+    await request(app).get('/api/sync/cabinet').set(auth)
     const before = identityCalls.count
-    await request(app).get('/api/sync/cabinet').set(alice)
-    await request(app).get('/api/sync/cabinet').set(alice)
+    await request(app).get('/api/sync/cabinet').set(auth)
+    await request(app).get('/api/sync/cabinet').set(auth)
     expect(identityCalls.count).toBe(before)
   })
 })
 
 describe('PUT /api/sync/cabinet', () => {
   it('creates a document when the base revision matches', async () => {
+    const { auth } = newAccount()
     const doc = sampleDoc('Doc A')
     const res = await request(app)
       .put('/api/sync/cabinet')
-      .set(alice)
+      .set(auth)
       .set('If-Match', '"r0"')
       .send(doc)
     expect(res.status).toBe(200)
     expect(res.body.etag).toBe('"r1"')
     expect(res.body.doc).toEqual({ ...doc, ...EMPTY_FOR_OLDER_APPS })
 
-    const get = await request(app).get('/api/sync/cabinet').set(alice)
+    const get = await request(app).get('/api/sync/cabinet').set(auth)
     expect(get.body.doc).toEqual({ ...doc, ...EMPTY_FOR_OLDER_APPS })
     expect(get.body.etag).toBe('"r1"')
   })
@@ -158,34 +168,30 @@ describe('PUT /api/sync/cabinet', () => {
   }
 
   it('takes a document right at the body limit', async () => {
-    const res = await request(app)
-      .put('/api/sync/cabinet')
-      .set(dave)
-      .set('If-Match', '*')
-      .send(docOfSize(SYNC_BODY_LIMIT_BYTES))
+    const res = await save(newAccount().auth, docOfSize(SYNC_BODY_LIMIT_BYTES))
     expect(res.status).toBe(200)
   })
 
   it('refuses a document one byte over the limit with a JSON 413', async () => {
-    const before = await request(app).get('/api/sync/cabinet').set(dave)
-    const res = await request(app)
-      .put('/api/sync/cabinet')
-      .set(dave)
-      .set('If-Match', '*')
-      .send(docOfSize(SYNC_BODY_LIMIT_BYTES + 1))
+    const { auth } = newAccount()
+    await save(auth, sampleDoc('Stored'))
+    const before = await request(app).get('/api/sync/cabinet').set(auth)
+    const res = await save(auth, docOfSize(SYNC_BODY_LIMIT_BYTES + 1))
     expect(res.status).toBe(413)
     expect(res.type).toBe('application/json')
     expect(res.body.error).toEqual(expect.any(String))
 
     // The refused save left the stored copy as it was.
-    const after = await request(app).get('/api/sync/cabinet').set(dave)
+    const after = await request(app).get('/api/sync/cabinet').set(auth)
     expect(after.body).toEqual(before.body)
   })
 
   it('rejects a stale base revision with the current document', async () => {
+    const { auth } = newAccount()
+    await save(auth, sampleDoc('Doc A'))
     const res = await request(app)
       .put('/api/sync/cabinet')
-      .set(alice)
+      .set(auth)
       .set('If-Match', '"r0"')
       .send(sampleDoc('Doc B'))
     expect(res.status).toBe(409)
@@ -194,50 +200,55 @@ describe('PUT /api/sync/cabinet', () => {
   })
 
   it('advances the revision on a matching write', async () => {
+    const { auth } = newAccount()
+    await save(auth, sampleDoc('Doc A'))
     const res = await request(app)
       .put('/api/sync/cabinet')
-      .set(alice)
+      .set(auth)
       .set('If-Match', '"r1"')
       .send(sampleDoc('Doc C', '2026-10-15T11:00:00.000Z'))
     expect(res.status).toBe(200)
     expect(res.body.etag).toBe('"r2"')
 
-    const get = await request(app).get('/api/sync/cabinet').set(alice)
+    const get = await request(app).get('/api/sync/cabinet').set(auth)
     expect(get.body.doc.cabinets[0].name).toBe('Doc C')
     expect(get.body.etag).toBe('"r2"')
   })
 
   it('requires an If-Match header', async () => {
+    const { auth } = newAccount()
     const res = await request(app)
       .put('/api/sync/cabinet')
-      .set(alice)
+      .set(auth)
       .send(sampleDoc())
     expect(res.status).toBe(428)
   })
 
   it('rejects a malformed If-Match header', async () => {
+    const { auth } = newAccount()
     const res = await request(app)
       .put('/api/sync/cabinet')
-      .set(alice)
+      .set(auth)
       .set('If-Match', 'garbage')
       .send(sampleDoc())
     expect(res.status).toBe(400)
   })
 
   it('force-overwrites with If-Match: *', async () => {
-    const res = await request(app)
-      .put('/api/sync/cabinet')
-      .set(alice)
-      .set('If-Match', '*')
-      .send(sampleDoc('Doc D'))
+    const { auth } = newAccount()
+    await save(auth, sampleDoc('Doc A'))
+    await save(auth, sampleDoc('Doc B'))
+    const res = await save(auth, sampleDoc('Doc D'))
     expect(res.status).toBe(200)
     expect(res.body.etag).toBe('"r3"')
+    expect(res.body.doc.cabinets[0].name).toBe('Doc D')
   })
 
   it('rejects a document that fails schema validation', async () => {
+    const { auth } = newAccount()
     const res = await request(app)
       .put('/api/sync/cabinet')
-      .set(alice)
+      .set(auth)
       .set('If-Match', '"r3"')
       .send({ schemaVersion: 2, cabinets: [], placements: {}, overrides: {}, unplaced: [], updatedAt: 'now' })
     expect(res.status).toBe(400)
@@ -245,9 +256,10 @@ describe('PUT /api/sync/cabinet', () => {
   })
 
   it('rejects malformed JSON', async () => {
+    const { auth } = newAccount()
     const res = await request(app)
       .put('/api/sync/cabinet')
-      .set(alice)
+      .set(auth)
       .set('If-Match', '"r3"')
       .set('Content-Type', 'application/json')
       .send('{not json')
@@ -255,14 +267,17 @@ describe('PUT /api/sync/cabinet', () => {
   })
 
   it('keeps accounts isolated', async () => {
-    const res = await request(app).get('/api/sync/cabinet').set(bob)
+    await save(newAccount().auth, sampleDoc('Someone else'))
+    const { name, auth } = newAccount()
+    const res = await request(app).get('/api/sync/cabinet').set(auth)
     expect(res.status).toBe(200)
-    expect(res.body.username).toBe('bob')
+    expect(res.body.username).toBe(name)
     expect(res.body.doc).toBeNull()
     expect(res.body.etag).toBe('"r0"')
   })
 
   it('rejects a cabinet with two shelves sharing an id', async () => {
+    const { auth } = newAccount()
     const doubled = sampleDoc()
     doubled.cabinets[0].slots = [
       { id: 's1', label: 'Top left', capacity: 40 },
@@ -270,117 +285,123 @@ describe('PUT /api/sync/cabinet', () => {
     ]
     const res = await request(app)
       .put('/api/sync/cabinet')
-      .set(alice)
+      .set(auth)
       .set('If-Match', '*')
       .send(doubled)
     expect(res.status).toBe(400)
   })
 
   it('accepts a cabinet with every shelf removed', async () => {
+    const { auth } = newAccount()
     const empty = sampleDoc()
     empty.cabinets[0].slots = []
     const res = await request(app)
       .put('/api/sync/cabinet')
-      .set(alice)
+      .set(auth)
       .set('If-Match', '*')
       .send(empty)
     expect(res.status).toBe(200)
 
-    const get = await request(app).get('/api/sync/cabinet').set(alice)
+    const get = await request(app).get('/api/sync/cabinet').set(auth)
     expect(get.body.doc.cabinets[0].slots).toEqual([])
   })
 
   it('keeps the manual sleeve calls, and rejects ones that are not true/false', async () => {
+    const { auth } = newAccount()
     const doc = { ...sampleDoc(), sleeves: { '9160941': true, '42': false } }
-    const res = await request(app).put('/api/sync/cabinet').set(alice).set('If-Match', '*').send(doc)
+    const res = await request(app).put('/api/sync/cabinet').set(auth).set('If-Match', '*').send(doc)
     expect(res.status).toBe(200)
-    const get = await request(app).get('/api/sync/cabinet').set(alice)
+    const get = await request(app).get('/api/sync/cabinet').set(auth)
     expect(get.body.doc.sleeves).toEqual({ '9160941': true, '42': false })
 
     const bad = await request(app)
       .put('/api/sync/cabinet')
-      .set(alice)
+      .set(auth)
       .set('If-Match', '*')
       .send({ ...sampleDoc(), sleeves: { '1': 'gatefold' } })
     expect(bad.status).toBe(400)
 
     const notAnId = await request(app)
       .put('/api/sync/cabinet')
-      .set(alice)
+      .set(auth)
       .set('If-Match', '*')
       .send({ ...sampleDoc(), sleeves: { abc: true } })
     expect(notAnId.status).toBe(400)
   })
 
   it('keeps the sleeve calls when an older app saves without them', async () => {
+    const { auth } = newAccount()
     const withCalls = { ...sampleDoc(), sleeves: { '9160941': true } }
-    await request(app).put('/api/sync/cabinet').set(alice).set('If-Match', '*').send(withCalls)
+    await request(app).put('/api/sync/cabinet').set(auth).set('If-Match', '*').send(withCalls)
 
     // A cached copy of the app from before sleeve calls existed renames it.
     const old = legacyDoc('Kitchen')
-    const res = await request(app).put('/api/sync/cabinet').set(alice).set('If-Match', '*').send(old)
+    const res = await request(app).put('/api/sync/cabinet').set(auth).set('If-Match', '*').send(old)
     expect(res.status).toBe(200)
     expect(res.body.doc.sleeves).toEqual({ '9160941': true })
 
-    const get = await request(app).get('/api/sync/cabinet').set(alice)
+    const get = await request(app).get('/api/sync/cabinet').set(auth)
     expect(get.body.doc.cabinets[0].name).toBe('Kitchen')
     expect(get.body.doc.sleeves).toEqual({ '9160941': true })
   })
 
   it('keeps the layout options when an older app saves without them, and rejects unknown ones', async () => {
+    const { auth } = newAccount()
     const options = { sort: 'byName', separateSizeClasses: true }
     await request(app)
       .put('/api/sync/cabinet')
-      .set(alice)
+      .set(auth)
       .set('If-Match', '*')
       .send({ ...sampleDoc(), options })
 
     const old = sampleDoc() // no options, like an app from before they synced
-    const res = await request(app).put('/api/sync/cabinet').set(alice).set('If-Match', '*').send(old)
+    const res = await request(app).put('/api/sync/cabinet').set(auth).set('If-Match', '*').send(old)
     expect(res.status).toBe(200)
-    const get = await request(app).get('/api/sync/cabinet').set(alice)
+    const get = await request(app).get('/api/sync/cabinet').set(auth)
     expect(get.body.doc.options).toEqual(options)
 
     const bad = await request(app)
       .put('/api/sync/cabinet')
-      .set(alice)
+      .set(auth)
       .set('If-Match', '*')
       .send({ ...sampleDoc(), options: { sort: 'random', separateSizeClasses: true } })
     expect(bad.status).toBe(400)
   })
 
   it('keeps the copies on display when an older app saves without them, and rejects bad ids', async () => {
+    const { auth } = newAccount()
     await request(app)
       .put('/api/sync/cabinet')
-      .set(alice)
+      .set(auth)
       .set('If-Match', '*')
       .send({ ...sampleDoc(), displayed: [123, 456] })
 
-    await request(app).put('/api/sync/cabinet').set(alice).set('If-Match', '*').send(sampleDoc())
-    const get = await request(app).get('/api/sync/cabinet').set(alice)
+    await request(app).put('/api/sync/cabinet').set(auth).set('If-Match', '*').send(sampleDoc())
+    const get = await request(app).get('/api/sync/cabinet').set(auth)
     expect(get.body.doc.displayed).toEqual([123, 456])
 
     const bad = await request(app)
       .put('/api/sync/cabinet')
-      .set(alice)
+      .set(auth)
       .set('If-Match', '*')
       .send({ ...sampleDoc(), displayed: ['abc'] })
     expect(bad.status).toBe(400)
   })
 
   it('clears the sleeve calls when a current app saves none', async () => {
+    const { auth } = newAccount()
     await request(app)
       .put('/api/sync/cabinet')
-      .set(alice)
+      .set(auth)
       .set('If-Match', '*')
       .send({ ...sampleDoc(), sleeves: { '9160941': true } })
     await request(app)
       .put('/api/sync/cabinet')
-      .set(alice)
+      .set(auth)
       .set('If-Match', '*')
       .send({ ...sampleDoc(), sleeves: {} })
 
-    const get = await request(app).get('/api/sync/cabinet').set(alice)
+    const get = await request(app).get('/api/sync/cabinet').set(auth)
     expect(get.body.doc.sleeves).toEqual({})
   })
 })
@@ -393,11 +414,8 @@ const storedDoc = (username: string): unknown => {
 
 describe('cabinet document versions', () => {
   it('accepts a version-1 save from an older app and stores it as version 2', async () => {
-    const res = await request(app)
-      .put('/api/sync/cabinet')
-      .set(bob)
-      .set('If-Match', '*')
-      .send(legacyDoc('Hall'))
+    const { name, auth } = newAccount()
+    const res = await save(auth, legacyDoc('Hall'))
     expect(res.status).toBe(200)
     expect(res.body.doc).toEqual({
       schemaVersion: 2,
@@ -407,7 +425,7 @@ describe('cabinet document versions', () => {
     })
 
     // What is stored is plain version 2: the derived lists are gone.
-    expect(storedDoc('bob')).toEqual({
+    expect(storedDoc(name)).toEqual({
       schemaVersion: 2,
       cabinets: cabinetsNamed('Hall'),
       updatedAt: '2026-10-15T10:00:00.000Z',
@@ -416,11 +434,10 @@ describe('cabinet document versions', () => {
 
   it('hands out a row stored before version 2 as version 2', async () => {
     const { putCabinetRow } = await import('./db')
-    putCabinetRow('carol', JSON.stringify(legacyDoc('Attic')), 'force')
-    const carol = { Authorization: 'Discogs token=token-carol' }
-    knownTokens['token-carol'] = 'carol'
+    const { name, auth } = newAccount()
+    putCabinetRow(name, JSON.stringify(legacyDoc('Attic')), 'force')
 
-    const get = await request(app).get('/api/sync/cabinet').set(carol)
+    const get = await request(app).get('/api/sync/cabinet').set(auth)
     expect(get.body.doc).toEqual({
       schemaVersion: 2,
       cabinets: cabinetsNamed('Attic'),
@@ -431,7 +448,7 @@ describe('cabinet document versions', () => {
     // A conflict reply hands it out as version 2 too.
     const conflict = await request(app)
       .put('/api/sync/cabinet')
-      .set(carol)
+      .set(auth)
       .set('If-Match', '"r0"')
       .send(sampleDoc('Attic'))
     expect(conflict.status).toBe(409)
@@ -440,7 +457,9 @@ describe('cabinet document versions', () => {
 
   it('gives apps from before version 2 the lists their storage panel counts', async () => {
     // Those apps store a reply as is and run Object.keys(doc.placements).
-    const res = await request(app).get('/api/sync/cabinet').set(bob)
+    const { auth } = newAccount()
+    await save(auth, legacyDoc('Hall'))
+    const res = await request(app).get('/api/sync/cabinet').set(auth)
     expect(res.body.doc.schemaVersion).toBe(2)
     expect(Object.keys(res.body.doc.placements)).toEqual([])
     expect(res.body.doc.unplaced).toEqual([])
@@ -450,11 +469,7 @@ describe('cabinet document versions', () => {
     // Version 1 grew with every record and hit the 256 KB limit around 10,000
     // records (#134). Version 2 has no per-record lists; an app still cached
     // from before it keeps getting this refusal until it updates.
-    const res = await request(app)
-      .put('/api/sync/cabinet')
-      .set(bob)
-      .set('If-Match', '*')
-      .send(legacyDoc('Big', 20_000))
+    const res = await save(newAccount().auth, legacyDoc('Big', 20_000))
     expect(res.status).toBe(413)
   })
 })
