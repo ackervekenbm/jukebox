@@ -28,6 +28,16 @@ genuinely needs an install/postinstall script cannot be added without revisiting
 `check` job (`npm ci && npm run build && npm test`) on every PR, and a green
 `check` is required to merge. There is no other test suite.
 
+## Demo and README screenshots
+
+`npm run demo` runs the app against `scripts/demo-discogs.mjs`, a local stand-in
+for the Discogs API with an invented collection and generated SVG covers (sign in
+as `demo`, any token; data in `data/demo`). The README images in
+`docs/screenshots/` come from it via `scripts/screenshots.mjs` (Playwright,
+installed with `--no-save`, deliberately not a dependency). Never put a real
+collection or real cover art in the repo. When a screen in the screenshots
+changes visibly, regenerate them.
+
 ## Issue-first workflow (MANDATORY)
 
 Before starting any new work item, create a GitHub issue:
