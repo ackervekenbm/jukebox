@@ -19,13 +19,45 @@ export interface SyncSnapshot {
 }
 
 export class SyncError extends Error {
+  /** HTTP status, or 0 when the server could not be reached at all. */
   status: number
+  /** How long the server asked to wait before trying again (Retry-After), in ms. */
+  retryAfterMs?: number
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, retryAfterMs?: number) {
     super(message)
     this.name = 'SyncError'
     this.status = status
+    this.retryAfterMs = retryAfterMs
   }
+
+  /** Busy or unreachable rather than refused: the same request may work later. */
+  get retryable(): boolean {
+    return this.status === 0 || this.status === 429 || this.status >= 500
+  }
+}
+
+/** Retry-After as seconds or an HTTP date, in ms; undefined when absent or unreadable. */
+export function retryAfterMs(value: string | null, now = Date.now()): number | undefined {
+  if (!value) return undefined
+  const seconds = Number(value)
+  if (value.trim() !== '' && Number.isFinite(seconds)) return Math.max(0, seconds) * 1000
+  const date = Date.parse(value)
+  return Number.isNaN(date) ? undefined : Math.max(0, date - now)
+}
+
+/**
+ * What a failed answer means for the user. A refused token needs them; a busy
+ * or failing Discogs (the server checks the token there) only needs time.
+ */
+function failure(res: Response, fallback: string): SyncError {
+  if (res.status === 401) return new SyncError('Discogs refused the token. Check it in Settings.', 401)
+  const wait = retryAfterMs(res.headers.get('retry-after'))
+  if (res.status === 429) return new SyncError('Discogs is busy. Trying again shortly.', 429, wait)
+  if (res.status >= 500) {
+    return new SyncError("Discogs or the server can't be reached. Trying again shortly.", res.status, wait)
+  }
+  return new SyncError(fallback, res.status)
 }
 
 /**
@@ -61,6 +93,10 @@ async function syncFetch(
       signal: controller.signal,
       headers: { Authorization: `Discogs token=${token}`, ...rest.headers },
     })
+  } catch (err) {
+    if (signal?.aborted) throw err
+    // No answer at all (offline, or the timeout above): worth trying again.
+    throw new SyncError("Can't reach the server. Trying again shortly.", 0)
   } finally {
     clearTimeout(timeoutId)
     signal?.removeEventListener('abort', onCallerAbort)
@@ -86,7 +122,7 @@ function asSnapshot(body: Record<string, unknown>): SyncSnapshot {
 export async function fetchCabinet(token: string, signal?: AbortSignal): Promise<SyncSnapshot> {
   const res = await syncFetch({ method: 'GET', token }, signal)
   const body = await readBody(res)
-  if (!res.ok) throw new SyncError('Could not read the synced cabinet', res.status)
+  if (!res.ok) throw failure(res, 'Could not read the synced cabinet')
   return asSnapshot(body)
 }
 
@@ -118,6 +154,6 @@ export async function pushCabinet(
   // The server (or a proxy in front of it) refused the body for its size. That
   // fails the same way on every retry, so say so instead of a generic failure.
   if (res.status === 413) throw new SyncError(CABINET_TOO_LARGE, 413)
-  if (!res.ok) throw new SyncError('Could not save the cabinet', res.status)
+  if (!res.ok) throw failure(res, 'Could not save the cabinet')
   return asSnapshot(body)
 }

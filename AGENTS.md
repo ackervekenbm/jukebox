@@ -210,7 +210,11 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   at a time, and a push only marks the cabinet clean when no edit happened
   while it was in flight (an edit counter), so a quick second edit is never
   lost; a reset ("Clear everything") makes a push still in flight drop its
-  answer, so it can't write the cabinet back. Shelf ids are unique: the
+  answer, so it can't write the cabinet back. A busy or unreachable server
+  or Discogs (`SyncError.retryable`: no answer, 429, 5xx) leaves the status
+  `offline` and tries the push or the first read again after `Retry-After`
+  (else `SYNC_RETRY_MS`); a refused token (401) is an `error` and is not
+  retried. Shelf ids are unique: the
   schema rejects duplicates and loading repairs
   them (`withUniqueSlotIds`), since older clients numbered shelves by
   count. Building, rebasing and repairing the synced document are plain

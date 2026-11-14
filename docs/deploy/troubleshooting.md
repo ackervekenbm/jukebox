@@ -47,7 +47,7 @@ config, wrong port).
 | Old version after a deploy | The device hasn't switched to the new build yet, or a proxy caches it | [Devices after an update](operations.md#devices-after-an-update); if that doesn't help, [a stale deployment](#a-stale-deployment-survives-every-reload) |
 | `docker pull` → `denied` / `unauthorized` | Stale GitHub credentials on the host (the image is public) | [If a pull is denied](docker-image.md#if-a-pull-is-denied) |
 | Cabinet sync fails with 401 | The Discogs token is invalid or expired | Generate a new token on Discogs (settings → developers) and paste it into Settings |
-| Cabinet sync fails with 429 or 502, the log shows `[auth]` | Discogs is rate limiting (429) or down/unreachable (502) while checking the token; the token itself is fine | Wait and try again; a 429 says how long in `Retry-After` |
+| Cabinet sync fails with 429 or 502, the log shows `[auth]` | Discogs is rate limiting (429) or down/unreachable (502) while checking the token; the token itself is fine | Nothing to do: the app keeps the cabinet on the device, shows "Not synced — will retry" and tries again by itself, after `Retry-After` for a 429 (else 30 s) |
 | Cabinet sync fails with 409 | Another device saved first; normally fixes itself | A 409 that keeps coming back is worth an issue |
 | Cabinet sync fails with 413 | The cabinet document is over the server's 256 KB limit | [Below](#cabinet-sync-fails-with-413) |
 | The app won't open offline | Plain HTTP, or a certificate the device doesn't trust | [https-and-offline.md](https-and-offline.md) |
