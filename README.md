@@ -1,11 +1,8 @@
-<p align="center">
-  <img src="public/favicon.svg" width="96" height="96" alt="">
-</p>
-
-<h1 align="center">Jukebox</h1>
+<h1 align="center">
+  <img src="docs/screenshots/banner.webp" width="860" alt="Jukebox: your Discogs collection, beautifully browsable">
+</h1>
 
 <p align="center">
-  <strong>Your Discogs record collection, beautifully browsable.</strong><br>
   A fast, installable web app for your vinyl: grouped by artist, searchable, offline, and self-hosted.
 </p>
 
