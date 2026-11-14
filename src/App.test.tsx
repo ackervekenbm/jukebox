@@ -285,7 +285,8 @@ describe('saved views', () => {
 
     await user.click(screen.getByRole('button', { name: 'Settings' }))
     await user.click(screen.getByRole('button', { name: 'Advanced' }))
-    await user.click(await screen.findByRole('button', { name: 'Clear everything' }))
+    await user.click(await screen.findByRole('button', { name: 'Clear everything…' }))
+    await user.click(screen.getByRole('button', { name: 'Clear everything' }))
 
     await waitFor(() => expect(localStorage.getItem(VIEWS_KEY)).toBeNull())
     expect(localStorage.getItem(SETTINGS_KEY)).toBeNull()

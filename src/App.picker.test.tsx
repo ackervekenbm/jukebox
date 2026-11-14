@@ -206,7 +206,8 @@ describe('random picker listen log', () => {
     await user.click(screen.getByRole('button', { name: 'Close release details' }))
     await user.click(screen.getByRole('button', { name: 'Settings' }))
     await user.click(await screen.findByRole('button', { name: 'Advanced' }))
-    await user.click(await screen.findByRole('button', { name: 'Clear everything' }))
+    await user.click(await screen.findByRole('button', { name: 'Clear everything…' }))
+    await user.click(screen.getByRole('button', { name: 'Clear everything' }))
 
     await waitFor(async () => expect(await getListenLog('alice')).toEqual([]))
     expect(localStorage.getItem(PICKER_KEY)).toBeNull()

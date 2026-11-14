@@ -386,6 +386,21 @@
   color: var(--danger);
 }
 
+.storage-confirm {
+  text-align: center;
+}
+
+.storage-confirm-text {
+  margin: 0 0 10px;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.storage-confirm-warning {
+  color: var(--danger);
+}
+
 .advanced-actions {
   display: flex;
   flex-wrap: wrap;
