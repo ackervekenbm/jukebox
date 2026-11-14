@@ -45,7 +45,7 @@ import { ArtistSection } from './components/ArtistSection'
 import { RecentList } from './components/RecentList'
 import { ReleaseDetail, type RecentPick } from './components/ReleaseDetail'
 import { StatsPanel } from './components/StatsPanel'
-import { SettingsIcon, RefreshIcon, ShuffleIcon, ChevronIcon, RecordPlayer, StatsIcon, CabinetIcon } from './components/icons'
+import { SettingsIcon, ShuffleIcon, ChevronIcon, RecordPlayer, StatsIcon, CabinetIcon } from './components/icons'
 import { clearCabinet } from './db/cabinet'
 import { loadViews, saveViews, clearViews } from './db/views'
 import {
@@ -506,6 +506,17 @@ export default function App() {
               onGroupPressingsChange={changeGroupPressings}
               pickerSkip={pickerSkip}
               onPickerSkipChange={changePickerSkip}
+              onRefresh={
+                settings
+                  ? () => {
+                      // Close, so the sync banner shows what's happening.
+                      setShowSettings(false)
+                      refresh()
+                    }
+                  : undefined
+              }
+              refreshing={status === 'loading'}
+              lastSynced={fetchedAt ? formatTime(fetchedAt) : undefined}
               onClose={settings ? () => setShowSettings(false) : undefined}
             >
               {settings && (
@@ -574,16 +585,6 @@ export default function App() {
             <div className="header-top">
               <h1 className="app-title">Jukebox</h1>
               <div className="header-actions">
-                <button
-                  type="button"
-                  className="icon-btn"
-                  onClick={refresh}
-                  disabled={status === 'loading'}
-                  title="Refresh collection"
-                  aria-label="Refresh collection"
-                >
-                  <RefreshIcon />
-                </button>
                 <button
                   type="button"
                   className="icon-btn"
