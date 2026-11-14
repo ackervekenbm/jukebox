@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2025-2026 ackervekenbm
 
-import type { KeyboardEvent } from 'react'
 import type { DisplayRelease } from '../utils/collection'
 import { effectiveYears } from '../utils/collection'
 import { VinylIcon } from './icons'
@@ -16,23 +15,8 @@ interface ReleaseCardProps {
 export function ReleaseCard({ display, onOpen, showArtist }: ReleaseCardProps) {
   const lines = effectiveYears(display)
 
-  const handleKey = (event: KeyboardEvent<HTMLElement>) => {
-    if (!onOpen) return
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      onOpen(display)
-    }
-  }
-
   return (
-    <article
-      className="release-card"
-      role="button"
-      tabIndex={onOpen ? 0 : undefined}
-      aria-label={`${display.artistName} — ${display.title}`}
-      onClick={onOpen ? () => onOpen(display) : undefined}
-      onKeyDown={handleKey}
-    >
+    <article className="release-card">
       <div className="release-cover">
         {display.coverImage ? (
           <img
@@ -42,7 +26,7 @@ export function ReleaseCard({ display, onOpen, showArtist }: ReleaseCardProps) {
             decoding="async"
           />
         ) : (
-          <div className="release-cover missing" aria-label="No cover art">
+          <div className="release-cover missing" role="img" aria-label="No cover art">
             <VinylIcon size={22} />
           </div>
         )}
@@ -50,7 +34,20 @@ export function ReleaseCard({ display, onOpen, showArtist }: ReleaseCardProps) {
       <div className="release-meta">
         {showArtist && <p className="release-artist">{display.artistName}</p>}
         <h3 className="release-title" title={display.title}>
-          {display.title}
+          {onOpen ? (
+            // A real button, stretched over the whole card (CSS), so the card's
+            // year and format stay readable text for screen readers.
+            <button
+              type="button"
+              className="release-open"
+              aria-label={`${display.artistName} — ${display.title}`}
+              onClick={() => onOpen(display)}
+            >
+              {display.title}
+            </button>
+          ) : (
+            display.title
+          )}
         </h3>
         {lines.length > 0 && (
           <div className="release-years">

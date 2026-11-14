@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2025-2026 ackervekenbm
 
-import type { KeyboardEvent } from 'react'
 import type { PressingGroup } from '../utils/collection'
 import { effectiveYears, stackCountLabel } from '../utils/collection'
 import { VinylIcon } from './icons'
@@ -23,22 +22,8 @@ export function StackCard({ group, onOpen }: StackCardProps) {
   const lines = effectiveYears(primary)
   const badge = stackCountLabel(group)
 
-  const handleKey = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      onOpen(group)
-    }
-  }
-
   return (
-    <article
-      className="release-card stack-card"
-      role="button"
-      tabIndex={0}
-      aria-label={`${primary.artistName} — ${primary.title}${badge ? `, ${badge}` : ''}`}
-      onClick={() => onOpen(group)}
-      onKeyDown={handleKey}
-    >
+    <article className="release-card stack-card">
       <div className="release-cover">
         {primary.coverImage ? (
           <img
@@ -48,20 +33,29 @@ export function StackCard({ group, onOpen }: StackCardProps) {
             decoding="async"
           />
         ) : (
-          <div className="release-cover missing" aria-label="No cover art">
+          <div className="release-cover missing" role="img" aria-label="No cover art">
             <VinylIcon size={22} />
           </div>
         )}
       </div>
       {badge && (
-        <span className="stack-badge">
+        // The button's name already says how many pressings.
+        <span className="stack-badge" aria-hidden="true">
           <VinylIcon size={12} />
           {badge}
         </span>
       )}
       <div className="release-meta">
         <h3 className="release-title" title={primary.title}>
-          {primary.title}
+          {/* Stretched over the whole card (CSS), like a release card. */}
+          <button
+            type="button"
+            className="release-open"
+            aria-label={`${primary.artistName} — ${primary.title}${badge ? `, ${badge}` : ''}`}
+            onClick={() => onOpen(group)}
+          >
+            {primary.title}
+          </button>
         </h3>
         {lines.length > 0 && (
           <div className="release-years">
