@@ -86,6 +86,12 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
 
 ## Architecture
 
+- `src/App.tsx` — wires the app together: the account, the browse state
+  (search, filters, folders, view and sort) and which overlay is open. Saved
+  views live in `useSavedViews`, the open release (card, pressing stack or
+  random pick) in `useReleaseDetail`; the header, toolbar, folder bar, sync
+  states and settings overlay are their own components. Shared controls:
+  `SegmentedControl` (view and sort switches) with `ARTIST_SORT_OPTIONS`.
 - `src/hooks/useCollection.ts` — load orchestration: stale-while-revalidate.
   Content-first: the release grid commits to the UI immediately; master-year
   enrichment runs in the background and streams in as each year arrives.
