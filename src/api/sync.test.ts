@@ -7,6 +7,7 @@ import {
   fetchCabinet,
   CABINET_TOO_LARGE,
   pushCabinet,
+  retryAfterMs,
   revisionFromEtag,
   SyncConflictError,
   SyncError,
@@ -143,5 +144,51 @@ describe('pushCabinet', () => {
     mockFetch(() => json({ error: 'Invalid cabinet document' }, 400))
 
     await expect(pushCabinet('tok', doc, '"r0"')).rejects.toMatchObject({ status: 400 })
+  })
+})
+
+describe('what a failed sync means', () => {
+  it('asks the user to check a refused token, and does not retry it', async () => {
+    mockFetch(() => json({ error: 'Discogs authentication failed' }, 401))
+
+    const err = await fetchCabinet('bad').catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(SyncError)
+    expect(err).toMatchObject({ status: 401, retryable: false, message: expect.stringMatching(/Check it in Settings/) })
+  })
+
+  it('treats a busy Discogs as retryable and keeps its Retry-After', async () => {
+    mockFetch(() => new Response('{}', { status: 429, headers: { 'Retry-After': '7' } }))
+
+    await expect(pushCabinet('tok', doc, '"r0"')).rejects.toMatchObject({
+      status: 429,
+      retryable: true,
+      retryAfterMs: 7000,
+      message: expect.stringMatching(/busy/),
+    })
+  })
+
+  it('treats a failing server or Discogs as retryable', async () => {
+    mockFetch(() => json({ error: 'Discogs authentication failed' }, 502))
+
+    await expect(fetchCabinet('tok')).rejects.toMatchObject({ status: 502, retryable: true })
+  })
+
+  it('treats no answer at all as retryable, but lets a caller abort', async () => {
+    mockFetch(() => Promise.reject(new TypeError('Failed to fetch')))
+    await expect(fetchCabinet('tok')).rejects.toMatchObject({ status: 0, retryable: true })
+
+    const caller = new AbortController()
+    caller.abort()
+    mockFetch(() => Promise.reject(new DOMException('Aborted', 'AbortError')))
+    await expect(fetchCabinet('tok', caller.signal)).rejects.toMatchObject({ name: 'AbortError' })
+  })
+
+  it('reads Retry-After as seconds or as a date', () => {
+    const now = Date.parse('2026-01-01T00:00:00Z')
+    expect(retryAfterMs('30', now)).toBe(30_000)
+    expect(retryAfterMs('Thu, 01 Jan 2026 00:00:10 GMT', now)).toBe(10_000)
+    expect(retryAfterMs('Thu, 01 Jan 2025 00:00:10 GMT', now)).toBe(0)
+    expect(retryAfterMs(null, now)).toBeUndefined()
+    expect(retryAfterMs('soon', now)).toBeUndefined()
   })
 })

@@ -6,7 +6,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import * as store from '../db/cabinet'
 import * as syncApi from '../api/sync'
 import type { CabinetDoc, LegacyCabinetDoc } from '../shared/cabinetDoc'
-import { PUSH_DEBOUNCE_MS, useCabinet } from './useCabinet'
+import { PUSH_DEBOUNCE_MS, SYNC_RETRY_MS, useCabinet } from './useCabinet'
 import {
   buildCabinetDoc,
   defaultCabinet,
@@ -231,13 +231,75 @@ describe('useCabinet', () => {
     await waitFor(() => expect(result.current.displayed).toEqual([releases[1]]))
   })
 
-  it('reports offline when the server cannot be reached', async () => {
+  it('reports offline when the server cannot be reached, and reads it again later', async () => {
+    vi.useFakeTimers()
     vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
-    vi.spyOn(syncApi, 'fetchCabinet').mockRejectedValue(new Error('boom'))
+    vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+    const fetchSpy = vi
+      .spyOn(syncApi, 'fetchCabinet')
+      .mockRejectedValueOnce(new syncApi.SyncError("Can't reach the server.", 0))
+      .mockResolvedValue({ doc: docWith('From the server'), etag: '"r2"' })
 
     const { result } = renderHook(() => useIt())
+    await act(async () => {})
+    expect(result.current.status).toBe('offline')
 
-    await waitFor(() => expect(result.current.status).toBe('offline'))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SYNC_RETRY_MS)
+    })
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(result.current.status).toBe('synced')
+    expect(result.current.cabinet.name).toBe('From the server')
+  })
+
+  it('says why when the server refuses the token, and does not retry', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
+    const fetchSpy = vi
+      .spyOn(syncApi, 'fetchCabinet')
+      .mockRejectedValue(new syncApi.SyncError('Discogs refused the token. Check it in Settings.', 401))
+
+    const { result } = renderHook(() => useIt())
+    await act(async () => {})
+    expect(result.current.status).toBe('error')
+    expect(result.current.error).toMatch(/Check it in Settings/)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SYNC_RETRY_MS * 2)
+    })
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('pushes again after the wait a busy server asked for', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
+    vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+    vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: null, etag: '"r0"' })
+    const pushSpy = vi
+      .spyOn(syncApi, 'pushCabinet')
+      .mockRejectedValueOnce(new syncApi.SyncError('Discogs is busy. Trying again shortly.', 429, 5000))
+      .mockResolvedValue({ doc: docWith('x'), etag: '"r1"' })
+
+    const { result } = renderHook(() => useIt())
+    await act(async () => {})
+    act(() => result.current.addSlot())
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS)
+    })
+    expect(result.current.status).toBe('offline')
+    expect(result.current.error).toMatch(/busy/)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4999)
+    })
+    expect(pushSpy).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1)
+    })
+    expect(pushSpy).toHaveBeenCalledTimes(2)
+    expect(result.current.status).toBe('synced')
+    expect(result.current.error).toBeNull()
+    expect(result.current.dirty).toBe(false)
   })
 
   it('pushes local edits after the debounce', async () => {

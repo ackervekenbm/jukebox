@@ -29,11 +29,21 @@ import {
   pushCabinet,
   revisionFromEtag,
   SyncConflictError,
+  SyncError,
 } from '../api/sync'
 
 /** How long edits settle before the cabinet is pushed to the server. */
 export const PUSH_DEBOUNCE_MS = 800
 const MAX_PUSH_ATTEMPTS = 3
+/** Wait before retrying a busy or unreachable server, unless it says how long (Retry-After). */
+export const SYNC_RETRY_MS = 30_000
+const MAX_RETRY_MS = 10 * 60_000
+
+/** How long to wait before trying again after `err`, or null when retrying won't help. */
+function retryDelayFor(err: unknown): number | null {
+  if (!(err instanceof SyncError) || !err.retryable) return null
+  return Math.min(Math.max(err.retryAfterMs ?? SYNC_RETRY_MS, 1000), MAX_RETRY_MS)
+}
 
 export type CabinetStatus = 'local' | 'loading' | 'syncing' | 'synced' | 'offline' | 'error'
 
@@ -99,6 +109,10 @@ export function useCabinet({
   const [dirty, setDirty] = useState(false)
   const [status, setStatus] = useState<CabinetStatus>('local')
   const [error, setError] = useState<string | null>(null)
+  // Set after a busy or unreachable server: when to push again, or reload the server copy.
+  const [pushRetry, setPushRetry] = useState<number | null>(null)
+  const [reloadRetry, setReloadRetry] = useState<number | null>(null)
+  const [loadAttempt, setLoadAttempt] = useState(0)
 
   const {
     notes,
@@ -194,6 +208,7 @@ export function useCabinet({
           // A push queued behind this one must start from the saved revision.
           live.current = { ...live.current, revision: savedRevision }
           setError(null)
+          setPushRetry(null)
           if (edits.current === editsAtStart) {
             setDirty(false)
             setStatus('synced')
@@ -217,8 +232,10 @@ export function useCabinet({
             persist(nextDoc, nextRevision, true)
             continue
           }
-          setStatus('error')
           setError(err instanceof Error ? err.message : 'Sync failed')
+          const delay = retryDelayFor(err)
+          setStatus(delay === null ? 'error' : 'offline')
+          setPushRetry(delay)
           return
         }
       }
@@ -318,16 +335,43 @@ export function useCabinet({
         setRevision(remoteRevision)
         setStatus('synced')
         persist(remote.doc, remoteRevision, false)
-      } catch {
+      } catch (err) {
         if (cancelled) return
-        setStatus('offline')
+        const delay = retryDelayFor(err)
+        if (delay === null) {
+          // Refused (a revoked token): retrying won't help, so say why.
+          setStatus('error')
+          setError(err instanceof Error ? err.message : 'Sync failed')
+        } else {
+          setStatus('offline')
+          setReloadRetry(delay)
+        }
       }
     })()
 
     return () => {
       cancelled = true
     }
-  }, [enabled, username, token, persist, push])
+  }, [enabled, username, token, persist, push, loadAttempt])
+
+  // "Offline — will retry" means it: try the save or the first read again later.
+  useEffect(() => {
+    if (pushRetry === null || !enabled) return
+    const timer = setTimeout(() => {
+      setPushRetry(null)
+      void push(live.current.doc, live.current.revision)
+    }, pushRetry)
+    return () => clearTimeout(timer)
+  }, [pushRetry, enabled, push])
+
+  useEffect(() => {
+    if (reloadRetry === null || !enabled) return
+    const timer = setTimeout(() => {
+      setReloadRetry(null)
+      setLoadAttempt((n) => n + 1)
+    }, reloadRetry)
+    return () => clearTimeout(timer)
+  }, [reloadRetry, enabled])
 
   useEffect(() => {
     if (!dirty || !enabled) return
@@ -480,6 +524,8 @@ export function useCabinet({
   const reset = useCallback(async () => {
     resets.current++
     queued.current = false
+    setPushRetry(null)
+    setReloadRetry(null)
     if (username) await clearCabinet(username)
     setCabinets([defaultCabinet()])
     setOverrides({})

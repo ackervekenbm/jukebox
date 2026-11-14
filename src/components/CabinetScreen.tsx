@@ -19,7 +19,8 @@ const STATUS_TEXT: Record<CabinetStatus, string> = {
   loading: 'Checking the server…',
   syncing: 'Saving…',
   synced: 'Synced',
-  offline: 'Offline — will retry',
+  // No connection, or Discogs busy or down: the hook tries again on its own.
+  offline: 'Not synced — will retry',
   error: 'Could not sync',
 }
 

@@ -114,7 +114,7 @@ The cabinet icon opens a planner for your physical shelves. Add shelves, set how
 - **Separate sizes** (optional) keeps 12" records and 7"/10" singles on shelves of their own. CDs and tapes form their own group.
 - **Warnings** appear when sizes have to share a shelf, an artist is split across shelves, records are out of order because shelves are nearly full, a shelf is over capacity, or records fit nowhere.
 - **Edit shelves** to change sizes or remove a shelf. **Undo** brings a removed shelf back.
-- The cabinet **syncs across your devices** through your Jukebox server.
+- The cabinet **syncs across your devices** through your Jukebox server. When the server or Discogs is busy or out of reach, changes stay on the device and sync by themselves once it answers again.
 
 </details>
 
