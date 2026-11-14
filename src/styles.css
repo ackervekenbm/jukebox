@@ -220,6 +220,10 @@ button:disabled {
   max-height: calc(
     100vh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
   );
+  /* 100dvh excludes iOS Safari's toolbar, so the bottom stays visible. */
+  max-height: calc(
+    100dvh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
   display: flex;
   flex-direction: column;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
@@ -1634,6 +1638,10 @@ button:disabled {
   max-height: calc(
     100vh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
   );
+  /* 100dvh excludes iOS Safari's toolbar, so the bottom stays visible. */
+  max-height: calc(
+    100dvh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
   display: flex;
   flex-direction: column;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
@@ -2031,10 +2039,42 @@ button:disabled {
 
 @media (prefers-reduced-motion: reduce) {
   .rr-vinyl {
-    animation-duration: 3.2s;
+    animation: none;
   }
-  .release-card:hover {
+  .release-card:hover,
+  .random-fab:hover {
     transform: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Fingers need about 44px: grow the small controls on touch screens only, so
+   mouse layouts keep their compact look. */
+@media (pointer: coarse) {
+  .icon-btn,
+  .stack-step {
+    width: 44px;
+    height: 44px;
+  }
+
+  .folder-chip,
+  .sort-toggle button {
+    min-height: 44px;
+  }
+
+  /* The rename/delete icons sit in a dense list: a bigger hit area, same look. */
+  .views-icon-btn {
+    position: relative;
+  }
+
+  .views-icon-btn::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
   }
 }
 

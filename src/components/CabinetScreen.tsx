@@ -3,6 +3,7 @@
 
 import { sortYear, type DisplayRelease } from '../utils/collection'
 import { useScrollLock } from '../hooks/useScrollLock'
+import { useDialog } from '../hooks/useDialog'
 import type { CabinetStatus, RemovedSlot, UseCabinetResult } from '../hooks/useCabinet'
 import { useDiscogsWaitNote } from '../hooks/useDiscogsWait'
 import {
@@ -125,6 +126,7 @@ export function CabinetScreen({
   onClose,
 }: CabinetScreenProps) {
   useScrollLock(true)
+  const dialogRef = useDialog<HTMLDivElement>(onClose)
   const {
     options,
     plan,
@@ -286,6 +288,7 @@ export function CabinetScreen({
 
   return (
     <div
+      ref={dialogRef}
       className="detail-overlay"
       role="dialog"
       aria-modal="true"
@@ -425,7 +428,10 @@ export function CabinetScreen({
                         }}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter') handleAdd()
-                          if (event.key === 'Escape') closeAdd()
+                          if (event.key === 'Escape') {
+                            event.preventDefault() // closes the form, not the cabinet
+                            closeAdd()
+                          }
                         }}
                         autoFocus
                       />
