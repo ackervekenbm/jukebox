@@ -146,7 +146,21 @@ describe('random picker listen log', () => {
 
     expect(await screen.findByRole('dialog')).toBeTruthy()
     expect(screen.queryByText('Recent picks')).toBeNull()
-    expect(warn).toHaveBeenCalled()
+    expect(warn).toHaveBeenCalledWith('[picker] could not read the listen log', expect.any(Error))
+    expect(warn).toHaveBeenCalledWith('[picker] could not update the listen log', expect.any(Error))
+  })
+
+  it('still logs the pick when only the history cannot be read', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(listenLog, 'getRecentListenIds').mockRejectedValue(new Error('IndexedDB is gone'))
+    const logged = vi.spyOn(listenLog, 'logListen')
+    const user = await renderApp()
+
+    await user.click(fab())
+
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+    expect(logged).toHaveBeenCalledTimes(1)
+    expect(warn).toHaveBeenCalledWith('[picker] could not read the listen log', expect.any(Error))
   })
 
   it('shows no history when a release is opened from the grid', async () => {
