@@ -403,8 +403,9 @@ docker logs -f jukebox                  # docker run
 journalctl -u jukebox -f                # systemd
 ```
 
-The server is quiet: a startup line, Discogs identity-check errors (`[auth]`;
-a rejected token is a plain 401 and is not logged), uncaught 5xx
+The server is quiet: a startup line, Discogs identity-check errors (`[auth]`: Discogs
+rate limiting or down, answered as 429 or 502; a rejected token is a plain 401
+and is not logged), uncaught 5xx
 (`[server]`) and shutdown. It does **not** log requests, tokens or collection
 data. The `/discogs` proxy forwards each request's token to Discogs, and sync
 requests resolve it to a Discogs username; the server keeps only a SHA-256 hash
