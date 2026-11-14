@@ -247,6 +247,9 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   tokens, never hardcoded colors. One file per area (`base`, `shell`,
   `collection`, `detail`, `cabinet`, …), pulled in by `src/styles.css` in
   cascade order; put a rule in its area's file, keeping that order in mind.
+  Each screen has its own class prefix (`stats-` for the stats screen,
+  `storage-` for Settings → Advanced, `cabinet-`, …); never reuse another
+  screen's classes, or its rules leak in (#187, #193).
 - PWA via `vite-plugin-pwa`: app-shell precache + `album-art` runtime cache
   (500 entries, 30-day expiry). `vite.config.ts`.
 
