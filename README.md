@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/icons/icon.svg" width="96" height="96" alt="">
+  <img src="public/favicon.svg" width="96" height="96" alt="">
 </p>
 
 <h1 align="center">Jukebox</h1>
@@ -190,7 +190,7 @@ Open <http://localhost:5199>. If that port is taken, Vite picks the next free on
 | `npm test` / `npm run test:watch` | Unit tests (Vitest: jsdom for the client, node for API routes) |
 | `npm run lint` / `lint:fix` | ESLint |
 | `npm run fixtures` | Refresh the recorded Discogs payloads (needs `DISCOGS_TOKEN`) |
-| `npm run icons` | Regenerate the app icons from `public/icons/icon.svg` |
+| `npm run icons` | Regenerate the PNG app icons (the artwork lives in `scripts/gen-icons.mjs`) |
 | `node scripts/screenshots.mjs` | Regenerate the README screenshots from the demo (instructions are in the script) |
 
 Every change is checked with `npm run build && npm test`; CI runs the same on each pull request.
