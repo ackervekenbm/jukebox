@@ -8,7 +8,7 @@ import { useReleaseTracklist } from '../hooks/useReleaseTracklist'
 import { useScrollLock } from '../hooks/useScrollLock'
 import { useDialog } from '../hooks/useDialog'
 import { formatRelativeTime } from '../utils/time'
-import { CloseIcon, ChevronIcon } from './icons'
+import { CloseIcon, ChevronIcon, ShuffleIcon } from './icons'
 
 interface ReleaseDetailProps {
   display: DisplayRelease
@@ -33,6 +33,8 @@ interface ReleaseDetailProps {
   gatefoldSource?: string
   /** Flips the sleeve call; vinyl only, no toggle without it. */
   onToggleGatefold?: () => void
+  /** Re-rolls the random pick; no shuffle button without it. */
+  onPickAnother?: () => void
 }
 
 export interface RecentPick {
@@ -55,6 +57,7 @@ export function ReleaseDetail({
   gatefold = false,
   gatefoldSource,
   onToggleGatefold,
+  onPickAnother,
 }: ReleaseDetailProps) {
   useScrollLock(true)
   const dialogRef = useDialog<HTMLDivElement>(onClose)
@@ -343,6 +346,23 @@ export function ReleaseDetail({
           </div>
         </div>
       </div>
+
+      {/* The shuffle button floats in the same corner as on the grid, but lives
+          inside the sheet so it stays reachable while the page behind is inert. */}
+      {onPickAnother && (
+        <button
+          type="button"
+          className="random-fab"
+          onClick={(event) => {
+            event.stopPropagation()
+            onPickAnother()
+          }}
+          title="Pick another random release"
+          aria-label="Pick another random release"
+        >
+          <ShuffleIcon size={20} />
+        </button>
+      )}
     </div>
   )
 }

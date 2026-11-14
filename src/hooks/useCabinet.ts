@@ -160,6 +160,10 @@ export function useCabinet({
     setDirty(true)
   }, [])
 
+  // "Clear everything" bumps this; a push that started before it must not
+  // write its answer back into the cleared cabinet.
+  const resets = useRef(0)
+
   /**
    * Pushes a document, rebasing and retrying while the server reports a newer
    * revision. Gives up after a few rounds so a rebase loop cannot spin.
@@ -177,12 +181,14 @@ export function useCabinet({
       }
       setStatus('syncing')
       const editsAtStart = edits.current
+      const resetsAtStart = resets.current
       let nextDoc = startDoc
       let nextRevision = startRevision
 
       for (let attempt = 0; attempt < MAX_PUSH_ATTEMPTS; attempt++) {
         try {
           const result = await pushCabinet(authToken, nextDoc, etagForRevision(nextRevision))
+          if (resets.current !== resetsAtStart) return
           const savedRevision = revisionFromEtag(result.etag, nextRevision + 1)
           setRevision(savedRevision)
           // A push queued behind this one must start from the saved revision.
@@ -198,6 +204,7 @@ export function useCabinet({
           }
           return
         } catch (err) {
+          if (resets.current !== resetsAtStart) return
           if (err instanceof SyncConflictError) {
             const base = edits.current === editsAtStart ? nextDoc : live.current.doc
             nextDoc = rebaseCabinetDoc(base)
@@ -471,6 +478,8 @@ export function useCabinet({
   }, [push])
 
   const reset = useCallback(async () => {
+    resets.current++
+    queued.current = false
     if (username) await clearCabinet(username)
     setCabinets([defaultCabinet()])
     setOverrides({})

@@ -76,6 +76,10 @@ function seedSettings() {
 const fab = () =>
   screen.getByRole('button', { name: "Pick a random release from what's shown" })
 
+/** The same shuffle button, as the open release shows it. */
+const reroll = async () =>
+  within(await screen.findByRole('dialog')).getByRole('button', { name: 'Pick another random release' })
+
 async function renderApp() {
   const user = userEvent.setup()
   render(<App />)
@@ -108,7 +112,7 @@ describe('random picker listen log', () => {
     // window (default 10 over a 3-release collection) forces a different one.
     // The re-roll is async — it reads then writes the listen log before it
     // swaps the release — so wait for the dialog to move off the first pick.
-    await user.click(fab())
+    await user.click(await reroll())
     await waitFor(() =>
       expect(screen.getByRole('dialog')).not.toHaveAccessibleName(first),
     )
@@ -142,7 +146,21 @@ describe('random picker listen log', () => {
 
     expect(await screen.findByRole('dialog')).toBeTruthy()
     expect(screen.queryByText('Recent picks')).toBeNull()
-    expect(warn).toHaveBeenCalled()
+    expect(warn).toHaveBeenCalledWith('[picker] could not read the listen log', expect.any(Error))
+    expect(warn).toHaveBeenCalledWith('[picker] could not update the listen log', expect.any(Error))
+  })
+
+  it('still logs the pick when only the history cannot be read', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(listenLog, 'getRecentListenIds').mockRejectedValue(new Error('IndexedDB is gone'))
+    const logged = vi.spyOn(listenLog, 'logListen')
+    const user = await renderApp()
+
+    await user.click(fab())
+
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+    expect(logged).toHaveBeenCalledTimes(1)
+    expect(warn).toHaveBeenCalledWith('[picker] could not read the listen log', expect.any(Error))
   })
 
   it('shows no history when a release is opened from the grid', async () => {
@@ -182,7 +200,7 @@ describe('random picker listen log', () => {
     const user = await renderApp()
 
     await user.click(fab())
-    await user.click(fab())
+    await user.click(await reroll())
     expect(await getListenLog('alice')).toHaveLength(2)
 
     await user.click(screen.getByRole('button', { name: 'Close release details' }))

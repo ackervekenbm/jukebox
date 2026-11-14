@@ -63,7 +63,10 @@ export function useReleaseDetail({ releases, masterYears, candidates, username, 
     if (candidates.length === 0 || !username) return
     // The listen log only steers and annotates the pick: if IndexedDB fails,
     // pick from everything and open the release without its history.
-    const recentIds = await getRecentListenIds(username, pickerSkip).catch(() => [])
+    const recentIds = await getRecentListenIds(username, pickerSkip).catch((err: unknown) => {
+      console.warn('[picker] could not read the listen log', err)
+      return []
+    })
     const picked = pickAvoiding(candidates, recentIds, pickerSkip)
     if (!picked) return
     let entries: ListenEntry[] = []

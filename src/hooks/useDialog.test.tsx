@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2025-2026 ackervekenbm
 
+import { StrictMode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useDialog } from './useDialog'
 
 function Sheet({ name, onClose, children }: { name: string; onClose?: () => void; children?: React.ReactNode }) {
@@ -61,53 +62,64 @@ describe('useDialog', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('keeps Tab and Shift+Tab inside the topmost sheet', () => {
-    render(
+  it('makes the page behind the topmost sheet inert, and wakes it up again on close', () => {
+    const Page = ({ detail }: { detail: boolean }) => (
       <>
         <button type="button">Behind</button>
         <Sheet name="Cabinet">
           <button type="button">Cabinet button</button>
         </Sheet>
-        <Sheet name="Detail">
-          <button type="button">First</button>
-          <button type="button" disabled>
-            Disabled
-          </button>
-          <button type="button">Last</button>
-        </Sheet>
-      </>,
+        {detail && (
+          <Sheet name="Detail">
+            <button type="button">Detail button</button>
+          </Sheet>
+        )}
+      </>
     )
-    const first = screen.getByRole('button', { name: 'First' })
-    const last = screen.getByRole('button', { name: 'Last' })
-    // Focus starts on the sheet itself: Tab goes to its first control.
-    fireEvent.keyDown(window, { key: 'Tab' })
-    expect(first).toHaveFocus()
-    fireEvent.keyDown(window, { key: 'Tab' })
-    expect(last).toHaveFocus()
-    // Past the end it wraps around instead of leaving for the page behind.
-    fireEvent.keyDown(window, { key: 'Tab' })
-    expect(first).toHaveFocus()
-    fireEvent.keyDown(window, { key: 'Tab', shiftKey: true })
-    expect(last).toHaveFocus()
+    const { rerender, container } = render(<Page detail />)
+    const behind = screen.getByRole('button', { name: 'Behind' })
+    const cabinet = screen.getByRole('dialog', { name: 'Cabinet' })
+    const detail = screen.getByRole('dialog', { name: 'Detail' })
+    expect(behind).toHaveAttribute('inert')
+    expect(cabinet).toHaveAttribute('inert')
+    expect(detail).not.toHaveAttribute('inert')
+    expect(container).not.toHaveAttribute('inert')
+
+    rerender(<Page detail={false} />)
+    expect(behind).toHaveAttribute('inert')
+    expect(cabinet).not.toHaveAttribute('inert')
+
+    rerender(<button type="button">Behind</button>)
+    expect(document.querySelector('[inert]')).toBeNull()
   })
 
-  it('lets Tab reach a companion control floating over the sheet', () => {
+  it('hands focus back to an opener that the sheet made inert, under StrictMode too', () => {
+    const Page = ({ open }: { open: boolean }) => (
+      <StrictMode>
+        <button type="button">Shuffle</button>
+        {open && <Sheet name="Detail" />}
+      </StrictMode>
+    )
+    const { rerender } = render(<Page open={false} />)
+    screen.getByRole('button', { name: 'Shuffle' }).focus()
+
+    rerender(<Page open />)
+    expect(screen.getByRole('dialog', { name: 'Detail' })).toHaveFocus()
+    expect(screen.getByText('Shuffle')).toHaveAttribute('inert')
+
+    rerender(<Page open={false} />)
+    expect(screen.getByRole('button', { name: 'Shuffle' })).toHaveFocus()
+  })
+
+  it('leaves alone what was inert before it opened', () => {
     render(
       <>
-        <button type="button">Behind</button>
-        <Sheet name="Detail">
-          <button type="button">Close</button>
-        </Sheet>
-        <button type="button" data-modal-companion>
-          Shuffle
-        </button>
+        <div inert>Already inert</div>
+        <Sheet name="Stats" />
       </>,
     )
-    fireEvent.keyDown(window, { key: 'Tab' })
-    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus()
-    fireEvent.keyDown(window, { key: 'Tab' })
-    expect(screen.getByRole('button', { name: 'Shuffle' })).toHaveFocus()
-    fireEvent.keyDown(window, { key: 'Tab' })
-    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus()
+    const already = screen.getByText('Already inert')
+    cleanup()
+    expect(already).toHaveAttribute('inert')
   })
 })

@@ -15,7 +15,7 @@ export const STORAGE_PREFIX = 'vinyl-vault:'
  * is attempted even when another fails.
  */
 export async function clearAllLocalData(): Promise<void> {
-  await Promise.allSettled([
+  const results = await Promise.allSettled([
     (async () => {
       const db = await dbPromise
       const names = [...db.objectStoreNames]
@@ -25,4 +25,7 @@ export async function clearAllLocalData(): Promise<void> {
     Promise.resolve().then(() => removeKeysStartingWith(STORAGE_PREFIX)),
     clearAlbumArtCache(),
   ])
+  for (const result of results) {
+    if (result.status === 'rejected') console.warn('[storage] could not clear part of the local data', result.reason)
+  }
 }
