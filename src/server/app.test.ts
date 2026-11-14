@@ -117,8 +117,10 @@ describe('GET /api/sync/cabinet', () => {
 
   it('memoizes the identity check', async () => {
     const { auth } = newAccount()
+    const start = identityCalls.count
     await request(app).get('/api/sync/cabinet').set(auth)
     const before = identityCalls.count
+    expect(before).toBe(start + 1)
     await request(app).get('/api/sync/cabinet').set(auth)
     await request(app).get('/api/sync/cabinet').set(auth)
     expect(identityCalls.count).toBe(before)
@@ -249,7 +251,7 @@ describe('PUT /api/sync/cabinet', () => {
     const res = await request(app)
       .put('/api/sync/cabinet')
       .set(auth)
-      .set('If-Match', '"r3"')
+      .set('If-Match', '"r0"')
       .send({ schemaVersion: 2, cabinets: [], placements: {}, overrides: {}, unplaced: [], updatedAt: 'now' })
     expect(res.status).toBe(400)
     expect(res.body.error).toBe('Invalid cabinet document')
@@ -260,7 +262,7 @@ describe('PUT /api/sync/cabinet', () => {
     const res = await request(app)
       .put('/api/sync/cabinet')
       .set(auth)
-      .set('If-Match', '"r3"')
+      .set('If-Match', '"r0"')
       .set('Content-Type', 'application/json')
       .send('{not json')
     expect(res.status).toBe(400)
