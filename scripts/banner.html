@@ -68,6 +68,9 @@
       <linearGradient id="sleeve" x1="0" y1="0" x2="1" y2="1">
         <stop offset="0" stop-color="#26305a"/><stop offset="1" stop-color="#121830"/>
       </linearGradient>
+      <linearGradient id="bars" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ffd27a"/><stop offset="1" stop-color="#d97a1e" stop-opacity="0.55"/>
+      </linearGradient>
       <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
         <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000" flood-opacity="0.5"/>
       </filter>
@@ -91,15 +94,27 @@
     <g filter="url(#shadow)">
       <rect x="0" y="0" width="300" height="300" rx="10" fill="url(#sleeve)"/>
       <rect x="0.75" y="0.75" width="298.5" height="298.5" rx="9.5" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1.5"/>
-      <!-- Printed artwork: a sunburst of thin amber rings, off-centre. -->
-      <g fill="none" stroke="#ffd27a" stroke-width="2">
-        <circle cx="110" cy="190" r="40" stroke-opacity="0.55"/>
-        <circle cx="110" cy="190" r="62" stroke-opacity="0.35"/>
-        <circle cx="110" cy="190" r="84" stroke-opacity="0.22"/>
-        <circle cx="110" cy="190" r="106" stroke-opacity="0.12"/>
+      <!-- Printed artwork: an equaliser, so the sleeve doesn't repeat the record's rings. -->
+      <g fill="url(#bars)" fill-opacity="0.9">
+        <rect x="29" y="230" width="10" height="46" rx="5"/>
+        <rect x="47" y="202" width="10" height="74" rx="5"/>
+        <rect x="65" y="176" width="10" height="100" rx="5"/>
+        <rect x="83" y="192" width="10" height="84" rx="5"/>
+        <rect x="101" y="156" width="10" height="120" rx="5"/>
+        <rect x="119" y="140" width="10" height="136" rx="5"/>
+        <rect x="137" y="166" width="10" height="110" rx="5"/>
+        <rect x="155" y="186" width="10" height="90" rx="5"/>
+        <rect x="173" y="148" width="10" height="128" rx="5"/>
+        <rect x="191" y="174" width="10" height="102" rx="5"/>
+        <rect x="209" y="206" width="10" height="70" rx="5"/>
+        <rect x="227" y="190" width="10" height="86" rx="5"/>
+        <rect x="245" y="222" width="10" height="54" rx="5"/>
+        <rect x="263" y="242" width="10" height="34" rx="5"/>
       </g>
-      <circle cx="110" cy="190" r="18" fill="#ffd27a" fill-opacity="0.85"/>
-      <text x="24" y="44" font-family="Inter, sans-serif" font-size="15" font-weight="500" letter-spacing="3" fill="#ffffff" fill-opacity="0.55">SIDE A</text>
+      <rect x="27" y="282" width="246" height="2" rx="1" fill="#ffd27a" fill-opacity="0.25"/>
+      <!-- Artist and album, as a sleeve would print them. -->
+      <text x="27" y="42" font-family="Inter, sans-serif" font-size="14" font-weight="500" letter-spacing="1.5" fill="#ffffff" fill-opacity="0.6">ackervekenbm</text>
+      <text x="25" y="80" font-family="Fraunces, Georgia, serif" font-size="36" font-weight="600" letter-spacing="1" fill="#fff1d6" style="font-variation-settings: 'SOFT' 100">JUKEBOX</text>
     </g>
   </svg>
 
