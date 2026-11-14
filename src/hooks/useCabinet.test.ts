@@ -312,6 +312,36 @@ describe('useCabinet', () => {
     expect(result.current.status).toBe('local')
   })
 
+  it('ignores the answer to a push that was in flight when the cabinet was reset', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
+    const putSpy = vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
+    vi.spyOn(store, 'clearCabinet').mockResolvedValue(undefined)
+    vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: null, etag: '"r0"' })
+    let answer: (value: Awaited<ReturnType<typeof syncApi.pushCabinet>>) => void = () => {}
+    vi.spyOn(syncApi, 'pushCabinet').mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+
+    const { result } = renderHook(() => useIt())
+    await act(async () => {})
+    act(() => result.current.addSlot())
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS)
+    })
+    expect(result.current.status).toBe('syncing')
+
+    await act(() => result.current.reset())
+    putSpy.mockClear()
+    await act(async () => answer({ doc: docWith('x'), etag: '"r1"' }))
+
+    expect(putSpy).not.toHaveBeenCalled()
+    expect(result.current.status).toBe('local')
+    expect(result.current.cabinet.slots).toHaveLength(2)
+  })
+
   it('removes every shelf, so the layout can start over', async () => {
     vi.spyOn(store, 'getCabinet').mockResolvedValue(null)
     vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
