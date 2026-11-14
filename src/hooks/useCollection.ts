@@ -3,17 +3,8 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { Settings } from '../db/settings'
-import {
-  getCachedCollection,
-  setCachedCollection,
-  removeCachedCollection,
-  getMasterYears,
-  setMasterYears,
-  clearMasterYears,
-  clearReleaseDetails,
-  clearReleaseNotes,
-  removeCachedCollectionValue,
-} from '../db/collection'
+import { getCachedCollection, setCachedCollection, getMasterYears, setMasterYears } from '../db/collection'
+import { clearAllLocalData } from '../db/wipe'
 import {
   fetchCollection,
   fetchFolders,
@@ -21,7 +12,6 @@ import {
   type CollectionResult,
   type MasterYears,
 } from '../api/discogs'
-import { clearAlbumArtCache } from '../utils/storage'
 import type { DiscogsCollectionFolder, DiscogsCollectionRelease } from '../types/discogs'
 
 export type Status = 'idle' | 'loading' | 'error'
@@ -195,17 +185,10 @@ export function useCollection(settings: Settings | null): UseCollectionResult {
 
   const wipeCache = useCallback(async () => {
     if (!account) return
-    // "Clear everything" must reclaim every byte, including the service-worker
-    // album-art runtime cache, and stop any collection sync still in flight.
+    // "Clear everything": stop any sync still in flight, so it can't write the
+    // collection back, then clear all of the app's browser storage.
     abortRef.current?.abort()
-    await Promise.allSettled([
-      removeCachedCollection(account.username),
-      clearMasterYears(),
-      clearReleaseDetails(),
-      clearReleaseNotes(),
-      removeCachedCollectionValue(account.username),
-      clearAlbumArtCache(),
-    ])
+    await clearAllLocalData()
     setReleases([])
     setFolders([])
     setMasterYearsState({})

@@ -8,6 +8,8 @@ export class AuthError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** Discogs' Retry-After, passed on with a 429. */
+    readonly retryAfter?: string,
   ) {
     super(message)
     this.name = 'AuthError'
@@ -44,8 +46,15 @@ export async function resolveUsername(token: string): Promise<string> {
     throw new AuthError(502, 'Discogs identity check is unreachable')
   }
 
-  if (!response.ok) {
+  if (response.status === 401 || response.status === 403) {
     throw new AuthError(401, 'Discogs rejected the token')
+  }
+  // Busy or down is not a bad token: the client should try again, not sign out.
+  if (response.status === 429) {
+    throw new AuthError(429, 'Discogs is rate limiting the identity check', response.headers.get('retry-after') ?? undefined)
+  }
+  if (!response.ok) {
+    throw new AuthError(502, `Discogs identity check failed with ${response.status}`)
   }
 
   const body = (await response.json()) as { username?: string }
