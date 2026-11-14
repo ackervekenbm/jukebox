@@ -27,7 +27,8 @@ async function requireUser(req: Request, res: Response): Promise<string | null> 
     return await resolveUsername(token)
   } catch (err) {
     const status = err instanceof AuthError ? err.status : 500
-    if (status >= 500) console.error('[auth] identity check failed', err)
+    if (status >= 500 || status === 429) console.error('[auth] identity check failed', err)
+    if (err instanceof AuthError && err.retryAfter) res.set('Retry-After', err.retryAfter)
     res.status(status).json({ error: 'Discogs authentication failed' })
     return null
   }
