@@ -31,7 +31,8 @@ import {
   SyncConflictError,
 } from '../api/sync'
 
-const PUSH_DEBOUNCE_MS = 800
+/** How long edits settle before the cabinet is pushed to the server. */
+export const PUSH_DEBOUNCE_MS = 800
 const MAX_PUSH_ATTEMPTS = 3
 
 export type CabinetStatus = 'local' | 'loading' | 'syncing' | 'synced' | 'offline' | 'error'

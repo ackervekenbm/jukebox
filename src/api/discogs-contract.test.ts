@@ -16,6 +16,7 @@ import type {
   DiscogsMaster,
   DiscogsRelease,
 } from '../types/discogs'
+import { json, mockFetch } from '../test/http'
 
 // Real responses captured from the Discogs API by
 // scripts/refresh-discogs-fixtures.mjs. These tests are hermetic: `fetch` is
@@ -55,23 +56,6 @@ if (!collectionFixture) {
   console.info(
     'Discogs contract fixtures not present — run `DISCOGS_TOKEN=... npm run fixtures` ' +
       'or let the nightly discogs-contract workflow generate them.',
-  )
-}
-
-function json(body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  })
-}
-
-function mockFetch(handler: (url: string, init?: RequestInit) => unknown): void {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((url: string, init?: RequestInit) => {
-      const result = handler(url, init)
-      return result instanceof Promise ? result : Promise.resolve(result)
-    }),
   )
 }
 

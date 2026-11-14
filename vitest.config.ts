@@ -14,6 +14,13 @@ export default defineConfig({
     __REPO__: JSON.stringify('ackervekenbm/jukebox'),
   },
   test: {
+    // `npm run test:coverage` writes a text summary and an HTML report to coverage/.
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/**/*.d.ts', 'src/main.tsx'],
+      reporter: ['text-summary', 'html'],
+    },
     environment: 'jsdom',
     globals: false,
     setupFiles: ['./src/test/setup.ts'],

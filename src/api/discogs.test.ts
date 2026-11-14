@@ -11,38 +11,15 @@ import {
   fetchReleaseNotes,
 } from './discogs'
 import { discogsBudget } from './rateLimit'
+import { json, mockFetch } from '../test/http'
 
 const API = '/discogs'
-
-function json(
-  body: unknown,
-  status = 200,
-  headers: Record<string, string> = {},
-): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...headers },
-  })
-}
 
 function collectionPage(page: number, pages: number, items: number): Response {
   return json({
     pagination: { page, pages, per_page: 100, items },
     releases: [{ id: page, instance_id: page }],
   })
-}
-
-let fetchMock: ReturnType<typeof vi.fn>
-
-function mockFetch(handler: (url: string, init?: RequestInit) => unknown): void {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((url: string, init?: RequestInit) => {
-      const result = handler(url, init)
-      return result instanceof Promise ? result : Promise.resolve(result)
-    }),
-  )
-  fetchMock = vi.mocked(fetch)
 }
 
 beforeEach(() => {
@@ -62,7 +39,7 @@ describe('fetchFolders', () => {
     const folders = await fetchFolders('alice', 'tok')
 
     expect(folders).toEqual([{ id: 1, name: 'All', count: 3 }])
-    const [url, init] = fetchMock.mock.calls[0]
+    const [url, init] = vi.mocked(fetch).mock.calls[0]
     expect(String(url)).toBe(`${API}/users/alice/collection/folders`)
     expect((init as RequestInit).headers).toMatchObject({ Authorization: 'Discogs token=tok' })
   })
@@ -137,7 +114,7 @@ describe('fetchCollection', () => {
     expect(result.items).toBe(2)
     expect(result.releases.map((r) => r.instance_id)).toEqual([1, 2])
 
-    const urls = fetchMock.mock.calls.map(([url]) => String(url))
+    const urls = vi.mocked(fetch).mock.calls.map(([url]) => String(url))
     expect(urls).toHaveLength(2)
     expect(urls[0]).toContain('page=1&per_page=100')
     expect(urls[1]).toContain('page=2&per_page=100')
@@ -413,7 +390,7 @@ describe('fetchCollectionValue', () => {
       median: '$5,234.56',
       maximum: '$9,999.99',
     })
-    const [url, init] = fetchMock.mock.calls[0]
+    const [url, init] = vi.mocked(fetch).mock.calls[0]
     expect(String(url)).toBe(`${API}/users/alice/collection/value`)
     expect((init as RequestInit).headers).toMatchObject({ Authorization: 'Discogs token=tok' })
   })
@@ -431,7 +408,7 @@ describe('fetchCollectionValue', () => {
 
     await fetchCollectionValue('a b/c', 'tok')
 
-    expect(String(fetchMock.mock.calls[0][0])).toBe(
+    expect(String(vi.mocked(fetch).mock.calls[0][0])).toBe(
       `${API}/users/a%20b%2Fc/collection/value`,
     )
   })

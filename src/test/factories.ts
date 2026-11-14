@@ -61,8 +61,11 @@ interface FakeInput {
 
 let counter = 0
 
-/** A collection record shaped for the shelf planner and the physical-facts checks. */
-export function fakeRecord(input: FakeInput): DisplayRelease {
+/**
+ * A collection record as the screens, the shelf planner and the physical-facts
+ * checks get it. `overrides` sets any other field directly.
+ */
+export function fakeRecord(input: FakeInput, overrides: Partial<DisplayRelease> = {}): DisplayRelease {
   const id = input.id ?? ++counter
   const year = input.year ?? 2020
   const formatText = input.formatText ?? 'Vinyl · 12" · LP'
@@ -90,5 +93,6 @@ export function fakeRecord(input: FakeInput): DisplayRelease {
       },
     } as unknown as DiscogsCollectionRelease,
     dateAdded: '2024-01-01T00:00:00-00:00',
+    ...overrides,
   }
 }
