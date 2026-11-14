@@ -88,6 +88,32 @@ describe('SettingsForm', () => {
     expect(screen.getByText(/avoids the last N picks/)).toBeInTheDocument()
   })
 
+  it('offers no refresh on first run, before there is a collection', () => {
+    renderSettings()
+    expect(screen.queryByRole('button', { name: /Refresh/ })).not.toBeInTheDocument()
+  })
+
+  it('refreshes from Discogs, showing when it last synced, and waits while a sync runs', () => {
+    const base = {
+      initial: { username: 'bob', token: 'tok-1', theme: 'midnight' as const },
+      theme: 'midnight' as const,
+      onThemeChange: vi.fn(),
+      onSave: vi.fn(),
+      groupPressings: false,
+      onGroupPressingsChange: vi.fn(),
+      pickerSkip: 10,
+      onPickerSkipChange: vi.fn(),
+    }
+    const onRefresh = vi.fn()
+    const { rerender } = render(<SettingsForm {...base} onRefresh={onRefresh} lastSynced="11:53 AM" />)
+    expect(screen.getByText(/Last synced 11:53 AM/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh from Discogs' }))
+    expect(onRefresh).toHaveBeenCalledTimes(1)
+
+    rerender(<SettingsForm {...base} onRefresh={onRefresh} refreshing />)
+    expect(screen.getByRole('button', { name: 'Refreshing…' })).toBeDisabled()
+  })
+
   it('renders additional children (advanced section)', () => {
     renderSettings()
     expect(screen.getByText('advanced slot')).toBeInTheDocument()
