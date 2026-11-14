@@ -12,6 +12,7 @@ proxy, and the `/api` sync store (SQLite) that backs cross-device features.
 npm install       # install deps (uses package-lock.json, commit it)
 npm run build     # = tsc --noEmit && eslint . && vite build && tsup (server)
 npm test          # unit tests (vitest) — jsdom for client, node for server
+npm run test:coverage  # same, plus a coverage summary and coverage/index.html
 ```
 
 Installs are **script-free**: `.npmrc` sets `ignore-scripts=true`.
@@ -23,6 +24,11 @@ this — keep the install toolchain-free. The consequence: a dependency that
 genuinely needs an install/postinstall script cannot be added without revisiting
 `.npmrc`; prefer packages that ship prebuilds or use optional platform packages
 (esbuild does).
+
+Tests sit next to the code they test (`foo.ts` → `foo.test.ts`). `src/test/`
+holds only what tests share: the setup file, factories (`release`, `artist`,
+`fakeRecord`), `http.ts` (`json`, `mockFetch` for a stubbed fetch) and the
+Discogs fixtures. Use those rather than another local copy.
 
 **Verification for every change is `npm run build && npm test`.** CI runs the
 `check` job (`npm ci && npm run build && npm test`) on every PR, and a green

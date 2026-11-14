@@ -3,13 +3,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
-import type { DiscogsCollectionRelease } from '../types/discogs'
-import type { DisplayRelease } from '../utils/collection'
-import { makeSortKey } from '../utils/sortName'
 import * as store from '../db/cabinet'
 import * as syncApi from '../api/sync'
 import type { CabinetDoc, LegacyCabinetDoc } from '../shared/cabinetDoc'
-import { useCabinet } from './useCabinet'
+import { PUSH_DEBOUNCE_MS, useCabinet } from './useCabinet'
 import {
   buildCabinetDoc,
   defaultCabinet,
@@ -17,6 +14,7 @@ import {
   rebaseCabinetDoc,
   withUniqueSlotIds,
 } from '../utils/cabinetModel'
+import { fakeRecord } from '../test/factories'
 
 // The release-notes scan has its own tests; here it reports whatever notes the
 // test sets, and never touches the network.
@@ -28,31 +26,7 @@ vi.mock('./useGatefoldNotes', () => ({
   },
 }))
 
-let nextId = 0
-
-function release(artist: string, title: string): DisplayRelease {
-  const id = ++nextId
-  return {
-    key: `${id}-${id}`,
-    instanceId: id,
-    id,
-    title,
-    titleKey: makeSortKey(title),
-    year: 2000,
-    originalYear: 2000,
-    artistName: artist,
-    genres: [],
-    styles: [],
-    labels: [],
-    country: '',
-    formatNames: ['Vinyl'],
-    formatText: 'Vinyl · 12" · LP',
-    coverImage: '',
-    thumb: '',
-    release: {} as DiscogsCollectionRelease,
-    dateAdded: '2024-01-01T00:00:00-00:00',
-  }
-}
+const release = (artist: string, title: string) => fakeRecord({ artist, title, year: 2000 })
 
 function docWith(cabinetName: string): CabinetDoc {
   return {
@@ -214,7 +188,7 @@ describe('useCabinet', () => {
 
     act(() => result.current.setSeparateSizeClasses(true))
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(800)
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS)
     })
 
     expect(pushSpy.mock.calls[0][1].options?.separateSizeClasses).toBe(true)
@@ -238,7 +212,7 @@ describe('useCabinet', () => {
     expect(result.current.plan.placements[releases[0].key]).toBeUndefined()
     expect(result.current.plan.unplaced).not.toContain(releases[0])
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(800)
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS)
     })
     expect(pushSpy.mock.calls[0][1].displayed).toEqual([releases[0].instanceId])
 
@@ -280,7 +254,7 @@ describe('useCabinet', () => {
 
     act(() => result.current.addSlot())
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(800)
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS)
     })
 
     expect(pushSpy).toHaveBeenCalledTimes(1)
@@ -308,7 +282,7 @@ describe('useCabinet', () => {
 
     act(() => result.current.addSlot())
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(800)
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS)
     })
 
     expect(pushSpy).toHaveBeenCalledTimes(2)
@@ -330,7 +304,7 @@ describe('useCabinet', () => {
 
     act(() => result.current.addSlot())
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(800)
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS)
     })
 
     expect(fetchSpy).not.toHaveBeenCalled()
@@ -488,15 +462,15 @@ describe('useCabinet', () => {
 
       act(() => result.current.addSlot())
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(800)
+        await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS)
       })
       act(() => result.current.toggleGatefold(releases[0]))
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(800)
+        await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS)
         release()
       })
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(800)
+        await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS)
       })
 
       expect(pushSpy).toHaveBeenCalledTimes(2)
@@ -534,7 +508,7 @@ describe('useCabinet', () => {
       result.current.removeSlot('slot-2')
     })
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(800)
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS)
     })
     expect(pushSpy).toHaveBeenCalledTimes(1)
 
@@ -543,11 +517,11 @@ describe('useCabinet', () => {
       result.current.removeSlot('slot-1')
     })
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(800)
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS)
       release()
     })
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(800)
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS)
     })
 
     // The second removal survives and reaches the server, one push at a time,

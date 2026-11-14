@@ -12,13 +12,7 @@ import {
   SyncError,
 } from './sync'
 import { etagForRevision } from '../shared/etag'
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  })
-}
+import { json } from '../test/http'
 
 const doc: CabinetDoc = {
   schemaVersion: 2,

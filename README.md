@@ -185,6 +185,7 @@ Open <http://localhost:5199>. If that port is taken, Vite picks the next free on
 | `npm run build` | Type-check, lint, then build the client (`dist/`) and server (`dist-server/`) |
 | `npm start` | Run the built server |
 | `npm test` / `npm run test:watch` | Unit tests (Vitest: jsdom for the client, node for API routes) |
+| `npm run test:coverage` | The same tests with a coverage summary, and an HTML report in `coverage/` |
 | `npm run lint` / `lint:fix` | ESLint |
 | `npm run fixtures` | Refresh the recorded Discogs payloads (needs `DISCOGS_TOKEN`) |
 | `npm run icons` | Regenerate the PNG app icons (the artwork lives in `scripts/gen-icons.mjs`) |

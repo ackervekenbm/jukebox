@@ -5,11 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import type { DiscogsCollectionRelease } from '../types/discogs'
 import type { DisplayRelease } from '../utils/collection'
-import { makeSortKey } from '../utils/sortName'
 import { planCabinet, type CabinetPlan, type PlannedSlot } from '../utils/cabinet'
 import type { Cabinet } from '../shared/cabinetDoc'
 import { CabinetScreen } from './CabinetScreen'
 import type { UseCabinetResult } from '../hooks/useCabinet'
+import { fakeRecord } from '../test/factories'
 
 const mock = vi.hoisted(() => ({ state: {} as Record<string, unknown> }))
 
@@ -24,32 +24,8 @@ vi.mock('../hooks/useDiscogsWait', () => ({
   },
 }))
 
-let nextId = 0
-
-function release(artist: string, title: string, overrides: Partial<DisplayRelease> = {}): DisplayRelease {
-  const id = ++nextId
-  return {
-    key: `${id}-${id}`,
-    instanceId: id,
-    id,
-    title,
-    titleKey: makeSortKey(title),
-    year: 2001,
-    originalYear: 2001,
-    artistName: artist,
-    genres: [],
-    styles: [],
-    labels: [],
-    country: '',
-    formatNames: ['Vinyl'],
-    formatText: 'Vinyl · 12" · LP',
-    coverImage: '',
-    thumb: '',
-    release: {} as DiscogsCollectionRelease,
-    dateAdded: '2024-01-01T00:00:00-00:00',
-    ...overrides,
-  }
-}
+const release = (artist: string, title: string, overrides: Partial<DisplayRelease> = {}) =>
+  fakeRecord({ artist, title, year: 2001 }, overrides)
 
 const releases = [release('Alpha', 'First'), release('Beta', 'Second')]
 

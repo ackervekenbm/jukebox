@@ -3,35 +3,17 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
-import type { DiscogsCollectionRelease, DiscogsFormat } from '../types/discogs'
-import type { DisplayRelease } from '../utils/collection'
-import { makeSortKey } from '../utils/sortName'
+import type { DiscogsFormat } from '../types/discogs'
 import * as api from '../api/discogs'
 import * as db from '../db/collection'
 import { useGatefoldNotes } from './useGatefoldNotes'
+import { fakeRecord } from '../test/factories'
 
-function release(id: number, formatText: string, formats: DiscogsFormat[]): DisplayRelease {
-  return {
-    key: `${id}-${id}`,
-    instanceId: id,
-    id,
-    title: `Title ${id}`,
-    titleKey: makeSortKey(`Title ${id}`),
-    year: 2000,
-    originalYear: 2000,
-    artistName: 'Artist',
-    genres: [],
-    styles: [],
-    labels: [],
-    country: '',
-    formatNames: [...new Set(formats.map((format) => format.name))],
-    formatText,
-    coverImage: '',
-    thumb: '',
-    release: { basic_information: { formats } } as unknown as DiscogsCollectionRelease,
-    dateAdded: '2024-01-01T00:00:00-00:00',
-  }
-}
+const release = (id: number, formatText: string, formats: DiscogsFormat[]) =>
+  fakeRecord(
+    { artist: 'Artist', title: `Title ${id}`, id, year: 2000, formatText, formats },
+    { formatNames: [...new Set(formats.map((format) => format.name))] },
+  )
 
 const lp = (id: number) =>
   release(id, 'Vinyl · LP · Album', [{ name: 'Vinyl', qty: '1', descriptions: ['LP', 'Album'] }])
