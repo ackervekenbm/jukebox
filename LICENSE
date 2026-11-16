@@ -1,7 +1,7 @@
                     GNU AFFERO GENERAL PUBLIC LICENSE
                        Version 3, 19 November 2007
 
- Copyright (C) 2025-2026 ackervekenbm
+ Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
  Everyone is permitted to copy and distribute verbatim copies
  of this license document, but changing it is not allowed.
 
@@ -117,8 +117,7 @@ implementation is available to the public in source code form.  A
 "Major Component", in this context, means a major essential component
 (kernel, window system, and so on) of the specific operating system
 (if any) on which the executable work runs, or a compiler used to
-produce the executable work, or an object code interpreter used to
-run it.
+produce the work, or an object code interpreter used to run it.
 
   The "Corresponding Source" for a work in object code form means all
 the source code needed to generate, install, and (for an executable
@@ -223,7 +222,7 @@ terms of section 4, provided that you also meet all of these conditions:
 
   A compilation of a covered work with other separate and independent
 works, which are not by their nature extensions of the covered work,
-and which are not combined with it such that they form a larger program,
+and which are not combined with it such as to form a larger program,
 in or on a volume of a storage or distribution medium, is called an
 "aggregate" if the compilation and its resulting copyright are not
 used to limit the access or legal rights of the compilation's users
@@ -252,8 +251,8 @@ in one of these ways:
     product that is covered by this License, on a durable physical
     medium customarily used for software interchange, for a price no
     more than your reasonable cost of physically performing this
-    conveying of source, or (2) access to copy the Corresponding
-    Source from a network server at no charge.
+    conveying of source, or (2) access to copy the
+    Corresponding Source from a network server at no charge.
 
     c) Convey individual copies of the object code with a copy of the
     written offer to provide the Corresponding Source.  This
@@ -404,7 +403,7 @@ paragraph of section 11).
   However, if you cease all violation of this License, then your
 license from a particular copyright holder is reinstated (a)
 provisionally, unless and until the copyright holder explicitly and
-finally terminates your license, or (b) permanently, if the copyright
+finally terminates your license, and (b) permanently, if the copyright
 holder fails to notify you of the violation by some reasonable means
 prior to 60 days after the cessation.
 
@@ -436,20 +435,18 @@ covered work, you indicate your acceptance of this License to do so.
 
   Each time you convey a covered work, the recipient automatically
 receives a license from the original licensors, to run, modify and
-propagate that work, under the terms of this License.  You are not
-responsible for enforcing compliance by third parties with this
-License.
+propagate that work, subject to this License.  You are not responsible
+for enforcing compliance by third parties with this License.
 
   An "entity transaction" is a transaction transferring control of an
 organization, or substantially all assets of one, or subdividing an
 organization, or merging organizations.  If propagation of a covered
 work results from an entity transaction, each party to that
-transaction who receives a copy of the covered work also receives
-whatever licenses to the covered work the party's predecessor in
-interest had or could give under the previous paragraph, plus a right
-to possession of the Corresponding Source of the covered work from the
-predecessor in interest, if the predecessor has it or can get it with
-reasonable efforts.
+transaction who receives a copy of the work also receives whatever
+licenses to the work the party's predecessor in interest had or could
+give under the previous paragraph, plus a right to possession of the
+Corresponding Source of the work from the predecessor in interest, if
+the predecessor has it or can get it with reasonable efforts.
 
   You may not impose any further restrictions on the exercise of the
 rights granted or affirmed under this License.  For example, you may
@@ -469,11 +466,11 @@ work thus licensed is called the contributor's "contributor version".
 owned or controlled by the contributor, whether already acquired or
 hereafter acquired, that would be infringed by some manner, permitted
 by this License, of making, using, or selling its contributor version,
-but do not include claims that would be infringed only as a consequence
-of further modification of the contributor version.  For purposes of
-this definition, "control" includes the right to grant patent
-sublicenses in a manner consistent with the requirements of this
-License.
+but do not include claims that would be infringed only as a
+consequence of further modification of the contributor version.  For
+purposes of this definition, "control" includes the right to grant
+patent sublicenses in a manner consistent with the requirements of
+this License.
 
   Each contributor grants you a non-exclusive, worldwide, royalty-free
 patent license under the contributor's essential patent claims, to
@@ -488,11 +485,11 @@ party means to make such an agreement or commitment not to enforce a
 patent against the party.
 
   If you convey a covered work, knowingly relying on a patent license,
-and the Corresponding Source of the covered work is not available for
-anyone to copy, free of charge and under the terms of this License,
-through a publicly available network server or other readily accessible
-means, then you must either (1) cause the Corresponding Source to be
-so available, or (2) arrange to deprive yourself of the benefit of the
+and the Corresponding Source of the work is not available for anyone
+to copy, free of charge and under the terms of this License, through a
+publicly available network server or other readily accessible means,
+then you must either (1) cause the Corresponding Source to be so
+available, or (2) arrange to deprive yourself of the benefit of the
 patent license for this particular work, or (3) arrange, in a manner
 consistent with the requirements of this License, to extend the patent
 license to downstream recipients.  "Knowingly relying" means you have
@@ -504,14 +501,29 @@ country that you have reason to believe are valid.
   If, pursuant to or in connection with a single transaction or
 arrangement, you convey, or propagate by procuring conveyance of, a
 covered work, and grant a patent license to some of the parties
-receiving the covered work, then the patent license you grant is
-automatically extended to all recipients of the covered work and
-works based on it.
+receiving the covered work authorizing them to use, propagate, modify
+or convey a specific copy of the covered work, then the patent license
+you grant is automatically extended to all recipients of the covered
+work and works based on it.
 
-  A patent license is not granted under this section for any other
-purpose, or in the presence of any other kind of infringement that
-may otherwise be relied upon to exclude you from practicing this
-License or from the rights it grants.
+  A patent license is "discriminatory" if it does not include within
+the scope of its coverage, prohibits the exercise of, or is
+conditioned on the non-exercise of one or more of the rights that are
+specifically granted under this License.  You may not convey a covered
+work if you are a party to an arrangement with a third party that is
+in the business of distributing software, under which you make payment
+to the third party based on the extent of your activity of conveying
+the work, and under which the third party grants, to any of the
+parties who would receive the covered work from you, a discriminatory
+patent license (a) in connection with copies of the covered work
+conveyed by you (or copies made from those copies), or (b) primarily
+for and in connection with specific products or compilations that
+contain the covered work, unless you entered into that arrangement,
+or that patent license was granted, prior to 28 March 2007.
+
+  Nothing in this License shall be construed as excluding or limiting
+any implied license or other defenses to infringement that may
+otherwise be available to you under applicable patent law.
 
   12. No Surrender of Others' Freedom.
 
@@ -543,8 +555,8 @@ permission to link or combine any covered work with a work licensed
 under version 3 of the GNU General Public License into a single
 combined work, and to convey the resulting work.  The terms of this
 License will continue to apply to the part which is the covered work,
-but the work with which it is combined will remain governed by version 3
-of the GNU General Public License.
+but the work with which it is combined will remain governed by version
+3 of the GNU General Public License.
 
   14. Revised Versions of this License.
 
@@ -555,17 +567,17 @@ address new problems or concerns.
 
   Each version is given a distinguishing version number.  If the
 Program specifies that a certain numbered version of the GNU Affero General
-Public License "or any later version" applies to it, you have the option of
-following the terms and conditions either of that numbered version or of
-any later version published by the Free Software Foundation.  If the
-Program does not specify a version number of the GNU Affero General Public
-License, you may choose any version ever published by the Free Software
-Foundation.
+Public License "or any later version" applies to it, you have the
+option of following the terms and conditions either of that numbered
+version or of any later version published by the Free Software
+Foundation.  If the Program does not specify a version number of the
+GNU Affero General Public License, you may choose any version ever published
+by the Free Software Foundation.
 
-  If the Program specifies that a proxy can decide which future versions
-of the GNU Affero General Public License can be used, that proxy's public
-statement of acceptance of a version permanently authorizes you to choose
-that version for the Program.
+  If the Program specifies that a proxy can decide which future
+versions of the GNU Affero General Public License can be used, that proxy's
+public statement of acceptance of a version permanently authorizes you
+to choose that version for the Program.
 
   Later license versions may give you additional or different
 permissions.  However, no additional obligations are imposed on any
@@ -602,7 +614,7 @@ above cannot be given local legal effect according to their terms,
 reviewing courts shall apply local law that most closely approximates
 an absolute waiver of all civil liability in connection with the
 Program, unless a warranty or assumption of liability accompanies a
-copy in return for a fee.
+copy of the Program in return for a fee.
 
                      END OF TERMS AND CONDITIONS
 
@@ -621,8 +633,8 @@ the "copyright" line and a pointer to where the full notice is found.
     Copyright (C) <year>  <name of author>
 
     This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License as published
-    by the Free Software Foundation, either version 3 of the License, or
+    it under the terms of the GNU Affero General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
