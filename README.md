@@ -228,6 +228,8 @@ Please run `npm run build && npm test` before you push.
 
 ## License
 
+Copyright (C) 2025-2026 ackervekenbm.
+
 Jukebox is free software under the **GNU Affero General Public License v3.0 or later** (`AGPL-3.0-or-later`); see [`LICENSE`](LICENSE).
 You may use, study, share and modify it. If you run a modified version as a network service for others, you must offer them its source code.
 
