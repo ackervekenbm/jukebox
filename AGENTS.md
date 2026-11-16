@@ -276,6 +276,10 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
 
 ## Dependencies / Dependabot
 
+- Security is separate from the weekly version updates: Dependabot
+  vulnerability alerts and security updates are on (a security update opens
+  its own PR, outside the weekly group, sub-dependencies included), and CodeQL
+  runs as GitHub's default setup (repository settings, no workflow file).
 - Dependabot majors stay **enabled** (we watch how often majors recur) — do not
   add `ignore` rules without the maintainer asking.
 - One deliberate exception (issue #88): the `typescript` **major** is ignored in
