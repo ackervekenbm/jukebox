@@ -19,20 +19,7 @@ on:
       - '.github/workflows/docker-build.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'Dockerfile'
-      - 'docker-entrypoint.sh'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.npmrc'
-      - 'vite.config.ts'
-      - 'tsconfig.json'
-      - 'eslint.config.js'
-      - '.dockerignore'
-      - 'index.html'
-      - 'src/**'
-      - 'public/**'
-      - '.github/workflows/docker-build.yml'
+    # No paths filter: smoke is a required check, so it must run on every PR.
   workflow_dispatch:
 
 # One run per ref at a time, queued rather than cancelled: two quick merges

@@ -32,7 +32,8 @@ Discogs fixtures. Use those rather than another local copy.
 
 **Verification for every change is `npm run build && npm test`.** CI runs the
 `check` job (`npm ci && npm run build && npm test`) on every PR, and a green
-`check` is required to merge. There is no other test suite.
+`check` is required to merge, as is the Docker `smoke` job. There is no other
+test suite.
 
 ## README upkeep (MANDATORY)
 
@@ -85,7 +86,7 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
 
 - `main` is protected (ruleset `main-branch-protection`): **no direct pushes**,
   linear history, and every change lands via a pull request and a **squash
-  merge** (the only merge method). Required check: `check` (CI), on a branch
+  merge** (the only merge method). Required checks: `check` (CI) and `smoke` (Docker image), on a branch
   that is up to date with `main` (the PR's **Update branch** button, or a rebase).
 - After merging, GitHub auto-deletes the head branch (`delete-branch-on-merge` is on).
 - Pattern: create branch → implement → update README/docs → `npm run build && npm test` → push → `gh pr create`
@@ -312,7 +313,7 @@ port/env/tag tables, in sync with the workflow matrix and the Dockerfile.
 
 - Every `main` push with app paths re-builds the multi-arch image and pushes
   `ghcr.io/ackervekenbm/jukebox:latest` (see `.github/workflows/docker-build.yml`).
-  PRs touching the same paths run a **smoke job** first: build the image, boot
+  Every PR runs a **smoke job** (no paths filter, so it can be required): build the image, boot
   it, poll `/api/health` and assert the PWA cache headers — the image only
   publishes when smoke passes. Publishing happens on `main` only: a manual
   (`workflow_dispatch`) run from another branch stops after smoke, so it can't
