@@ -11,7 +11,8 @@ Please report security problems privately, not in a public issue:
 
 You'll get an answer within a week. Fixes land on `main` and ship in the next
 `ghcr.io/ackervekenbm/jukebox:latest` image; there are no older release lines
-to patch.
+to patch. Known vulnerabilities in dependencies are flagged by Dependabot
+alerts and fixed through Dependabot security-update PRs; CodeQL scans the code.
 
 ## Scope and design notes
 
