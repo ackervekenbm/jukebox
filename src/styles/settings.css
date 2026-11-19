@@ -74,24 +74,34 @@
   font-size: 14px;
 }
 
-.settings-build {
-  margin: 18px 0 0;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-  text-align: center;
-  font-size: 11px;
-  color: var(--text-faint);
+.settings-about {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 12px;
   line-height: 1.5;
 }
 
-.settings-build a {
+.settings-about dt {
   color: var(--text-faint);
+}
+
+.settings-about dd {
+  margin: 0;
+  text-align: right;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+.settings-about a {
+  color: var(--text-dim);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
-.settings-build a:hover {
-  color: var(--text-dim);
+.settings-about a:hover {
+  color: var(--text);
 }
 
 .settings-form {

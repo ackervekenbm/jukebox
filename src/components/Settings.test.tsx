@@ -119,3 +119,15 @@ describe('SettingsForm', () => {
     expect(screen.getByText('advanced slot')).toBeInTheDocument()
   })
 })
+describe('About', () => {
+  const href = (name: string) => screen.getByRole('link', { name }).getAttribute('href')
+
+  it('shows the build, source, feedback, author and license', () => {
+    renderSettings()
+    expect(screen.getByText('development build')).toBeInTheDocument()
+    expect(href('ackervekenbm/jukebox')).toBe('https://github.com/ackervekenbm/jukebox')
+    expect(href('Report an issue')).toBe('https://github.com/ackervekenbm/jukebox/issues')
+    expect(href('ackervekenbm')).toBe('https://github.com/ackervekenbm')
+    expect(href('AGPL-3.0-or-later')).toBe('https://github.com/ackervekenbm/jukebox/blob/main/LICENSE')
+  })
+})

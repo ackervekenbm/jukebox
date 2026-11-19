@@ -7,6 +7,8 @@ import type { ThemeId } from '../theme'
 import { THEMES } from '../theme'
 import { VinylIcon, CloseIcon } from './icons'
 
+const OWNER = __REPO__.split('/')[0]
+
 interface SettingsProps {
   initial: SettingsType
   theme: ThemeId
@@ -189,41 +191,59 @@ export function SettingsForm({
 
           {children}
 
-          <p className="settings-build">
-            {__BUILD_SHA__ === 'dev' ? (
-              'development build'
-            ) : (
-              <>
-                <a
-                  href={`https://github.com/${__REPO__}/commit/${__BUILD_SHA__}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {__BUILD_SHA__.slice(0, 7)}
-                </a>
-                {__BUILD_TIME__ && (
+          <div className="theme-section">
+            <span className="theme-heading">About</span>
+            <dl className="settings-about">
+              <dt>Build</dt>
+              <dd>
+                {__BUILD_SHA__ === 'dev' ? (
+                  'development build'
+                ) : (
                   <>
-                    {' · '}
-                    {new Date(__BUILD_TIME__).toLocaleString([], {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                    <a href={`https://github.com/${__REPO__}/commit/${__BUILD_SHA__}`} target="_blank" rel="noopener noreferrer">
+                      {__BUILD_SHA__.slice(0, 7)}
+                    </a>
+                    {__BUILD_TIME__ &&
+                      ` · ${new Date(__BUILD_TIME__).toLocaleString([], {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}`}
                   </>
                 )}
-                {' · '}
-                <a
-                  href={`https://github.com/${__REPO__}/issues`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
+              </dd>
+              <dt>Source</dt>
+              <dd>
+                <a href={`https://github.com/${__REPO__}`} target="_blank" rel="noopener noreferrer">
+                  {__REPO__}
+                </a>
+              </dd>
+              <dt>Feedback</dt>
+              <dd>
+                <a href={`https://github.com/${__REPO__}/issues`} target="_blank" rel="noopener noreferrer">
                   Report an issue
                 </a>
-              </>
-            )}
-          </p>
+              </dd>
+              <dt>Made by</dt>
+              <dd>
+                <a href={`https://github.com/${OWNER}`} target="_blank" rel="noopener noreferrer">
+                  {OWNER}
+                </a>
+              </dd>
+              <dt>License</dt>
+              <dd>
+                {__LICENSE__ ? (
+                  <a href={`https://github.com/${__REPO__}/blob/main/LICENSE`} target="_blank" rel="noopener noreferrer">
+                    {__LICENSE__}
+                  </a>
+                ) : (
+                  'not chosen yet'
+                )}
+              </dd>
+            </dl>
+          </div>
         </div>
       </div>
     </div>

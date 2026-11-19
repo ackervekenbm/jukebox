@@ -113,6 +113,11 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   random pick) in `useReleaseDetail`; the header, toolbar, folder bar, sync
   states and settings overlay are their own components. Shared controls:
   `SegmentedControl` (view and sort switches) with `ARTIST_SORT_OPTIONS`.
+  Settings ends with an **About** section from build-time constants
+  (`vite.config.ts`, mirrored in `vitest.config.ts`, declared in
+  `src/vite-env.d.ts`): `__BUILD_SHA__`, `__BUILD_TIME__`, `__REPO__` from the
+  image build's args ("development build" without them) and `__LICENSE__`
+  from `package.json`'s `license`.
 - `src/hooks/useCollection.ts` — load orchestration: stale-while-revalidate.
   Content-first: the release grid commits to the UI immediately; master-year
   enrichment runs in the background and streams in as each year arrives.

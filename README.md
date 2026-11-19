@@ -125,6 +125,7 @@ The cabinet icon opens a planner for your physical shelves. Add shelves, set how
 - **Tracklists** load when you open a release and are cached in the browser, so they work offline after that.
 - **Collection stats:** release years, how the collection grew over time, top genres, and Discogs' low / median / high estimate of its value.
 - **Random picker.** The shuffle button picks from what's on screen and respects your search and filters. Each pick goes into a local **listen log** (the last 200), and the picker skips your most recent picks: 10 by default, adjustable from 0 to 100. Opened from the picker, the detail view lists your last few picks so you can go back to one.
+- **About:** the bottom of Settings shows which build is running (the commit, linked to GitHub, and when it was built), with links to the source, the issue tracker, the author and the license.
 
 </details>
 
