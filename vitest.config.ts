@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2025-2026 ackervekenbm
 
+import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
+
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { license?: string }
 
 export default defineConfig({
   plugins: [react()],
@@ -12,6 +15,8 @@ export default defineConfig({
     __BUILD_SHA__: JSON.stringify('dev'),
     __BUILD_TIME__: JSON.stringify(''),
     __REPO__: JSON.stringify('ackervekenbm/jukebox'),
+    // package.json's `license`, shown in Settings → About.
+    __LICENSE__: JSON.stringify(pkg.license ?? ''),
   },
   test: {
     // `npm run test:coverage` writes a text summary and an HTML report to coverage/.

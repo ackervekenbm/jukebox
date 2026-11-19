@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2025-2026 ackervekenbm
 
+import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { license?: string }
 
 export default defineConfig({
   server: {
@@ -31,6 +34,8 @@ export default defineConfig({
     __BUILD_SHA__: JSON.stringify(process.env.COMMIT_SHA ?? 'dev'),
     __BUILD_TIME__: JSON.stringify(process.env.BUILD_TIME ?? ''),
     __REPO__: JSON.stringify(process.env.GITHUB_REPOSITORY ?? 'ackervekenbm/jukebox'),
+    // package.json's `license`, shown in Settings → About.
+    __LICENSE__: JSON.stringify(pkg.license ?? ''),
   },
   plugins: [
     react(),
