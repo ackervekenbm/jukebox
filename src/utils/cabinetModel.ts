@@ -3,11 +3,11 @@
 
 /*
  * The cabinet as stored and synced: a starter cabinet, shelf ids, and turning
- * the editable state into the synced document (and a stored or older document
- * back into it). Pure apart from reading this device's layout options.
+ * the editable state into the synced document (and a stored document back
+ * into it). Pure apart from reading this device's layout options.
  */
 
-import type { Cabinet, CabinetDoc, CabinetOptions, Slot, StoredCabinetDoc } from '../shared/cabinetDoc'
+import type { Cabinet, CabinetDoc, CabinetOptions, Slot } from '../shared/cabinetDoc'
 import { DEFAULT_CABINET_OPTIONS, loadCabinetOptions } from '../db/cabinetOptions'
 
 /** Roughly what a real LP shelf holds. */
@@ -64,7 +64,7 @@ export function withUniqueSlotIds(cabinets: Cabinet[]): Cabinet[] {
 }
 
 /** The cabinets to show for a stored or synced document. */
-export function cabinetsOf(doc: StoredCabinetDoc): Cabinet[] {
+export function cabinetsOf(doc: CabinetDoc): Cabinet[] {
   // No cabinet at all means a document from before cabinets existed; a cabinet
   // without shelves is a layout the user started over, and stays empty.
   return doc.cabinets.length > 0 ? withUniqueSlotIds(doc.cabinets) : [defaultCabinet()]
@@ -93,10 +93,9 @@ export function buildCabinetDoc(
 
 /**
  * Keeps the local copy after a 409: the device that is being edited wins. A
- * copy stored before version 2 comes out as version 2, and one stored before
- * options synced takes this device's own.
+ * copy stored before options synced takes this device's own.
  */
-export function rebaseCabinetDoc(local: StoredCabinetDoc): CabinetDoc {
+export function rebaseCabinetDoc(local: CabinetDoc): CabinetDoc {
   return buildCabinetDoc(
     local.cabinets,
     local.sleeves ?? {},
@@ -106,11 +105,11 @@ export function rebaseCabinetDoc(local: StoredCabinetDoc): CabinetDoc {
 }
 
 /** The copies on display, none for a document from before they synced. */
-export function displayedOf(doc: StoredCabinetDoc): number[] {
-  return ('displayed' in doc && doc.displayed) || []
+export function displayedOf(doc: CabinetDoc): number[] {
+  return doc.displayed ?? []
 }
 
 /** The document's layout options, or `fallback` when it predates them. */
-export function optionsOf(doc: StoredCabinetDoc, fallback: CabinetOptions): CabinetOptions {
-  return ('options' in doc && doc.options) || fallback
+export function optionsOf(doc: CabinetDoc, fallback: CabinetOptions): CabinetOptions {
+  return doc.options ?? fallback
 }

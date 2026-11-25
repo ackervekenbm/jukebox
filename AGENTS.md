@@ -155,9 +155,8 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   `cabinets`, the layout `options` (in-artist order, sizes apart), the
   user's `sleeves` calls and the copies `displayed` elsewhere (instance
   ids, left out of the plan); each device plans placements
-  itself. The server still accepts version 1 (with the derived `placements`,
-  `overrides`, `unplaced`) from older cached apps, and stores and hands out
-  every document, old rows included, as version 2 (`anyCabinetDocSchema`).
+  itself. The server accepts version 2 only; a row stored as version 1 is
+  handed out as stored, and the client re-saves it as version 2 on load.
 - `src/utils/cabinet.ts` — the shelf-layout engine (`planCabinet`): shelves
   sort exactly like the main view — always by artist (filing name), and inside
   an artist by the main view's Year or A–Z order (`CabinetSortMode` is
