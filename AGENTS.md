@@ -282,6 +282,9 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
 
 ## Dependencies / Dependabot
 
+- Every `updates:` entry in `.github/dependabot.yml` assigns its PRs to
+  `ackervekenbm` (`assignees`), so each Dependabot PR notifies the maintainer.
+  Keep it on any entry you add.
 - Security is separate from the weekly version updates: Dependabot
   vulnerability alerts and security updates are on (a security update opens
   its own PR, outside the weekly group, sub-dependencies included), and CodeQL
