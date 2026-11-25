@@ -58,39 +58,8 @@ export const cabinetDocSchema = z.object({
   updatedAt: z.iso.datetime(),
 })
 
-/**
- * Version 1, still sent by app copies cached before version 2: the same plus
- * the derived `placements`, `overrides` and `unplaced`, which nothing reads.
- */
-export const legacyCabinetDocSchema = z.object({
-  schemaVersion: z.literal(1),
-  cabinets: z.array(cabinetSchema),
-  placements: z.record(z.string(), z.string()).optional(),
-  overrides: z.record(z.string(), z.string()).optional(),
-  unplaced: z.array(z.string()).optional(),
-  sleeves: sleevesSchema.optional(),
-  updatedAt: z.iso.datetime(),
-})
-
-/** Either version, read as version 2: the derived version-1 fields are dropped. */
-export const anyCabinetDocSchema = z
-  .discriminatedUnion('schemaVersion', [cabinetDocSchema, legacyCabinetDocSchema])
-  .transform(
-    (doc): CabinetDoc => ({
-      schemaVersion: 2,
-      cabinets: doc.cabinets,
-      ...(doc.sleeves === undefined ? {} : { sleeves: doc.sleeves }),
-      ...('options' in doc && doc.options ? { options: doc.options } : {}),
-      ...('displayed' in doc && doc.displayed ? { displayed: doc.displayed } : {}),
-      updatedAt: doc.updatedAt,
-    }),
-  )
-
 export type Slot = z.infer<typeof slotSchema>
 export type Cabinet = z.infer<typeof cabinetSchema>
 export type CabinetDoc = z.infer<typeof cabinetDocSchema>
 /** The layout options, synced and fed to the planner (`planCabinet`). */
 export type CabinetOptions = z.infer<typeof optionsSchema>
-export type LegacyCabinetDoc = z.infer<typeof legacyCabinetDocSchema>
-/** A document as a browser may still hold it: written before version 2, or since. */
-export type StoredCabinetDoc = CabinetDoc | LegacyCabinetDoc

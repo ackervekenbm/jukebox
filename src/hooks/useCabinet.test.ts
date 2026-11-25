@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import * as store from '../db/cabinet'
 import * as syncApi from '../api/sync'
-import type { CabinetDoc, LegacyCabinetDoc } from '../shared/cabinetDoc'
+import type { CabinetDoc } from '../shared/cabinetDoc'
 import { PUSH_DEBOUNCE_MS, SYNC_RETRY_MS, useCabinet } from './useCabinet'
 import {
   buildCabinetDoc,
@@ -34,19 +34,6 @@ function docWith(cabinetName: string): CabinetDoc {
     cabinets: [{ id: 'main', name: cabinetName, slots: [{ id: 'slot-1', label: 'A', capacity: 40 }] }],
     sleeves: {},
     options: { sort: 'chronological', separateSizeClasses: false },
-    updatedAt: '2026-01-01T00:00:00.000Z',
-  }
-}
-
-/** A document as an app from before version 2 saved it, derived fields and all. */
-function legacyDocWith(cabinetName: string, sleeves?: Record<string, boolean>): LegacyCabinetDoc {
-  return {
-    schemaVersion: 1,
-    cabinets: [{ id: 'main', name: cabinetName, slots: [{ id: 'slot-1', label: 'A', capacity: 40 }] }],
-    placements: { '1-1': 'slot-1' },
-    overrides: {},
-    unplaced: ['2-2'],
-    ...(sleeves ? { sleeves } : {}),
     updatedAt: '2026-01-01T00:00:00.000Z',
   }
 }
@@ -106,18 +93,6 @@ describe('helpers', () => {
     expect(rebased.sleeves).toEqual({ '3': false })
   })
 
-  it('turns a copy stored before version 2 into version 2', () => {
-    const rebased = rebaseCabinetDoc(legacyDocWith('Old', { '5': true }))
-    expect(rebased).toEqual({
-      schemaVersion: 2,
-      cabinets: legacyDocWith('Old').cabinets,
-      sleeves: { '5': true },
-      options: { sort: 'chronological', separateSizeClasses: false },
-      displayed: [],
-      updatedAt: expect.any(String),
-    })
-    expect(rebaseCabinetDoc(legacyDocWith('Old')).sleeves).toEqual({})
-  })
 })
 
 describe('useCabinet', () => {
@@ -436,27 +411,6 @@ describe('useCabinet', () => {
     const ids = result.current.cabinet.slots.map((slot) => slot.id)
     expect(ids).toEqual(['slot-1', 'slot-3', 'slot-4'])
     expect(new Set(ids).size).toBe(ids.length)
-  })
-
-  it('pushes a dirty copy stored before version 2 as version 2', async () => {
-    vi.spyOn(store, 'getCabinet').mockResolvedValue({
-      username: 'alice',
-      doc: legacyDocWith('Old', { '9': true }),
-      revision: 3,
-      dirty: true,
-    })
-    vi.spyOn(store, 'putCabinet').mockResolvedValue(undefined)
-    vi.spyOn(syncApi, 'fetchCabinet').mockResolvedValue({ doc: null, etag: '"r0"' })
-    const pushSpy = vi
-      .spyOn(syncApi, 'pushCabinet')
-      .mockImplementation(async (_token, doc) => ({ doc, etag: '"r4"' }))
-
-    const { result } = renderHook(() => useIt())
-    await waitFor(() => expect(result.current.status).toBe('synced'))
-    const sent = pushSpy.mock.calls[0][1]
-    expect(sent.schemaVersion).toBe(2)
-    expect(sent).not.toHaveProperty('placements')
-    expect(sent.sleeves).toEqual({ '9': true })
   })
 
   describe('gatefolds', () => {

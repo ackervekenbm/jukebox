@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { rm } from 'node:fs/promises'
 import request from 'supertest'
 import type { Express } from 'express'
-import type { CabinetDoc, LegacyCabinetDoc } from '../shared/cabinetDoc'
+import type { CabinetDoc } from '../shared/cabinetDoc'
 
 const identityCalls = vi.hoisted(() => ({ count: 0 }))
 
@@ -27,12 +27,9 @@ vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
 })
 
 const { createApp, SYNC_BODY_LIMIT_BYTES } = await import('./app')
-const { closeDb, getCabinetRow } = await import('./db')
+const { closeDb } = await import('./db')
 
 const app: Express = createApp()
-
-/** Every reply adds these, empty, for apps cached from before version 2. */
-const EMPTY_FOR_OLDER_APPS = { placements: {}, overrides: {}, unplaced: [] }
 
 let accounts = 0
 
@@ -65,16 +62,6 @@ const sampleDoc = (
   cabinets: cabinetsNamed(name),
   sleeves: {},
   updatedAt,
-})
-
-/** As an app from before version 2 saves it: derived per-record fields, no sleeves. */
-const legacyDoc = (name = 'Living room', records = 3): LegacyCabinetDoc => ({
-  schemaVersion: 1,
-  cabinets: cabinetsNamed(name),
-  placements: Object.fromEntries(Array.from({ length: records }, (_, i) => [`${i}-${i}`, 's1'])),
-  overrides: {},
-  unplaced: [],
-  updatedAt: '2026-10-15T10:00:00.000Z',
 })
 
 /** Saves `doc` over whatever the account has (If-Match: *). */
@@ -138,10 +125,10 @@ describe('PUT /api/sync/cabinet', () => {
       .send(doc)
     expect(res.status).toBe(200)
     expect(res.body.etag).toBe('"r1"')
-    expect(res.body.doc).toEqual({ ...doc, ...EMPTY_FOR_OLDER_APPS })
+    expect(res.body.doc).toEqual(doc)
 
     const get = await request(app).get('/api/sync/cabinet').set(auth)
-    expect(get.body.doc).toEqual({ ...doc, ...EMPTY_FOR_OLDER_APPS })
+    expect(get.body.doc).toEqual(doc)
     expect(get.body.etag).toBe('"r1"')
   })
 
@@ -337,7 +324,7 @@ describe('PUT /api/sync/cabinet', () => {
     await request(app).put('/api/sync/cabinet').set(auth).set('If-Match', '*').send(withCalls)
 
     // A cached copy of the app from before sleeve calls existed renames it.
-    const old = legacyDoc('Kitchen')
+    const { sleeves: _, ...old } = sampleDoc('Kitchen')
     const res = await request(app).put('/api/sync/cabinet').set(auth).set('If-Match', '*').send(old)
     expect(res.status).toBe(200)
     expect(res.body.doc.sleeves).toEqual({ '9160941': true })
@@ -408,70 +395,14 @@ describe('PUT /api/sync/cabinet', () => {
   })
 })
 
-/** The document exactly as the server stored it. */
-const storedDoc = (username: string): unknown => {
-  const row = getCabinetRow(username)
-  return row ? JSON.parse(row.doc) : null
-}
-
 describe('cabinet document versions', () => {
-  it('accepts a version-1 save from an older app and stores it as version 2', async () => {
-    const { name, auth } = newAccount()
-    const res = await save(auth, legacyDoc('Hall'))
-    expect(res.status).toBe(200)
-    expect(res.body.doc).toEqual({
-      schemaVersion: 2,
+  it('refuses a version-1 save', async () => {
+    const res = await save(newAccount().auth, {
+      schemaVersion: 1,
       cabinets: cabinetsNamed('Hall'),
-      updatedAt: '2026-10-15T10:00:00.000Z',
-      ...EMPTY_FOR_OLDER_APPS,
-    })
-
-    // What is stored is plain version 2: the derived lists are gone.
-    expect(storedDoc(name)).toEqual({
-      schemaVersion: 2,
-      cabinets: cabinetsNamed('Hall'),
+      placements: {},
       updatedAt: '2026-10-15T10:00:00.000Z',
     })
-  })
-
-  it('hands out a row stored before version 2 as version 2', async () => {
-    const { putCabinetRow } = await import('./db')
-    const { name, auth } = newAccount()
-    putCabinetRow(name, JSON.stringify(legacyDoc('Attic')), 'force')
-
-    const get = await request(app).get('/api/sync/cabinet').set(auth)
-    expect(get.body.doc).toEqual({
-      schemaVersion: 2,
-      cabinets: cabinetsNamed('Attic'),
-      updatedAt: '2026-10-15T10:00:00.000Z',
-      ...EMPTY_FOR_OLDER_APPS,
-    })
-
-    // A conflict reply hands it out as version 2 too.
-    const conflict = await request(app)
-      .put('/api/sync/cabinet')
-      .set(auth)
-      .set('If-Match', '"r0"')
-      .send(sampleDoc('Attic'))
-    expect(conflict.status).toBe(409)
-    expect(conflict.body.doc).toEqual(get.body.doc)
-  })
-
-  it('gives apps from before version 2 the lists their storage panel counts', async () => {
-    // Those apps store a reply as is and run Object.keys(doc.placements).
-    const { auth } = newAccount()
-    await save(auth, legacyDoc('Hall'))
-    const res = await request(app).get('/api/sync/cabinet').set(auth)
-    expect(res.body.doc.schemaVersion).toBe(2)
-    expect(Object.keys(res.body.doc.placements)).toEqual([])
-    expect(res.body.doc.unplaced).toEqual([])
-  })
-
-  it('still refuses a version-1 save too large for the body limit', async () => {
-    // Version 1 grew with every record and hit the 256 KB limit around 10,000
-    // records (#134). Version 2 has no per-record lists; an app still cached
-    // from before it keeps getting this refusal until it updates.
-    const res = await save(newAccount().auth, legacyDoc('Big', 20_000))
-    expect(res.status).toBe(413)
+    expect(res.status).toBe(400)
   })
 })
