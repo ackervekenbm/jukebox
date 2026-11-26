@@ -35,6 +35,14 @@ Discogs fixtures. Use those rather than another local copy.
 `check` is required to merge, as is the Docker `smoke` job. There is no other
 test suite.
 
+## Working docs stay out of the repo
+
+Plans, specs, design mockups and screenshots are working documents: write them
+locally (`docs/superpowers/` and `.superpowers/` are git-ignored) or in the
+issue/PR, never commit them. What outlives the work goes into the README, this
+file or `docs/deploy/`. The README screenshots in `docs/screenshots/` are the
+exception: they are part of the README (see below).
+
 ## README upkeep (MANDATORY)
 
 `README.md` is the project's public front page, so it has to match the app.
