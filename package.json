@@ -64,5 +64,10 @@
     "vite": "^8.3.8",
     "vite-plugin-pwa": "^2.0.0",
     "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "glob@11": {
+      "minimatch": "^11.0.1"
+    }
   }
 }
