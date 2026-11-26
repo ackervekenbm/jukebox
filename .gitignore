@@ -26,3 +26,7 @@ coverage/
 # Local env
 .env
 .env.*
+
+# Private planning docs (plans, specs, mockups) stay local
+docs/superpowers/
+.superpowers/
