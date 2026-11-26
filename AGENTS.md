@@ -52,8 +52,8 @@ change a command, script, port, environment variable or image tag; change what
 is stored where (browser, server, sync document); or change a screen shown in
 the screenshots (regenerate them, see below). Keep its style: short highlights
 up top, detail in the collapsible sections, plain user-facing wording, no
-internal jargon. If nothing in the README is affected, say so in the PR
-description. AGENTS.md (architecture) and `docs/deploy/` (deployment) follow
+internal jargon. If nothing in the README is affected, strike it through in the PR
+checklist. AGENTS.md (architecture) and `docs/deploy/` (deployment) follow
 the same rule.
 
 ## Demo and README screenshots
@@ -102,6 +102,9 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   → merge once `check` passes. Use `gh pr merge --squash` when asked to merge.
 - **Never merge your own PR.** Ready PRs are handed over to a reviewer to merge;
   if the author merges, the other party reviews the squash only after the fact.
+- Every PR body follows `.github/pull_request_template.md`, also with
+  `gh pr create --body`: tick what is done, tick and ~~strike through~~ what
+  does not apply, and drop the "After merge" section when there is nothing to do.
 - Commit messages are imperative, single-paragraph (plus context lines), and
   reference the fix: `Fixes #<n>`.
 - **Branch hygiene** — keep the workspace tidy:
