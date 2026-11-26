@@ -307,6 +307,11 @@ gh issue create --title "<what>" --body "..."   # → gives an issue number
   group uninstallable. Patch/minor updates on the current line still land. Lift
   the ignore (and plan a deliberate TS6/7 migration) once typescript-eslint
   supports it.
+- One `overrides` entry in `package.json` (issue #253): `glob@11` gets
+  `minimatch@^11.0.1` (GHSA-g3hv-75wg-m249). `workbox-build` (via
+  `vite-plugin-pwa`) pins `glob@^11`, which only accepts the vulnerable
+  `minimatch@^10`. Remove the override once `workbox-build` moves to a newer
+  `glob`.
 
 ## Deployment (internal)
 
